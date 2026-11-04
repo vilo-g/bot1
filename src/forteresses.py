@@ -762,12 +762,40 @@ class ModuleForteresses(tours.ModuleTours):
                                 % (kid, ROYAUMES[kid], c[0], c[2], c[1], c[3]))
                 continue
             rates.pop(c, None)
-            lu = self.horloge()
-            src, dmax = self.sources[kid], self._reglages(kid)["distance_max"]
-            for (x, y, niv, minu) in fs:
-                self.carte.setdefault(kid, {})[(x, y)] = niv
-                if math.hypot(x - src["x"], y - src["y"]) <= dmax:
-                    self.fort[(kid, x, y)] = {"niveau": niv, "dispo": lu + minu}
+            self._appliquer_zone(kid, c, fs)
+
+    def _appliquer_zone(self, kid, c, fs):
+        """Zone relue : minuteurs a jour ; une forteresse connue qui n'y est plus libre (prise par un joueur) est retiree."""
+        lu = self.horloge()
+        src, dmax = self.sources[kid], self._reglages(kid)["distance_max"]
+        libres = set()
+        for (x, y, niv, minu) in fs:
+            libres.add((x, y))
+            self.carte.setdefault(kid, {})[(x, y)] = niv
+            if math.hypot(x - src["x"], y - src["y"]) <= dmax:
+                self.fort[(kid, x, y)] = {"niveau": niv, "dispo": lu + minu}
+        for k in [k for k in self.fort if k[0] == kid and dans_carre(c, k[1], k[2]) and (k[1], k[2]) not in libres]:
+            del self.fort[k]                         # plus libre (proprietaire) : on ne la propose plus
+
+    async def _apres_sans_info(self, cle):
+        """Le jeu n'a pas donne les infos de la forteresse : on relit TOUT DE SUITE sa zone de la carte. Si elle n'y est plus
+        libre (prise par un joueur) ou qu'elle a un delai, on le sait sans attendre la relecture des 5 minutes."""
+        kid, x, y = cle
+        c = next((z for z in zones_cercle(self.sources[kid]["x"], self.sources[kid]["y"], self._reglages(kid)["distance_max"])
+                  if dans_carre(z, x, y)), None)
+        if c is None:
+            return None
+        fs = await self._lire_carre(kid, c, delai=6)
+        if fs is None:
+            return None
+        self._appliquer_zone(kid, c, fs)
+        f = self.fort.get(cle)
+        if f is None:
+            return "la carte relue la montre prise par un autre joueur : retiree de la liste"
+        if f["dispo"] > self.horloge() + 1:
+            self.engagees[cle] = f["dispo"]
+            return "la carte relue lui donne un delai de %s : reprise a ce moment-la" % duree(f["dispo"] - self.horloge())
+        return None
 
     # ---------------------------------------------------------------- cibles
     def _candidats(self):

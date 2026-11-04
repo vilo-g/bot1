@@ -1,12 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "date": "04/11/2026",
   "nouveautes": [
-    "Tours : vrai niveau des tours dans chaque royaume (vert, glacier, sables, feu) : plus de soldats en trop, plus de refus.",
-    "Tours : la carte des 3 royaumes est lue en même temps, la tour la plus proche part d'abord, quel que soit le royaume.",
-    "Tours : plus de fausse pause de 10 s après 10 attaques réussies.",
-    "Les armées en route sont retenues d'un lancement à l'autre : plus de refus quand on relance le bot.",
-    "Un commandant refusé 2 fois (pas encore rentré) est mis de côté 3 min au lieu d'arrêter le module.",
-    "Une fois connecté, la fenêtre Chrome reprend sa taille normale : tu peux regarder le compte."
+    "Forteresses : une forteresse prise par un autre joueur est retirée de la liste (la carte est relue tout de suite), au lieu d'être réessayée en boucle.",
+    "Forteresses et tours : une cible dont le jeu ne donne pas les infos est laissée de côté 1, 5, 15 puis 30 min (avant : chaque minute, avec une pause des tours)."
   ]
 }

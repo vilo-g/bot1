@@ -71,6 +71,7 @@ RELIRE_TOURS = 60               # secondes : une zone deja lue est relue (si un 
 ZONES_RELUES_PAR_PASSAGE = 3    # zones relues au plus par passage (les plus proches du chateau d'abord) : jamais long
 VERIFS_MAX_PAR_PASSAGE = 10     # tours verifiees (relues) au plus par passage : au-dela, pause courte et message (jamais de boucle sans fin)
 LARGEUR_CRAN = 13              # cases : la carte est lue par couronnes de cette largeur autour du chateau (= une zone gaa)
+SANS_INFO_PAUSES = (60, 300, 900, 1800)   # cible dont le jeu ne donne pas les infos : laissee de cote 1 min, 5, 15, puis 30 min
 COMMANDANT_REFUSE = 180         # secondes : commandant refuse 2 fois de suite (sans doute pas au chateau) laisse de cote
 REFUS_MAX = 5                   # refus de suite (avec au moins 3 commandants differents) avant l'arret du module
 CIBLE_REFUSEE = (1800, 10800)   # cible ignoree par le serveur : laissee de cote 30 min, puis 3 h si elle est encore refusee
@@ -1032,6 +1033,7 @@ class ModuleTours:
         self.en_route = {}         # (royaume, x, y) de la tour -> (numero de commandant, instant d'arrivee prevu)
         self.sans_stock = {}       # royaume -> instant jusqu'auquel on le laisse de cote (plus de soldat dans son chateau)
         self.refus_cibles = {}     # (royaume, x, y) -> nombre de fois ou le serveur a ignore une attaque sur cette cible
+        self.sans_info = {}        # (royaume, x, y) -> demandes d'infos (adi/abi) restees sans reponse de suite
         self.nb_attaques = 0
         self.echecs = 0
         self._dernier_msg = ("", 0)
@@ -1323,11 +1325,26 @@ class ModuleTours:
                 break
             vus |= {m[0] for m in self.jeu.recus}
         if not rep or rep[1] != 0:
-            self.engagees[cle] = self.horloge() + 60
-            self._noter("   %s : pas de reponse correcte aux infos d'attaque (%s), on la saute 1 min."
+            # le jeu ne donne pas les infos d'une cible deja attaquee / prise par un autre joueur (la carte la dit encore libre
+            # jusqu'a sa prochaine relecture) : 1 min, puis 5 min, 15 min, 30 min, pour ne pas bloquer les autres attaques
+            n = self.sans_info[cle] = self.sans_info.get(cle, 0) + 1
+            pause = SANS_INFO_PAUSES[min(n, len(SANS_INFO_PAUSES)) - 1]
+            self.engagees[cle] = self.horloge() + pause
+            verdict = await self._apres_sans_info(cle)      # forteresses : relecture immediate de sa zone de la carte
+            if verdict:
+                self.sans_info.pop(cle, None)
+                self._noter("   %s : le jeu ne donne pas ses infos (sans doute deja attaquee par un autre joueur) ; %s."
+                            % (nom, verdict))
+                self._sauver_etat()
+                return False
+            self._noter("   %s : pas de reponse correcte aux infos d'attaque (%s)%s, on la saute %s."
                         % (nom, str(rep)[:120] if rep else "aucune reponse en 2 essais ; messages recus pendant l'attente : %s"
-                           % (", ".join(sorted(vus)) or "aucun")))
+                           % (", ".join(sorted(vus)) or "aucun"),
+                           " ; %de fois de suite : sans doute deja attaquee ou prise par un autre joueur" % n if n >= 2 else "",
+                           duree(pause)))
+            self._sauver_etat()
             return False
+        self.sans_info.pop(cle, None)
         adi = T.json_ou_none(rep[2]) or {}
         try:
             cra, info = self._construire(adi, pos, tour, kid, (cx, cy))
@@ -1423,6 +1440,11 @@ class ModuleTours:
             raise ArretModule("%d refus de suite avec %d commandants differents : le module s'arrete pour ne pas insister. Regarde "
                               "les messages du serveur ci-dessus (ou captures/journal_tours.txt)." % (len(self.refus_suite), len(set(self.refus_suite))))
         return False
+
+    async def _apres_sans_info(self, cle):
+        """Cible dont le jeu n'a pas donne les infos : les modules peuvent verifier aussitot sur la carte (forteresses).
+        Renvoie un texte si la cible n'est plus a prendre (elle est alors deja mise a jour), sinon None."""
+        return None
 
     def _construire(self, adi, pos, tour, kid, chateau):
         """Paquet cra du commandant `pos` sur la cible (voir construire_attaque) ; les forteresses surchargent cette methode."""
