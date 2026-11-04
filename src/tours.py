@@ -71,6 +71,8 @@ RELIRE_TOURS = 60               # secondes : une zone deja lue est relue (si un 
 ZONES_RELUES_PAR_PASSAGE = 3    # zones relues au plus par passage (les plus proches du chateau d'abord) : jamais long
 VERIFS_MAX_PAR_PASSAGE = 10     # tours verifiees (relues) au plus par passage : au-dela, pause courte et message (jamais de boucle sans fin)
 LARGEUR_CRAN = 13              # cases : la carte est lue par couronnes de cette largeur autour du chateau (= une zone gaa)
+COMMANDANT_REFUSE = 180         # secondes : commandant refuse 2 fois de suite (sans doute pas au chateau) laisse de cote
+REFUS_MAX = 5                   # refus de suite (avec au moins 3 commandants differents) avant l'arret du module
 CIBLE_REFUSEE = (1800, 10800)   # cible ignoree par le serveur : laissee de cote 30 min, puis 3 h si elle est encore refusee
 ESSAIS_PAR_PASSAGE = 8          # cibles essayees au plus par passage (une cible refusee ne bloque pas le commandant)
 PAUSE_SANS_STOCK = 300          # secondes pendant lesquelles un royaume sans soldat 216 est laisse de cote
@@ -843,7 +845,7 @@ def construire_attaque(cfg, adi, pos, tour, kid, chateau, effets, appris, cheval
         niv_brut = tour[4]
     ai = (adi.get("gaa") or {}).get("AI")
     type_cible = ai[0] if isinstance(ai, list) and ai else tour[0]
-    victoires = niv_brut if kid == 0 and type_cible == 2 else None      # royaume vert : le champ = nombre de victoires
+    victoires = niv_brut if type_cible == 2 and kid in combat.BASE_NIVEAU_TOURS else None   # tours : le champ = nombre de victoires
     niv = combat.niveau_effectif(combat.niveau_reel(kid, type_cible, niv_brut))
     extra = combat.vagues_supplementaires(cmd, effets, zone) if effets else 0
     nb_vagues = int(cfg.get("vagues_base", NB_VAGUES_BASE)) + extra
@@ -1008,7 +1010,8 @@ class ModuleTours:
 
     def __init__(self, jeu, cfg, sources, effets=None, appris=None, sortie=print, lire=None, vivante=None,
                  simulation=False, max_attaques=None, confirmer=True, horloge=time.time, dormir=asyncio.sleep,
-                 journal=JOURNAL_DEFAUT, presets=None, fiches_outils=None, duree_max=None, libre_a=None, partage=None):
+                 journal=JOURNAL_DEFAUT, presets=None, fiches_outils=None, duree_max=None, libre_a=None, partage=None,
+                 fichier_etat=JOURNAL_DEFAUT):
         self.jeu, self.cfg, self.effets = jeu, cfg, effets
         self.duree_max, self.fin = duree_max, None          # secondes de fonctionnement demandees (None = jusqu'a Ctrl+C)
         self.presets, self.fiches_outils = presets, fiches_outils   # mode P : preselections du compte, fiches des outils
@@ -1035,6 +1038,60 @@ class ModuleTours:
         self.cache = {}            # royaume -> {zone: (instant de lecture, {(x, y): entree})} : zones deja lues (les tours ne bougent pas)
         self.cran = {}             # royaume -> nombre de couronnes deja lues
         self._crans = {}           # royaume -> [[zones de la couronne 0], [couronne 1], ...]
+        self.refus_commandant = {}  # commandant -> cibles refusees de suite pour lui (2 = il n'est sans doute pas au chateau)
+        self.refus_suite = []      # commandants des refus consecutifs (tous commandants confondus)
+        # armees encore en route au lancement precedent : gardees dans captures/etat_<module>.json (pas de journal = tests : rien)
+        if fichier_etat is JOURNAL_DEFAUT:
+            fichier_etat = os.path.join(DOSSIER_CAPTURES, "etat_%s.json" % self.NOM_MODULE.lower()) if self.journal else None
+        self.fichier_etat = fichier_etat
+        self._charger_etat()
+
+    # ---------------------------------------------------------------- armees en route : gardees d'un lancement a l'autre
+    def _charger_etat(self):
+        """Au demarrage : commandants encore partis, tours deja visees (lancement precedent arrete ou plante). Sans ce fichier,
+        le bot croirait tous les commandants au chateau et le serveur ignorerait ses attaques."""
+        if not self.fichier_etat:
+            return
+        try:
+            with open(self.fichier_etat, encoding="utf-8") as f:
+                d = json.load(f)
+            t = self.horloge()
+            if t - float(d.get("sauve", 0)) > 4 * 3600:
+                return
+            partis = 0
+            for p, v in (d.get("libre_a") or {}).items():
+                p, v = int(p), float(v)
+                if v > t and p in self.cfg.get("commandants", []):
+                    self.libre_a[p] = max(self.libre_a.get(p, 0), v)
+                    partis += 1
+            for kid, x, y, pos, arr in d.get("en_route") or []:
+                if float(arr) > t - 3600:
+                    self.en_route[(int(kid), int(x), int(y))] = (int(pos), float(arr))
+            for kid, x, y, v in d.get("engagees") or []:
+                if float(v) > t:
+                    self.engagees[(int(kid), int(x), int(y))] = float(v)
+        except (OSError, ValueError, TypeError, KeyError):
+            return
+        if partis or self.engagees:
+            self._noter("   reprise du lancement precedent : %d commandant(s) encore en route, %d cible(s) deja visees (laissees de cote)."
+                        % (partis, len(self.engagees)))
+
+    def _sauver_etat(self):
+        if not self.fichier_etat:
+            return
+        t = self.horloge()
+        d = {"sauve": t,
+             "libre_a": {str(p): v for p, v in self.libre_a.items() if v > t and p in self.cfg.get("commandants", [])},
+             "en_route": [[k[0], k[1], k[2], pos, arr] for k, (pos, arr) in self.en_route.items()],
+             "engagees": [[k[0], k[1], k[2], v] for k, v in self.engagees.items() if v > t]}
+        try:
+            os.makedirs(os.path.dirname(self.fichier_etat), exist_ok=True)
+            tmp = self.fichier_etat + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(d, f)
+            os.replace(tmp, self.fichier_etat)
+        except OSError:
+            pass
 
     @property
     def dernier_envoi(self):
@@ -1097,6 +1154,7 @@ class ModuleTours:
             return
         pos, arrivee = self.en_route.pop(cle)
         self.libre_a[pos] = arrivee + tt + 1
+        self._sauver_etat()
         self._noter("   commandant %d : arrive sur la tour %s (%d,%d), retour en %d s -> libre dans %s"
                     % (pos, ROYAUMES.get(cle[0], "?"), sa[1], sa[2], tt, duree(self.libre_a[pos] - self.horloge())))
 
@@ -1220,9 +1278,13 @@ class ModuleTours:
         tours libres que de commandants prets (`besoin`) et qu'il reste des zones a lire."""
         while True:
             cands = self._tours_libres()
-            if len(cands) >= besoin or self.partage.urgence_prioritaire(self.NOM_MODULE):
+            if self.partage.urgence_prioritaire(self.NOM_MODULE):
                 return cands                                  # (urgence d'un module prioritaire : on n'elargit pas maintenant)
-            suivants = [(self.cran.get(k, 0), k) for k in self._royaumes_actifs() if self.cran.get(k, 0) < len(self._couronnes(k))]
+            # distance de la `besoin`-ieme tour libre la plus proche : un royaume dont la carte n'est pas lue jusque-la peut
+            # cacher des tours plus proches -> on lit sa couronne suivante (tous les royaumes avancent ensemble)
+            seuil = cands[besoin - 1][0] if len(cands) >= besoin else float("inf")
+            suivants = [(self.cran.get(k, 0), k) for k in self._royaumes_actifs()
+                        if self.cran.get(k, 0) < len(self._couronnes(k)) and self.cran.get(k, 0) * LARGEUR_CRAN < seuil]
             if not suivants:
                 return cands
             await self._lire_cran(min(suivants)[1])           # le royaume dont la prochaine couronne est la plus proche
@@ -1316,8 +1378,28 @@ class ModuleTours:
             self._noter("ATTAQUE %d : commandant %d (%s) -> %s niv %s, dist %.1f, mode %s, soldat %s, cheval %s, %s, trajet %s s"
                         % (self.nb_attaques, pos, info["nom"], nom, info["niveau"], info["distance"], info["mode"], info["soldat"], info["cheval"],
                            texte_vagues(info), tt))
+            self.refus_commandant.pop(pos, None)
+            self.refus_suite = []
+            self._sauver_etat()
             return True
         self.echecs += 1
+        self.refus_suite.append(pos)
+        deja = self.refus_commandant.setdefault(pos, [])
+        deja.append(cle)
+        if len(deja) >= 2:
+            # 2 refus de suite pour le MEME commandant sur 2 cibles differentes : c'est lui qui n'est pas disponible (encore en
+            # route, parti a la main...). On le met de cote 3 min et on rend ses cibles a la liste.
+            for c in deja[:-1]:
+                self.engagees.pop(c, None)
+                if self.refus_cibles.get(c, 0) > 0:
+                    self.refus_cibles[c] -= 1
+            self.refus_commandant[pos] = []
+            self.libre_a[pos] = self.horloge() + COMMANDANT_REFUSE
+            self._noter("   REFUS : commandant %d -> %s : attaque ignoree par le serveur, 2e refus de suite pour ce commandant sur une "
+                        "autre cible : il n'est sans doute pas au chateau (encore en route ?). Commandant mis de cote %s, ses cibles "
+                        "sont remises dans la liste." % (pos, nom, duree(COMMANDANT_REFUSE)))
+            self._sauver_etat()
+            return self._arret_si_trop_de_refus()
         # le probleme vient de la CIBLE (le meme refus pour tous les commandants) : on la laisse de cote, le commandant reste libre
         n = self.refus_cibles[cle] = self.refus_cibles.get(cle, 0) + 1
         pause = CIBLE_REFUSEE[min(n, len(CIBLE_REFUSEE)) - 1]
@@ -1332,9 +1414,14 @@ class ModuleTours:
                     % (pos, nom, texte_niveau(info),
                        "code %s, reponse %s" % (rep[1], rep[2][:200]) if rep else "attaque ignoree par le serveur (pas de reponse)",
                        flancs or "aucun soldat", texte_vagues(info), duree(pause)))
-        if self.echecs >= ECHECS_MAX:
-            raise ArretModule("%d refus de suite : le module s'arrete pour ne pas insister. Regarde le message du serveur "
-                              "ci-dessus (ou captures/journal_tours.txt)." % ECHECS_MAX)
+        self._sauver_etat()
+        return self._arret_si_trop_de_refus()
+
+    def _arret_si_trop_de_refus(self):
+        """Arret du module seulement si le serveur refuse tout : REFUS_MAX refus de suite, avec au moins 3 commandants differents."""
+        if len(self.refus_suite) >= REFUS_MAX and len(set(self.refus_suite)) >= 3:
+            raise ArretModule("%d refus de suite avec %d commandants differents : le module s'arrete pour ne pas insister. Regarde "
+                              "les messages du serveur ci-dessus (ou captures/journal_tours.txt)." % (len(self.refus_suite), len(set(self.refus_suite))))
         return False
 
     def _construire(self, adi, pos, tour, kid, chateau):
@@ -1422,13 +1509,13 @@ class ModuleTours:
                                       % (len(libres), duree(attente)))
                     return attente
                 break
-            verifs += 1
-            if verifs > VERIFS_MAX_PAR_PASSAGE:
-                self._noter("   %d tours verifiees dans ce passage sans en trouver une libre : pause de 10 s (%s)."
-                            % (VERIFS_MAX_PAR_PASSAGE, "; ".join(self.texte_carte(k) for k in self._royaumes_actifs())))
+            if verifs >= VERIFS_MAX_PAR_PASSAGE:
+                self._noter("   %d tours relues dans ce passage etaient en fait occupees : pause de 10 s (%s)."
+                            % (VERIFS_MAX_PAR_PASSAGE, " ; ".join(self.texte_carte(k) for k in self._royaumes_actifs())))
                 return 10
             frais = await self._verifier_tour(cand)
             if frais is None:
+                verifs += 1                             # seules comptent les tours qui n'etaient plus libres
                 if self.zones_ratees >= ZONES_RATEES_MAX:      # le jeu ne repond plus a la carte : on ne tourne pas en rond
                     self._noter("   le jeu ne repond plus aux demandes de carte (%d de suite) : nouvel essai dans %d s."
                                 % (self.zones_ratees, PAUSE_ZONES_RATEES))
@@ -1446,7 +1533,7 @@ class ModuleTours:
                 par_royaume = ", ".join("%s %d" % (ROYAUMES[k], sum(1 for c in cands if c[1] == k)) for k in sorted({c[1] for c in cands}))
                 self._attente_msg("tours-libres-%s" % par_royaume, "%d tour(s) libre(s) (%s), %d commandant(s) pret(s)."
                                   % (len(cands), " ; ".join(self.texte_carte(k, sum(1 for c in cands if c[1] == k))
-                                                           for k in sorted({c[1] for c in cands})), len(libres)))
+                                                           for k in self._royaumes_actifs()), len(libres)))
             partis += 1
             pos = restants.pop(0)
             if not await self.attaquer(pos, frais, cand[1]):

@@ -93,6 +93,7 @@ class SessionBot:
                     raise T.ErreurCDP("Session expiree et aucun identifiant fourni.")
                 await asyncio.wait_for(self._connexion(), self.delai_total * 3)
             self.sortie("[3/4] Connecte. Detection du serveur...")
+            await self._taille_normale()
             z = await self.jeu.detecter_zone()
             self.sortie("[4/4] PRET : serveur %s, pret en %d s. Ctrl+C = arret + deconnexion du compte."
                         % (z or "EmpireEx_3 (par defaut)", time.time() - t0))
@@ -106,6 +107,15 @@ class SessionBot:
         finally:
             self._mdp = None            # le mot de passe ne reste pas en memoire une fois connecte
         return self.jeu
+
+    async def _taille_normale(self):
+        """Une fois connecte : la page reprend la taille de la fenetre Chrome (la taille imposee 1920x880 ne sert qu'a la
+        connexion, pour cliquer au bon endroit). Le jeu redevient visible normalement ; le bot, lui, ne clique plus."""
+        try:
+            await self.nav.call("Emulation.clearDeviceMetricsOverride", {}, self.page)
+            self.sortie("   fenetre du jeu remise a sa taille normale : tu peux regarder le compte dans Chrome.")
+        except Exception:
+            pass                                      # jamais bloquant
 
     async def _reprise_session(self):
         """Le jeu se reconnecte tout seul avec la session du profil Chrome : on attend de le voir connecte.

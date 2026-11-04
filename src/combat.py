@@ -253,11 +253,17 @@ def victoires_avant_niveau_suivant(victoires):
     return k
 
 
+# Niveau de depart des tours de chaque royaume : niveau = BASE + floor(1,9 x victoires^0,555) + 1. Verifie sur les 1227 entrees
+# du jeu (items.json, dungeons + lords) : vert 1-90, glacier 20-51 (19 victoires = 29, 20 = 30, 103 = 44, 104 = 45),
+# sables 35-66 (19 = 44, 20 = 45, 111 = 60, 112 = 61), feu 45-76 (46 = 60, 47 = 61, 112 = 71).
+BASE_NIVEAU_TOURS = {0: 0, 2: 19, 1: 34, 3: 44}
+
+
 def niveau_reel(kid, type_cible, valeur):
-    """Niveau a utiliser pour les plafonds : tours (type 2) du royaume vert -> converti depuis les victoires ; sinon tel quel.
-    (Royaumes 1 a 3 : le champ est deja de l'ordre du niveau ; au pire le bot met moins que le maximum, jamais plus.)"""
-    if kid == 0 and type_cible == 2:
-        return niveau_tour_vert(valeur)
+    """Niveau a utiliser pour les plafonds. Tours (type 2) : la carte donne le NOMBRE DE VICTOIRES, converti en niveau selon le
+    royaume (BASE_NIVEAU_TOURS). Autres cibles (forteresses...) : tel quel."""
+    if type_cible == 2 and kid in BASE_NIVEAU_TOURS:
+        return BASE_NIVEAU_TOURS[kid] + niveau_tour_vert(valeur)
     return valeur
 
 
