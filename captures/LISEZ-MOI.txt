@@ -1,0 +1,6 @@
+Dossier PRIVE : les journaux enregistres par observer.py arrivent ici
+(ws_log.jsonl et http_log.jsonl). Ne les partage pas sans les avoir relus :
+ouvre-les dans le Bloc-notes et cherche "PW" ; tu dois lire XXXX(longueur ...).
+
+Les fichiers s'ajoutent a la suite a chaque lancement. Pour repartir de zero,
+supprime-les avant de relancer l'observateur.

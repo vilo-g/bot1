@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GGE Bot local</title>
+<style>
+:root{
+  --bg:#0e1117; --panel:#151a23; --panel2:#1b212d; --panel3:#222a38; --line:#2a3344; --line2:#364156;
+  --text:#e7eaf0; --muted:#8a94a8; --dim:#5f6a80;
+  --accent:#e3a94e; --accent2:#c7743a; --accentbg:rgba(227,169,78,.12);
+  --ok:#58c47f; --okbg:rgba(88,196,127,.12); --err:#ec6552; --errbg:rgba(236,101,82,.12); --info:#5fa8e8; --infobg:rgba(95,168,232,.12);
+  --k0:#62b15e; --k1:#dcae55; --k2:#77bde0; --k3:#e46a3e;
+  --r:12px; --mono:"Cascadia Mono","JetBrains Mono",Consolas,ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:232px 1fr;height:100vh}
+/* ---------- barre de gauche */
+nav{background:linear-gradient(180deg,#121722,#0f131b);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.marque{padding:22px 20px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+.marque .blason{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+  background:radial-gradient(circle at 30% 25%,#f3c776,#b8652f);box-shadow:0 4px 16px rgba(227,169,78,.25)}
+.marque b{display:block;font-size:15px;letter-spacing:.3px}
+.marque small{color:var(--muted);font-size:12px}
+.menu{padding:14px 10px;display:flex;flex-direction:column;gap:4px;flex:1;overflow:auto}
+.menu .titre{color:var(--dim);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;margin:14px 12px 6px}
+.menu button{all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:#c7cedb}
+.menu button:hover{background:var(--panel2)}
+.menu button.actif{background:var(--accentbg);color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.menu button svg{width:22px;height:22px;flex:none}
+.menu .pastille{margin-left:auto;font-size:11px;padding:1px 7px;border-radius:20px;background:var(--panel3);color:var(--muted)}
+.menu .pastille.ok{background:var(--okbg);color:var(--ok)}
+.pied{padding:14px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.point{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+.point.marche{background:var(--ok);box-shadow:0 0 0 4px var(--okbg);animation:pulse 2s infinite}
+.point.attente{background:var(--accent);box-shadow:0 0 0 4px var(--accentbg)}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(88,196,127,.04)}}
+/* ---------- centre */
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+header{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:1px solid var(--line);background:rgba(21,26,35,.6)}
+header h1{font-size:19px;margin:0;font-weight:600;letter-spacing:.2px}
+header .sous{color:var(--muted);font-size:13px}
+header .espace{flex:1}
+.bandeau-maj{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;margin-bottom:18px;border-radius:var(--r);
+  background:var(--infobg);border:1px solid rgba(95,168,232,.4)}
+.bandeau-maj b{color:var(--info)}
+.bandeau-maj .espace{flex:1}
+.nouveautes{margin:0 0 14px;padding-left:20px;color:var(--text);font-size:13px}
+.nouveautes:empty{display:none}
+.annonce{display:flex;align-items:center;gap:9px;max-width:420px;padding:8px 13px;border-radius:10px;font-size:12.5px;line-height:1.35;
+  color:var(--text);background:var(--accentbg);border:1px solid rgba(227,169,78,.35)}
+.annonce svg{width:18px;height:18px;flex:none;color:var(--accent)}
+.annonce b{color:var(--accent);font-weight:600}
+@media (max-width:1000px){.annonce{display:none}}
+.contenu{flex:1;overflow:auto;padding:24px 28px 120px}
+.page{display:none;max-width:1100px}
+#page-journal{max-width:none}
+.page.visible{display:block}
+.carte{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin-bottom:18px}
+.carte h2{font-size:15px;margin:0 0 4px;font-weight:600;display:flex;align-items:center;gap:10px}
+.carte .aide{color:var(--muted);font-size:13px;margin:0 0 14px}
+.grille{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.champ{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+input[type=text],input[type=number],input[type=password],select{background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:9px 12px;color:var(--text);outline:none;width:100%}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accentbg)}
+input.faux{border-color:var(--err)}
+.bouton{border:1px solid var(--line2);background:var(--panel2);border-radius:10px;padding:9px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-weight:600}
+.bouton:hover{border-color:var(--accent)}
+.bouton.principal{background:linear-gradient(180deg,#eab25a,#cf8a3d);border-color:#e0a04c;color:#1b1206}
+.bouton.principal:hover{filter:brightness(1.07)}
+.bouton.danger{background:var(--errbg);border-color:rgba(236,101,82,.5);color:#ff8e7e}
+.bouton:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.segment{display:inline-flex;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:3px;gap:3px;flex-wrap:wrap}
+.segment button{all:unset;cursor:pointer;padding:6px 12px;border-radius:7px;color:#c2c9d6;font-size:13px;white-space:nowrap}
+.segment button:hover{background:var(--panel3)}
+.segment button.on{background:var(--accent);color:#1b1206;font-weight:600}
+.interrupteur{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;color:var(--text);font-size:13px}
+.interrupteur input{display:none}
+.interrupteur i{width:38px;height:22px;border-radius:20px;background:var(--panel3);border:1px solid var(--line2);position:relative;transition:.15s}
+.interrupteur i::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#aab3c4;transition:.15s}
+.interrupteur input:checked+i{background:var(--accent);border-color:var(--accent)}
+.interrupteur input:checked+i::after{left:18px;background:#1b1206}
+/* royaumes */
+.royaumes{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.royaume{cursor:pointer;border:1px solid var(--line2);border-radius:12px;padding:14px;background:var(--panel2);display:flex;align-items:center;gap:12px;position:relative;transition:.12s}
+.royaume:hover{border-color:var(--c)}
+.royaume.on{border-color:var(--c);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 16%,transparent),var(--panel2) 70%)}
+.royaume .drapeau{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 22%,transparent);color:var(--c)}
+.royaume b{display:block}.royaume small{color:var(--muted)}
+.royaume .coche{position:absolute;top:10px;right:10px;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line2);display:grid;place-items:center}
+.royaume.on .coche{background:var(--c);border-color:var(--c)}
+.royaume.on .coche::after{content:"";width:5px;height:9px;border:solid #111;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.bloc-royaume{border:1px solid var(--line);border-left:3px solid var(--c);border-radius:12px;background:var(--panel);margin-top:14px}
+.bloc-royaume>summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:10px;font-weight:600}
+.bloc-royaume>summary::-webkit-details-marker{display:none}
+.bloc-royaume>summary .resume{color:var(--muted);font-weight:400;font-size:13px;margin-left:auto}
+.bloc-royaume .corps{padding:4px 18px 18px;display:grid;gap:18px}
+.ligne{display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center}
+.ligne>span{color:var(--muted);font-size:13px}
+.curseur{display:flex;align-items:center;gap:12px}
+.curseur input[type=range]{flex:1;accent-color:var(--accent)}
+.curseur output{min-width:86px;text-align:right;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
+.presets{display:grid;grid-template-columns:repeat(4,90px);gap:8px}
+.msg-champ{color:#ff8e7e;font-size:13px;margin-top:6px;min-height:0}.msg-champ:empty{display:none}
+.soldats{display:flex;flex-wrap:wrap;gap:10px}
+.soldat{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line2);border-radius:12px;padding:8px 10px 8px 8px;min-width:250px}
+.soldat .rang{width:22px;height:22px;border-radius:7px;background:var(--accent);color:#1b1206;font-weight:700;font-size:12px;display:grid;place-items:center;flex:none}
+.soldat img,.soldat .sans-image{width:46px;height:52px;object-fit:contain;flex:none;border-radius:8px;background:radial-gradient(circle at 50% 35%,#2b3445,#1a202b)}
+.sans-image{display:grid;place-items:center;color:var(--dim);font-size:12px}
+.soldat .infos{display:flex;flex-direction:column;min-width:0;flex:1}.soldat .infos small{color:var(--muted);font-size:11.5px}
+.soldat .actions{display:flex;gap:4px}
+.soldat .actions button{all:unset;cursor:pointer;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;color:var(--muted);background:var(--panel3)}
+.soldat .actions button:hover{color:var(--text);background:var(--line2)}
+.ajouter-soldat{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 16px;border:1.5px dashed var(--line2);border-radius:12px;color:var(--muted);min-height:52px}
+.ajouter-soldat:hover{border-color:var(--accent);color:var(--accent)}
+.ajouter-soldat .plus{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:var(--panel3);font-size:18px}
+.fond-modal{position:fixed;inset:0;background:rgba(5,7,10,.66);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:50;padding:20px}
+.modal{background:var(--panel);border:1px solid var(--line2);border-radius:16px;max-width:860px;width:100%;max-height:86vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.tete-modal{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}.tete-modal h2{margin:0;font-size:17px}
+.tete-modal .fermer{all:unset;cursor:pointer;margin-left:auto;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:20px;color:var(--muted);background:var(--panel2)}
+.tete-modal .fermer:hover{color:var(--text)}
+.galerie{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.carte-unite{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 12px;border:1px solid var(--line2);border-radius:14px;background:var(--panel2);transition:.12s}
+.carte-unite:hover{border-color:var(--accent);transform:translateY(-2px)}
+.carte-unite .cadre{width:100%;height:130px;border-radius:10px;display:grid;place-items:center;background:radial-gradient(circle at 50% 30%,#2e3850,#161b24 75%)}
+.carte-unite img{max-width:100%;max-height:124px;object-fit:contain}
+.carte-unite small{color:var(--muted);font-size:12px}
+.carte-unite.prise{opacity:.5;cursor:default;transform:none}
+.ligne.haut{align-items:start}.ligne.haut>span{padding-top:12px}
+.en-ligne{display:inline-flex;align-items:center;gap:8px;color:var(--text);font-size:13px}
+.en-ligne input{width:84px;padding:7px 10px}
+.vagues{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;max-width:600px}
+.vague{all:unset;cursor:pointer;border:1px solid var(--line2);border-radius:11px;padding:10px 12px;background:var(--panel2);display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;transition:.12s}
+.vague:hover{border-color:var(--accent)}
+.vague .num{grid-row:span 2;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:var(--panel3);color:var(--muted);font-weight:700;font-size:13px}
+.vague b{font-size:13px;font-weight:600}.vague small{color:var(--dim);font-size:11.5px}
+.vague.pleine{border-color:color-mix(in srgb,var(--accent) 70%,transparent);background:linear-gradient(180deg,var(--accentbg),var(--panel2))}
+.vague.pleine .num{background:var(--accent);color:#1b1206}.vague.pleine small{color:var(--accent)}
+.puce{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;background:var(--panel3);color:#c7cedb}
+.puce.ok{background:var(--okbg);color:var(--ok)}.puce.err{background:var(--errbg);color:#ff8e7e}.puce.info{background:var(--infobg);color:var(--info)}.puce.or{background:var(--accentbg);color:var(--accent)}
+/* barre d'enregistrement */
+.barre{position:sticky;bottom:-120px;margin-top:8px;padding:14px 18px;border-radius:12px;background:rgba(27,33,45,.96);border:1px solid var(--line2);
+  display:flex;align-items:center;gap:14px;backdrop-filter:blur(6px);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.barre .msg{flex:1;font-size:13px;color:var(--muted)}
+.barre .msg.err{color:#ff8e7e}.barre .msg.ok{color:var(--ok)}.barre .msg.sale{color:var(--accent)}
+.erreurs{margin:10px 0 0;padding-left:18px;color:#ff8e7e;font-size:13px}
+/* tableau de bord */
+.etat{display:flex;align-items:center;gap:18px}
+.etat .grand{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;background:var(--panel3)}
+.etat .grand.marche{background:var(--okbg);color:var(--ok)}.etat .grand.attente{background:var(--accentbg);color:var(--accent)}
+.etat h3{margin:0;font-size:20px}.etat p{margin:2px 0 0;color:var(--muted)}
+.chiffres{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:18px}
+.chiffre{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+.chiffre small{color:var(--muted);display:block}.chiffre b{font-size:24px;font-variant-numeric:tabular-nums}
+.choix-module{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.choix-module label{cursor:pointer;border:1px solid var(--line2);border-radius:12px;padding:14px;background:var(--panel2);display:flex;gap:12px;align-items:flex-start}
+.choix-module label.on{border-color:var(--accent);background:linear-gradient(135deg,var(--accentbg),var(--panel2) 70%)}
+.choix-module input{margin-top:3px;accent-color:var(--accent)}
+.choix-module b{display:block}.choix-module small{color:var(--muted)}
+/* journal */
+.journal{background:#0b0e13;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--line)}
+.journal .tete{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.journal .tete b{font-size:14px}
+.journal .tete .espace{flex:1}
+.lignes{flex:1;overflow:auto;padding:10px 6px 30px;font:12.5px/1.55 var(--mono)}
+.journal .lignes{font-size:12px}
+.l{display:flex;gap:10px;padding:2px 10px;border-radius:6px;white-space:pre-wrap;word-break:break-word}
+.l:hover{background:#121722}
+.l .h{color:var(--dim);flex:none}
+.l .tag{flex:none;font-size:11px;padding:0 6px;border-radius:5px;height:18px;line-height:18px;margin-top:1px}
+.tag.TOURS{background:rgba(98,177,94,.16);color:#86d282}.tag.FORT{background:rgba(199,116,58,.2);color:#f0a06a}
+.l.attaque .t{color:#f3c776}.l.err .t{color:#ff8e7e}.l.info .t{color:#8cc4f2}.l.ok .t{color:#86d282}.l.vide{height:8px}
+.journal-page{background:#0b0e13;border:1px solid var(--line);border-radius:var(--r);height:calc(100vh - 210px);display:flex;flex-direction:column}
+.outils-journal{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.outils-journal input[type=text]{max-width:300px}
+.vide-msg{color:var(--dim);padding:30px;text-align:center;font-family:inherit}
+.bascule{all:unset;cursor:pointer;color:var(--muted);padding:6px;border-radius:8px}
+.bascule:hover{color:var(--text);background:var(--panel2)}
+@media (max-width:760px){.app{grid-template-columns:1fr}nav{display:none}.g2,.g3,.g4{grid-template-columns:1fr}.ligne{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <nav>
+    <div class="marque">
+      <div class="blason"><svg width="22" height="22" viewBox="0 0 24 24" fill="#2a1406"><path d="M4 21V9l2-2V4h2v2h2V4h4v2h2V4h2v3l2 2v12h-6v-5a2 2 0 0 0-4 0v5z"/></svg></div>
+      <div><b>GGE Bot</b><small id="pseudo">local</small></div>
+    </div>
+    <div class="menu" id="menu">
+      <div class="titre">Pilotage</div>
+      <button data-page="accueil" class="actif"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>Tableau de bord</button>
+      <button data-page="compte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Compte<span class="pastille" id="p-compte">-</span></button>
+      <div class="titre">Modules</div>
+      <button data-page="tours"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21V10L6 8V4h3v2h2V4h2v2h2V4h3v4l-2 2v11"/><path d="M5 21h14M11 21v-4a1 1 0 0 1 2 0v4"/></svg>Tours<span class="pastille" id="p-tours">-</span></button>
+      <button data-page="forteresses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V11h3V8h3v3h6V8h3v3h3v10"/><path d="M3 21h18M10 21v-4h4v4M12 3v5M12 3l4 1.5L12 6"/></svg>Forteresses<span class="pastille" id="p-forteresses">-</span></button>
+      <div class="titre">Suivi</div>
+      <button data-page="journal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>Journal</button>
+    </div>
+    <div class="pied"><span class="point" id="pied-point"></span><span id="pied-texte">Bot arrêté</span></div>
+  </nav>
+
+  <main>
+    <header>
+      <div><h1 id="titre">Tableau de bord</h1><div class="sous" id="sous-titre">Lancer le bot et suivre ce qu'il fait</div></div>
+      <div class="espace"></div>
+      <div class="annonce" role="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
+        <span><b>Ne ferme pas les fenêtres noires</b> qui s'ouvrent : elles font tourner le bot et cette interface.</span></div>
+      <span class="puce" id="puce-etat">Arrêté</span>
+    </header>
+    <div class="contenu">
+
+      <!-- ===================== TABLEAU DE BORD -->
+      <section class="page visible" id="page-accueil">
+        <div class="carte">
+          <div class="etat">
+            <div class="grand" id="etat-icone"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+            <div><h3 id="etat-titre">Bot arrêté</h3><p id="etat-detail">Choisis les modules ci-dessous puis démarre.</p></div>
+          </div>
+          <div class="chiffres" id="chiffres"></div>
+        </div>
+        <div class="carte">
+          <h2>Lancer le bot</h2>
+          <p class="aide">Une seule connexion au compte : les modules choisis tournent ensemble. Les forteresses passent toujours avant les tours.</p>
+          <div class="choix-module" id="choix-modules"></div>
+          <div class="grille g3" style="margin-top:16px">
+            <label class="champ">Durée (vide = jusqu'à l'arrêt)<input type="text" id="l-duree" placeholder="ex. 3h, 90m, 2h30"></label>
+            <label class="champ">Nombre d'attaques maximum (vide = sans limite)<input type="number" id="l-max" min="1" placeholder="sans limite"></label>
+            <div class="champ">Mode test<label class="interrupteur" style="margin-top:6px"><input type="checkbox" id="l-simu"><i></i>Simulation (rien n'est envoyé)</label></div>
+          </div>
+          <div class="champ" style="margin-top:14px">Pendant que le bot travaille
+            <label class="interrupteur" style="margin-top:6px"><input type="checkbox" id="l-ecran" checked><i></i>Garder l'écran allumé (pas de veille ni de verrouillage, sinon le jeu se déconnecte)</label></div>
+          <div style="display:flex;gap:10px;margin-top:18px;align-items:center;flex-wrap:wrap">
+            <button class="bouton principal" id="b-demarrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Démarrer</button>
+            <button class="bouton danger" id="b-arreter"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Arrêter proprement</button>
+            <span class="aide" style="margin:0" id="l-msg"></span>
+          </div>
+          <ul class="erreurs" id="l-erreurs"></ul>
+          <p class="aide" style="margin:16px 0 0">Au démarrage, une fenêtre noire s'ouvre pour le bot : mot de passe seulement si la session a expiré,
+            puis les modules attaquent tout seuls, sans rien demander. Arrêter proprement = déconnexion du compte en quelques secondes.</p>
+        </div>
+        <div class="carte" id="carte-maj">
+          <h2>Version du bot</h2>
+          <p class="aide" id="maj-texte">Vérification des mises à jour…</p>
+          <ul class="nouveautes" id="maj-notes"></ul>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="bouton principal" id="maj-installer" hidden>Mettre à jour</button>
+            <button class="bouton" id="maj-verifier">Vérifier maintenant</button>
+            <span class="aide" style="margin:0" id="maj-msg"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== COMPTE -->
+      <section class="page" id="page-compte">
+        <div class="carte">
+          <h2>Compte du jeu</h2>
+          <p class="aide">Le bot reprend d'abord la session enregistrée dans son Chrome. Le mot de passe ne sert que si cette session a expiré :
+            enregistré ici, il n'est plus demandé dans la fenêtre du bot.</p>
+          <div class="grille g2">
+            <label class="champ">Nom du compte (pseudo)<input type="text" id="c-pseudo" autocomplete="off" spellcheck="false"></label>
+            <label class="champ">Mot de passe <span id="c-mdp-aide" style="color:var(--dim)"></span>
+              <span style="display:flex;gap:8px"><input type="password" id="c-mdp" autocomplete="new-password" placeholder="laisser vide = garder celui enregistré">
+              <button class="bouton" type="button" id="c-voir" title="Afficher / cacher">voir</button></span></label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px;align-items:center;flex-wrap:wrap">
+            <button class="bouton principal" id="c-enregistrer">Enregistrer</button>
+            <button class="bouton danger" id="c-effacer">Effacer le mot de passe</button>
+            <span class="aide" style="margin:0" id="c-msg"></span>
+          </div>
+          <ul class="erreurs" id="c-erreurs"></ul>
+        </div>
+        <div class="carte">
+          <h2>Où est le mot de passe ?</h2>
+          <p class="aide" style="margin:0">Dans <b>captures/identifiants.json</b>, sur ce PC seulement, <b>chiffré par Windows</b> pour ton compte Windows
+            (même protection que les mots de passe de Chrome) : ouvert sur un autre PC, il est illisible. Il n'est jamais renvoyé à cette page
+            ni écrit dans un journal. <b>Effacer le mot de passe</b> le supprime du fichier.</p>
+        </div>
+        <div class="carte">
+          <h2>Envoyer le bot à un ami</h2>
+          <p class="aide">Crée <b>copie-pour-un-ami.zip</b> dans le dossier du bot : le programme et la documentation, <b>sans rien de personnel</b>
+            (ni ton compte, ni ton mot de passe, ni ta session Chrome, ni tes journaux, ni tes réglages). Ton ami y enregistre son propre compte.</p>
+          <button class="bouton" id="c-copie">Créer la copie pour un ami</button>
+          <span class="aide" style="margin-left:10px" id="c-copie-msg"></span>
+        </div>
+      </section>
+
+      <!-- ===================== TOURS -->
+      <section class="page" id="page-tours">
+        <div class="carte">
+          <h2>Commandants</h2>
+          <p class="aide">Numéros dans la liste des commandants du jeu (le 1er = 1), séparés par des ;</p>
+          <input type="text" id="t-cmd" placeholder="ex. 1;2;3;4;5;6;7;8 (numéros 1 à 35)" style="max-width:420px">
+          <div class="msg-champ" id="t-cmd-err"></div>
+        </div>
+        <div class="carte">
+          <h2>Royaumes</h2>
+          <p class="aide">Le bot attaque toujours la tour libre la plus proche, tous royaumes confondus.</p>
+          <div class="royaumes" id="t-royaumes"></div>
+          <div id="t-blocs"></div>
+        </div>
+        <div class="barre"><div class="msg" id="t-msg">Aucune modification.</div>
+          <button class="bouton" data-annuler="tours">Annuler</button><button class="bouton principal" data-enregistrer="tours">Enregistrer</button></div>
+        <ul class="erreurs" id="t-erreurs"></ul>
+      </section>
+
+      <!-- ===================== FORTERESSES -->
+      <section class="page" id="page-forteresses">
+        <div class="carte">
+          <h2>Commandants <span class="puce or">prioritaire</span></h2>
+          <p class="aide">Numéros dans la liste du jeu, séparés par des ; Un commandant peut aussi être dans la liste des tours.</p>
+          <input type="text" id="f-cmd" placeholder="ex. 1;2;3;9 (numéros 1 à 35)" style="max-width:420px">
+          <div class="msg-champ" id="f-cmd-err"></div>
+        </div>
+        <div class="carte">
+          <h2>Réservation des commandants communs</h2>
+          <p class="aide" id="f-communs"></p>
+          <div class="grille g3">
+            <div class="champ">Activer<label class="interrupteur" style="margin-top:6px"><input type="checkbox" id="f-res-on"><i></i>Garder avant les forteresses</label></div>
+            <label class="champ">Secondes avant qu'une forteresse soit attaquable<input type="number" id="f-res-sec" min="1" max="3600" step="1"></label>
+            <label class="champ">Commandants gardés au maximum<select id="f-res-max"></select></label>
+          </div>
+          <div class="segment" id="f-res-rapide" style="margin-top:12px"></div>
+        </div>
+        <div class="carte">
+          <h2>Royaumes</h2>
+          <p class="aide">Forteresses lues sur la carte du jeu ; la plus proche attaquable d'abord, tous royaumes confondus.</p>
+          <div class="royaumes" id="f-royaumes"></div>
+          <div id="f-blocs"></div>
+        </div>
+        <div class="barre"><div class="msg" id="f-msg">Aucune modification.</div>
+          <button class="bouton" data-annuler="forteresses">Annuler</button><button class="bouton principal" data-enregistrer="forteresses">Enregistrer</button></div>
+        <ul class="erreurs" id="f-erreurs"></ul>
+      </section>
+
+      <!-- ===================== JOURNAL -->
+      <section class="page" id="page-journal">
+        <div class="outils-journal">
+          <div class="segment" id="j-source"></div>
+          <input type="text" id="j-filtre" placeholder="Filtrer (ex. ATTAQUE, commandant 3…)">
+          <label class="interrupteur" title="Descendre tout seul jusqu'aux dernières lignes"><input type="checkbox" id="j-suivre" checked><i></i>Suivre</label>
+          <button class="bouton" type="button" id="j-rafraichir" title="Recharger le journal et l'état du bot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>Rafraîchir</button>
+          <span class="aide" style="margin:0" id="j-rafraichi"></span>
+        </div>
+        <div class="journal-page"><div class="lignes" id="j-lignes"></div></div>
+      </section>
+    </div>
+  </main>
+
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const NOMS = {0:"vert",1:"sables",2:"glacier",3:"feu"};
+const COULEURS = {0:"var(--k0)",1:"var(--k1)",2:"var(--k2)",3:"var(--k3)"};
+const COTES = [["F","Flanc gauche"],["FF","Deux flancs"],["A","Avant"],["AF","Avant + flanc"],["AFF","Avant + 2 flancs"]];
+const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
+const VERSION = "2026-11-04-maj";     // doit etre egale a VERSION dans interface.py
+let serveur = null;            // dernier /api/etat
+const etat = {tours:null, forteresses:null};      // formulaires en cours
+const sale = {tours:false, forteresses:false};
+
+async function api(chemin, corps){
+  const opt = corps === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-GGE-Bot":"1"}, body:JSON.stringify(corps)};
+  const r = await fetch(chemin, opt);
+  const d = await r.json().catch(() => ({erreurs:["Réponse illisible du serveur."]}));
+  if(!r.ok) throw d;
+  return d;
+}
+function el(tag, attrs={}, ...enfants){
+  const e = document.createElement(tag);
+  for(const [k,v] of Object.entries(attrs)){
+    if(k === "class") e.className = v; else if(k === "style") e.style.cssText = v;
+    else if(k.startsWith("on")) e.addEventListener(k.slice(2), v); else if(v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  for(const c of enfants.flat()) if(c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+function segment(options, valeur, choisir){
+  return el("div",{class:"segment"}, options.map(([v,t]) => el("button",{class: v===valeur ? "on" : "", type:"button", onclick:()=>choisir(v)}, t)));
+}
+function cmdTexte(l){ return Array.isArray(l) ? l.join(";") : (l || ""); }
+function cmdListe(t){ return String(t||"").split(";").map(x=>x.trim()).filter(x=>/^\d+$/.test(x)).map(Number); }
+
+/* ------------------------------------------------------------------ navigation */
+const TITRES = {accueil:["Tableau de bord","Lancer le bot et suivre ce qu'il fait"], compte:["Compte","Nom du compte et mot de passe, gardés sur ce PC"], tours:["Module tours","Réglages enregistrés dans config.json (rubrique tours)"],
+  forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
+function aller(page){
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("visible", p.id === "page-"+page));
+  document.querySelectorAll("#menu button").forEach(b => b.classList.toggle("actif", b.dataset.page === page));
+  $("#titre").textContent = TITRES[page][0]; $("#sous-titre").textContent = TITRES[page][1];
+  try{ localStorage.setItem("gge-page", page); }catch(e){}
+  if(page === "journal") rafraichirJournal(true);
+}
+document.querySelectorAll("#menu button").forEach(b => b.addEventListener("click", () => aller(b.dataset.page)));
+
+/* ------------------------------------------------------------------ formulaires : valeurs par defaut */
+function defautTours(){ return {mode:"auto", cotes:"F", echelles:true, cheval:"F", distance_plumes:20, rayon:50, presets:[1,1,1,1], soldats:[216]}; }
+function reglTours(r){ const b = Object.assign(defautTours(), r || {}); if(!(r && Array.isArray(r.soldats) && r.soldats.length)) b.soldats = [(r && r.soldat) || 216]; b.soldats = [...b.soldats]; return b; }
+function defautFort(){ return {mode:"auto", cotes:"F", cheval:"F", distance_plumes:100, distance_max:50, vagues_remplies:2, presets:[1,1,1,1]}; }
+function chargerFormulaires(){
+  const ct = serveur.config.tours || {}, cf = serveur.config.forteresses || {};
+  etat.tours = {commandants: cmdTexte(ct.commandants), royaumes:[...(ct.royaumes||[])], reglages:{}};
+  for(const k of [0,1,2,3]) etat.tours.reglages[k] = reglTours((ct.reglages||{})[k]);
+  etat.forteresses = {commandants: cmdTexte(cf.commandants), royaumes:[...(cf.royaumes||[])], reglages:{},
+    reserve: Object.assign({secondes:0, max:1}, cf.reserve || {})};
+  for(const k of [1,2,3]) etat.forteresses.reglages[k] = Object.assign(defautFort(), (cf.reglages||{})[k] || {});
+  sale.tours = sale.forteresses = false;
+  dessinerTours(); dessinerFort(); marquer("tours"); marquer("forteresses");
+  for(const id of ["t-cmd", "f-cmd"]) if($("#" + id).value) verifierCommandants(id);   // reglages enregistres faux : signales tout de suite
+}
+function marquer(mod, texte, classe){
+  const m = mod === "tours" ? $("#t-msg") : $("#f-msg");
+  m.className = "msg " + (classe || (sale[mod] ? "sale" : ""));
+  m.textContent = texte || (sale[mod] ? "Modifications non enregistrées." : "Aucune modification.");
+}
+function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ mod === "tours" ? dessinerTours() : dessinerFort(); } }
+
+/* ------------------------------------------------------------------ blocs communs a un royaume */
+function curseur(min, max, pas, valeur, unite, poser){
+  const out = el("output",{}, valeur + " " + unite);
+  const r = el("input",{type:"range", min, max, step:pas, value:valeur, oninput:e => { out.textContent = e.target.value + " " + unite; poser(+e.target.value, false); },
+    onchange:e => poser(+e.target.value, true)});
+  return el("div",{class:"curseur"}, r, out);
+}
+function lignesCommunes(mod, b, avecEchelles){
+  const lignes = [];
+  lignes.push(el("div",{class:"ligne"}, el("span",{},"Mode d'attaque"),
+    segment([["auto","Remplissage automatique"],["presets","Présélections du jeu"]], b.mode, v => { b.mode = v; changer(mod); })));
+  if(b.mode === "auto"){
+    lignes.push(el("div",{class:"ligne"}, el("span",{},"Côtés à remplir"), segment(COTES, b.cotes, v => { b.cotes = v; changer(mod); })));
+  } else {
+    const ps = el("div",{class:"presets"}, [0,1,2,3].map(i => el("label",{class:"champ"}, i===3 ? "Vague 4 et +" : "Vague "+(i+1),
+      el("input",{type:"number", min:1, max:30, value:(b.presets||[])[i] ?? 1, oninput:e => { b.presets[i] = e.target.value === "" ? "" : +e.target.value; changer(mod,false); }}))));
+    lignes.push(el("div",{class:"ligne"}, el("span",{},"Présélection par vague"), ps));
+  }
+  if(avecEchelles){
+    lignes.push(el("div",{class:"ligne"}, el("span",{},"Échelles en bois"),
+      el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:!!b.echelles, onchange:e => { b.echelles = e.target.checked; changer(mod,false); }}), el("i"),
+        b.mode === "auto" ? "10 échelles sur la 1re vague de chaque côté" : "10 échelles, vague 1, sur un côté où la présélection n'avait plus aucun soldat")));
+  }
+  const ch = el("div",{style:"display:flex;gap:12px;align-items:center;flex-wrap:wrap"}, segment(CHEVAL, b.cheval, v => { b.cheval = v; changer(mod); }));
+  if(b.cheval === "CF") ch.append(el("label",{class:"en-ligne"}, "plumes à partir de",
+    el("input",{type:"number", min:1, value:b.distance_plumes ?? "", oninput:e => { b.distance_plumes = e.target.value === "" ? "" : +e.target.value; changer(mod,false); }}), "cases"));
+  lignes.push(el("div",{class:"ligne"}, el("span",{},"Cheval"), ch));
+  return lignes;
+}
+function tuileRoyaume(k, on, nb, basculer){
+  return el("div",{class:"royaume" + (on ? " on" : ""), style:"--c:"+COULEURS[k], onclick:basculer},
+    el("div",{class:"drapeau"}, el("svg",{}, )), el("div",{}, el("b",{}, NOMS[k][0].toUpperCase()+NOMS[k].slice(1)), el("small",{}, "royaume " + k)), el("span",{class:"coche"}));
+}
+function drapeau(k){
+  const d = document.createElementNS("http://www.w3.org/2000/svg","svg"); d.setAttribute("viewBox","0 0 24 24"); d.setAttribute("width","18"); d.setAttribute("height","18");
+  d.innerHTML = '<path fill="currentColor" d="M5 21V3h2v1h11l-2 4 2 4H7v9z"/>'; return d;
+}
+
+/* ------------------------------------------------------------------ module tours */
+function dessinerTours(){
+  const s = etat.tours;
+  const cmd = $("#t-cmd"); if(document.activeElement !== cmd) cmd.value = s.commandants;
+  const zone = $("#t-royaumes"); zone.replaceChildren();
+  for(const k of [0,1,2,3]){
+    const on = s.royaumes.includes(k);
+    const t = tuileRoyaume(k, on, 0, () => { s.royaumes = on ? s.royaumes.filter(x=>x!==k) : [...s.royaumes, k]; changer("tours"); });
+    t.querySelector(".drapeau").replaceChildren(drapeau(k)); zone.append(t);
+  }
+  const blocs = $("#t-blocs"); const ouverts = new Set([...blocs.querySelectorAll("details[open]")].map(d=>d.dataset.k)); blocs.replaceChildren();
+  for(const k of s.royaumes){
+    const b = s.reglages[k];
+    const resume = (b.mode === "auto" ? "auto " + b.cotes + " · " + b.soldats.length + " unité(s)" : "présélections · remplacement " + uniteTours(b.soldats[0]).nom) + " · cheval " + b.cheval + " · " + b.rayon + " cases";
+    const corps = el("div",{class:"corps"}, lignesCommunes("tours", b, true),
+      el("div",{class:"ligne haut"}, el("span",{}, b.mode === "presets" ? "Unité de remplacement" : "Soldats"), choixSoldats(b)),
+      el("div",{class:"ligne"}, el("span",{},"Distance maximale"), curseur(10, 500, 10, b.rayon, "cases", (v, fin) => { b.rayon = v; changer("tours", fin); })));
+    const d = el("details",{class:"bloc-royaume", style:"--c:"+COULEURS[k], "data-k":k, open: ouverts.size ? ouverts.has(String(k)) : true},
+      el("summary",{}, drapeau(k), "Royaume " + NOMS[k], el("span",{class:"resume"}, resume)), corps);
+    blocs.append(d);
+  }
+  if(!s.royaumes.length) blocs.append(el("p",{class:"aide", style:"margin-top:14px"}, "Coche au moins un royaume."));
+  pastilles();
+}
+/* verification des commandants pendant la frappe : 1 a 35, separes par des ; sans doublon */
+function erreurCommandants(texte){
+  const t = String(texte || "").trim();
+  if(!t) return "Écris au moins un numéro de commandant.";
+  const parts = t.split(";").map(x => x.trim());
+  if(parts.some(x => x === "")) return "Sépare les numéros par des ; sans case vide (ex. 1;3;4).";
+  const vus = new Set();
+  for(const p of parts){
+    if(!/^\d+$/.test(p)) return "« " + p + " » n'est pas un numéro.";
+    const n = +p;
+    if(n < 1 || n > 35) return "« " + p + " » : les numéros vont de 1 à 35 (35 commandants au plus).";
+    if(vus.has(n)) return "Le commandant " + n + " est écrit deux fois.";
+    vus.add(n);
+  }
+  return "";
+}
+function verifierCommandants(id){
+  const err = erreurCommandants($("#" + id).value);
+  $("#" + id).classList.toggle("faux", !!err); $("#" + id + "-err").textContent = err;
+  return !err;
+}
+$("#t-cmd").addEventListener("input", e => { etat.tours.commandants = e.target.value; verifierCommandants("t-cmd"); changer("tours", false); dessinerReserveInfo(); });
+
+/* ------------------------------------------------------------------ unites des tours (images) */
+function uniteTours(id){ return (serveur.unites_tours || []).find(u => u.id === id) || {id, nom:"Unité " + id, type:"", vitesse:"?", attaque:"?", image:null}; }
+function portrait(u){ return u.image ? el("img",{src:u.image, alt:u.nom, loading:"lazy"}) : el("div",{class:"sans-image"}, String(u.id)); }
+function choixRemplacement(b){
+  const u = uniteTours(b.soldats[0]);
+  return el("div",{}, el("div",{class:"soldats"},
+      el("div",{class:"soldat"}, portrait(u), el("div",{class:"infos"}, el("b",{}, u.nom), el("small",{}, u.type + " · vitesse " + u.vitesse + " · attaque " + u.attaque))),
+      el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerie(b, true)}, el("span",{class:"plus"}, "⇄"), "Changer d'unité")),
+    el("p",{class:"aide", style:"margin:8px 0 0"}, "Remplace les soldats qui manquent dans une présélection (même en partie). S'il n'y en a plus non plus : unités à distance les plus fortes du château, puis corps à corps."));
+}
+function choixSoldats(b){
+  if(b.mode === "presets") return choixRemplacement(b);
+  const liste = b.soldats;
+  const zone = el("div",{class:"soldats"});
+  liste.forEach((id, i) => {
+    const u = uniteTours(id);
+    zone.append(el("div",{class:"soldat"}, el("span",{class:"rang", title:"ordre d'utilisation"}, String(i + 1)), portrait(u),
+      el("div",{class:"infos"}, el("b",{}, u.nom), el("small",{}, u.type + " · vitesse " + u.vitesse + " · attaque " + u.attaque)),
+      el("div",{class:"actions"},
+        i > 0 ? el("button",{type:"button", title:"Utiliser avant la précédente", onclick:() => { [liste[i-1], liste[i]] = [liste[i], liste[i-1]]; changer("tours"); }}, "↑") : null,
+        liste.length > 1 ? el("button",{type:"button", title:"Retirer", onclick:() => { liste.splice(i, 1); changer("tours"); }}, "×") : null)));
+  });
+  if(liste.length < (serveur.nb_soldats_max || 4))
+    zone.append(el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerie(b)}, el("span",{class:"plus"}, "+"), "Ajouter une unité"));
+  return el("div",{}, zone, el("p",{class:"aide", style:"margin:8px 0 0"},
+    liste.length > 1 ? "La 1re unité part d'abord ; s'il en manque, la suivante complète (2 unités au plus par flanc)." : "Ajoute d'autres unités pour compléter quand celle-ci manque."));
+}
+function ouvrirGalerie(b, remplacer){
+  const fermer = () => { fond.remove(); document.removeEventListener("keydown", echap); };
+  const echap = e => { if(e.key === "Escape") fermer(); };
+  const fond = el("div",{class:"fond-modal", onclick:e => { if(e.target === fond) fermer(); }});
+  const grille = el("div",{class:"galerie"});
+  for(const u of serveur.unites_tours || []){
+    const pris = remplacer ? b.soldats[0] === u.id : b.soldats.includes(u.id);
+    grille.append(el("button",{type:"button", class:"carte-unite" + (pris ? " prise" : ""), disabled:pris,
+      onclick:() => { if(remplacer) b.soldats.splice(0, b.soldats.length, u.id); else b.soldats.push(u.id); fermer(); changer("tours"); }},
+      el("div",{class:"cadre"}, portrait(u)), el("b",{}, u.nom), el("small",{}, u.type + " · vitesse " + u.vitesse + " · attaque " + u.attaque),
+      pris ? el("span",{class:"puce ok"}, "déjà choisie") : el("span",{class:"puce"}, "n° " + u.id)));
+  }
+  fond.append(el("div",{class:"modal"}, el("div",{class:"tete-modal"}, el("div",{}, el("h2",{}, "Choisir une unité"),
+      el("p",{class:"aide", style:"margin:2px 0 0"}, remplacer ? "Unité de remplacement des présélections." : "Elle s'ajoute à la fin de la liste. Seules les unités présentes dans le château partent.")),
+    el("button",{type:"button", class:"fermer", title:"Fermer", onclick:fermer}, "×")), grille));
+  document.body.append(fond); document.addEventListener("keydown", echap);
+}
+
+function choixVagues(valeur, choisir){
+  const n = Math.min(4, Math.max(1, +valeur || 4));
+  const zone = el("div",{class:"vagues"});
+  for(let i = 1; i <= 4; i++){
+    const pleine = i <= n;
+    zone.append(el("button",{type:"button", class:"vague" + (pleine ? " pleine" : ""), onclick:() => choisir(i),
+      title: i === 4 ? "Remplir toutes les vagues" : "Remplir les vagues 1 à " + i},
+      el("span",{class:"num"}, String(i)), el("b",{}, i === 4 ? "Vague 4 et +" : "Vague " + i),
+      el("small",{}, pleine ? "pleine" : "vide")));
+  }
+  const texte = n >= 4 ? "Toutes les vagues sont remplies, y compris celles en plus du commandant."
+    : (n === 1 ? "Seule la vague 1 est remplie" : "Les vagues 1 à " + n + " sont remplies") + " ; les suivantes partent vides.";
+  return el("div",{}, zone, el("p",{class:"aide", style:"margin:8px 0 0"}, texte + " Soldat le plus rapide d'abord, complété par le suivant s'il manque."));
+}
+
+/* ------------------------------------------------------------------ module forteresses */
+function dessinerReserveInfo(){
+  const f = etat.forteresses; if(!f) return;
+  const communs = cmdListe(f.commandants).filter(c => cmdListe(etat.tours ? etat.tours.commandants : "").includes(c));
+  $("#f-communs").textContent = communs.length
+    ? "Commandant(s) aussi dans la liste des tours : " + communs.join(";") + ". Quand une forteresse devient attaquable dans moins de N secondes, le module tours ne les prend plus (un par forteresse, au plus le maximum)."
+    : "Aucun commandant commun avec le module tours : la réservation ne sert à rien pour l'instant.";
+  const sel = $("#f-res-max"); const n = Math.max(1, communs.length);
+  sel.replaceChildren(...Array.from({length:n}, (_, i) => el("option",{value:i+1, selected: f.reserve.max === i+1}, String(i+1))));
+  if(f.reserve.max > n){ f.reserve.max = n; }
+  const on = f.reserve.secondes > 0;
+  $("#f-res-on").checked = on; $("#f-res-sec").disabled = !on; sel.disabled = !on || communs.length < 2;
+  if(document.activeElement !== $("#f-res-sec")) $("#f-res-sec").value = on ? f.reserve.secondes : "";
+  $("#f-res-rapide").replaceChildren(...[[300,"5 min"],[600,"10 min"],[900,"15 min"],[1800,"30 min"]].map(([v,t]) =>
+    el("button",{type:"button", class: on && f.reserve.secondes === v ? "on" : "", onclick:() => { f.reserve.secondes = v; changer("forteresses"); }}, t)));
+}
+$("#f-res-on").addEventListener("change", e => { const r = etat.forteresses.reserve; r.secondes = e.target.checked ? (r.secondes || r._ancien || 900) : 0; if(!e.target.checked) r._ancien = +$("#f-res-sec").value || 900; changer("forteresses"); });
+$("#f-res-sec").addEventListener("input", e => { etat.forteresses.reserve.secondes = e.target.value === "" ? "" : +e.target.value; changer("forteresses", false); });
+$("#f-res-max").addEventListener("change", e => { etat.forteresses.reserve.max = +e.target.value; changer("forteresses", false); });
+function dessinerFort(){
+  const s = etat.forteresses;
+  const cmd = $("#f-cmd"); if(document.activeElement !== cmd) cmd.value = s.commandants;
+  dessinerReserveInfo();
+  const zone = $("#f-royaumes"); zone.replaceChildren();
+  for(const k of [1,2,3]){
+    const on = s.royaumes.includes(k);
+    const t = tuileRoyaume(k, on, 0, () => { s.royaumes = on ? s.royaumes.filter(x=>x!==k) : [...s.royaumes, k]; changer("forteresses"); });
+    t.querySelector(".drapeau").replaceChildren(drapeau(k)); zone.append(t);
+  }
+  const blocs = $("#f-blocs"); const ouverts = new Set([...blocs.querySelectorAll("details[open]")].map(d=>d.dataset.k)); blocs.replaceChildren();
+  for(const k of s.royaumes){
+    const b = s.reglages[k];
+    const resume = (b.mode === "auto" ? "auto " + b.cotes : "présélections") + " · " + (b.vagues_remplies >= 4 ? "toutes les vagues" : b.vagues_remplies + " vague(s)") + " · " + b.distance_max + " cases";
+    const corps = el("div",{class:"corps"}, lignesCommunes("forteresses", b, false),
+      el("div",{class:"ligne haut"}, el("span",{},"Vagues a remplir"), choixVagues(b.vagues_remplies, v => { b.vagues_remplies = v; changer("forteresses"); })),
+      el("div",{class:"ligne"}, el("span",{},"Distance maximale"), curseur(10, 500, 5, b.distance_max, "cases", (v, fin) => { b.distance_max = v; changer("forteresses", fin); })));
+    blocs.append(el("details",{class:"bloc-royaume", style:"--c:"+COULEURS[k], "data-k":k, open: ouverts.size ? ouverts.has(String(k)) : true},
+      el("summary",{}, drapeau(k), "Royaume " + NOMS[k], el("span",{class:"resume"}, resume)), corps));
+  }
+  if(!s.royaumes.length) blocs.append(el("p",{class:"aide", style:"margin-top:14px"}, "Coche au moins un royaume."));
+  pastilles();
+}
+$("#f-cmd").addEventListener("input", e => { etat.forteresses.commandants = e.target.value; verifierCommandants("f-cmd"); changer("forteresses", false); dessinerReserveInfo(); });
+
+/* ------------------------------------------------------------------ enregistrer / annuler */
+function versServeur(mod){
+  const s = etat[mod]; const regl = {};
+  for(const k of s.royaumes){ const b = Object.assign({}, s.reglages[k]); if(b.mode === "auto") delete b.presets; else delete b.cotes;
+    if(mod === "tours" && b.mode === "presets" && Array.isArray(b.soldats)) b.soldats = b.soldats.slice(0, 1); if(b.cheval !== "CF") delete b.distance_plumes; regl[k] = b; }
+  const d = {commandants: s.commandants, royaumes: s.royaumes, reglages: regl};
+  if(mod === "forteresses") d.reserve = {secondes: +s.reserve.secondes || 0, max: +s.reserve.max || 1};
+  return d;
+}
+document.querySelectorAll("[data-enregistrer]").forEach(b => b.addEventListener("click", async () => {
+  const mod = b.dataset.enregistrer, liste = mod === "tours" ? $("#t-erreurs") : $("#f-erreurs");
+  liste.replaceChildren();
+  if(!verifierCommandants(mod === "tours" ? "t-cmd" : "f-cmd")){
+    marquer(mod, "Pas enregistré : corrige les commandants.", "err");
+    liste.append(el("li",{}, "Commandants : " + erreurCommandants(etat[mod].commandants)));
+    return;
+  }
+  try{
+    await api("/api/config/" + mod, versServeur(mod));
+    sale[mod] = false; marquer(mod, "Enregistré dans config.json.", "ok");
+    serveur = await api("/api/etat"); pastilles(); dessinerModules();
+  }catch(e){
+    marquer(mod, "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(e.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
+  }
+}));
+document.querySelectorAll("[data-annuler]").forEach(b => b.addEventListener("click", () => {
+  const mod = b.dataset.annuler, c = serveur.config[mod] || {}; const s = etat[mod];
+  s.commandants = cmdTexte(c.commandants); s.royaumes = [...(c.royaumes||[])];
+  for(const k of Object.keys(s.reglages)) s.reglages[k] = mod === "tours" ? reglTours((c.reglages||{})[k]) : Object.assign(defautFort(), (c.reglages||{})[k] || {});
+  if(mod === "forteresses") s.reserve = Object.assign({secondes:0, max:1}, c.reserve || {});
+  sale[mod] = false; mod === "tours" ? dessinerTours() : dessinerFort(); marquer(mod); (mod === "tours" ? $("#t-erreurs") : $("#f-erreurs")).replaceChildren();
+}));
+window.addEventListener("beforeunload", e => { if(sale.tours || sale.forteresses){ e.preventDefault(); e.returnValue = ""; } });
+
+/* ------------------------------------------------------------------ tableau de bord */
+function configOk(nom){ const c = serveur && serveur.config[nom]; return !!(c && c.commandants && c.commandants.length && c.royaumes && c.royaumes.length); }
+function pastilles(){
+  for(const nom of ["tours","forteresses"]){
+    const p = $("#p-"+nom); if(!p || !serveur) continue;
+    const ok = configOk(nom); p.textContent = sale[nom] ? "modifié" : ok ? "prêt" : "à régler"; p.className = "pastille" + (ok && !sale[nom] ? " ok" : "");
+  }
+}
+const choixModules = new Set();
+function dessinerModules(){
+  const zone = $("#choix-modules"); zone.replaceChildren();
+  const desc = {tours:"Tours les plus proches, couronne par couronne.", forteresses:"Forteresses lues sur la carte, minuteur personnel."};
+  for(const m of serveur.modules){
+    const ok = configOk(m.nom), on = choixModules.has(m.nom);
+    const cb = el("input",{type:"checkbox", checked:on, onchange:e => { e.target.checked ? choixModules.add(m.nom) : choixModules.delete(m.nom); dessinerModules(); }});
+    zone.append(el("label",{class: on ? "on" : ""}, cb, el("div",{}, el("b",{}, m.nom[0].toUpperCase() + m.nom.slice(1) + "  "),
+      m.priorite === Math.min(...serveur.modules.map(x=>x.priorite)) ? el("span",{class:"puce or"},"prioritaire") : null, " ",
+      el("span",{class:"puce " + (ok ? "ok" : "err")}, ok ? "réglages OK" : "à régler"), el("small",{style:"display:block;margin-top:4px"}, desc[m.nom] || ""))));
+  }
+}
+function depuis(t){ const s = Math.max(0, Date.now()/1000 - t); return s < 90 ? Math.round(s)+" s" : s < 5400 ? Math.round(s/60)+" min" : (s/3600).toFixed(1)+" h"; }
+function dessinerEtat(){
+  const b = serveur.bot || {etat:"arrete"};
+  const marche = b.etat === "en_marche", attente = b.etat === "connexion" || b.etat === "demarrage";
+  const libelle = marche ? "Le bot travaille" : attente ? (b.etat === "connexion" ? "Connexion au compte…" : "Démarrage…") : "Bot arrêté";
+  $("#etat-titre").textContent = b.arret_demande && (marche || attente) ? "Arrêt en cours…" : libelle;
+  $("#etat-detail").textContent = marche ? "Depuis " + depuis(b.debut) + " · modules : " + (b.modules||[]).join(", ")
+    : attente ? "Connexion en cours (mot de passe dans la fenêtre du bot seulement si la session a expiré)."
+    : (b.remarque ? "(" + b.remarque + ") " : "") + "Choisis les modules ci-dessous puis démarre.";
+  $("#etat-icone").className = "grand" + (marche ? " marche" : attente ? " attente" : "");
+  $("#pied-point").className = "point" + (marche ? " marche" : attente ? " attente" : "");
+  $("#pied-texte").textContent = libelle;
+  const pe = $("#puce-etat"); pe.textContent = marche ? "Travaille" : attente ? "Connexion" : "Arrêté"; pe.className = "puce" + (marche ? " ok" : attente ? " or" : "");
+  const ch = $("#chiffres"); ch.replaceChildren();
+  if(marche){
+    for(const [nom, n] of Object.entries(b.attaques || {}))
+      ch.append(el("div",{class:"chiffre"}, el("small",{}, "Attaques " + nom), el("b",{}, String(n)),
+        (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
+  }
+  $("#b-demarrer").disabled = marche || attente; $("#b-arreter").disabled = !(marche || attente) || b.arret_demande;
+}
+$("#b-demarrer").addEventListener("click", async () => {
+  $("#l-erreurs").replaceChildren(); $("#l-msg").textContent = "";
+  if(sale.tours || sale.forteresses){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
+  const corps = {modules:[...choixModules], duree:$("#l-duree").value.trim(), max_attaques: $("#l-max").value ? +$("#l-max").value : null, simulation:$("#l-simu").checked, ecran_allume:$("#l-ecran").checked};
+  try{ await api("/api/demarrer", corps); $("#l-msg").textContent = "Démarré : regarde la fenêtre du bot."; }
+  catch(e){ $("#l-erreurs").replaceChildren(...(e.erreurs||["Erreur"]).map(x => el("li",{},x))); }
+  majEtat();
+});
+$("#b-arreter").addEventListener("click", async () => {
+  try{ await api("/api/arreter", {}); $("#l-msg").textContent = "Arrêt demandé : déconnexion propre dans quelques secondes."; }
+  catch(e){ $("#l-msg").textContent = (e.erreurs||["Erreur"]).join(" "); }
+  majEtat();
+});
+
+/* ------------------------------------------------------------------ compte */
+function dessinerCompte(){
+  const c = serveur.compte || {};
+  if(document.activeElement !== $("#c-pseudo")) $("#c-pseudo").value = c.pseudo || serveur.pseudo || "";
+  const p = $("#p-compte");
+  if(c.mdp_enregistre && c.mdp_lisible){ p.textContent = "enregistré"; p.className = "pastille ok"; $("#c-mdp-aide").textContent = "· enregistré et chiffré"; }
+  else if(c.mdp_enregistre){ p.textContent = "illisible"; p.className = "pastille"; $("#c-mdp-aide").textContent = "· illisible sur ce PC : enregistre-le de nouveau"; }
+  else { p.textContent = "à la demande"; p.className = "pastille"; $("#c-mdp-aide").textContent = "· aucun enregistré (demandé dans la fenêtre du bot)"; }
+  $("#c-effacer").disabled = !c.mdp_enregistre;
+  if(!c.windows) $("#c-mdp-aide").textContent += " · (chiffrement Windows indisponible ici)";
+}
+$("#c-voir").addEventListener("click", () => { const i = $("#c-mdp"); i.type = i.type === "password" ? "text" : "password"; });
+$("#c-enregistrer").addEventListener("click", async () => {
+  $("#c-erreurs").replaceChildren(); $("#c-msg").textContent = "";
+  try{
+    const d = await api("/api/compte", {pseudo: $("#c-pseudo").value, mdp: $("#c-mdp").value || null});
+    serveur.compte = d.compte; serveur.pseudo = d.compte.pseudo; $("#c-mdp").value = ""; $("#c-mdp").type = "password";
+    $("#pseudo").textContent = d.compte.pseudo; dessinerCompte(); $("#c-msg").textContent = "Enregistré.";
+  }catch(e){ $("#c-erreurs").replaceChildren(...(e.erreurs||["Erreur"]).map(x => el("li",{},x))); }
+});
+$("#c-effacer").addEventListener("click", async () => {
+  try{ const d = await api("/api/compte/effacer", {}); serveur.compte = d.compte; dessinerCompte(); $("#c-msg").textContent = "Mot de passe effacé : il sera demandé dans la fenêtre du bot si besoin."; }
+  catch(e){ $("#c-msg").textContent = (e.erreurs||["Erreur"]).join(" "); }
+});
+$("#c-copie").addEventListener("click", async () => {
+  $("#c-copie-msg").textContent = "Création…";
+  try{ const d = await api("/api/copie-ami", {}); $("#c-copie-msg").textContent = "Créé : " + d.chemin + " (" + d.fichiers + " fichiers, " + d.taille_mo + " Mo)."; }
+  catch(e){ $("#c-copie-msg").textContent = (e.erreurs||["Erreur"]).join(" "); }
+});
+
+/* ------------------------------------------------------------------ journal */
+const journaux = {bot:{pos:-1, lignes:[]}, tours:{pos:-1, lignes:[]}, forteresses:{pos:-1, lignes:[]}};
+let source = "bot";
+function classeLigne(t){
+  if(/ATTAQUE \d+|HIT|-> forteresse|-> tour/.test(t) && /ATTAQUE/.test(t)) return "attaque";
+  if(/REFUS|ERREUR|ATTENTION|ARRET DE CE MODULE|SESSION COUPEE|pas de reponse correcte|introuvable/i.test(t)) return "err";
+  if(/reservation|pause : un module prioritaire|Duree demandee|Arret demande/i.test(t)) return "info";
+  if(/PRET :|session reprise|MODULES EN MARCHE|Configuration enregistree/i.test(t)) return "ok";
+  return "";
+}
+function ligneHtml(brut){
+  const m = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d)  ?(.*)$/.exec(brut);
+  const heure = m ? m[2] : "", texte = (m ? m[3] : brut).replace(/^\s+/, "");
+  if(!texte.trim()) return el("div",{class:"l vide"});
+  const t = /^\[(TOURS|FORT)\] (.*)$/.exec(texte);
+  return el("div",{class:"l " + classeLigne(texte)}, el("span",{class:"h"}, heure), t ? el("span",{class:"tag " + t[1]}, t[1] === "FORT" ? "FORT" : "TOURS") : null,
+    el("span",{class:"t"}, (t ? t[2] : texte).replace(/^\s+/, "")));
+}
+async function lire(src){
+  const j = journaux[src];
+  const d = await api("/api/journal?source=" + src + "&pos=" + j.pos);
+  if(j.pos === -1 || d.pos < j.pos) j.lignes = [];
+  j.pos = d.pos; j.lignes.push(...d.lignes); if(j.lignes.length > 3000) j.lignes.splice(0, j.lignes.length - 3000);
+  if(d.bot && serveur){ serveur.bot = d.bot; dessinerEtat(); }
+  return d.lignes.length;
+}
+function remplir(conteneur, lignes, filtre, suivre){
+  const bas = conteneur.scrollHeight - conteneur.scrollTop - conteneur.clientHeight < 40;
+  const f = (filtre || "").toLowerCase();
+  const vues = f ? lignes.filter(l => l.toLowerCase().includes(f)) : lignes;
+  conteneur.replaceChildren(...(vues.length ? vues.slice(-1500).map(ligneHtml) : [el("div",{class:"vide-msg"}, f ? "Aucune ligne ne correspond." : "Rien pour l'instant. Le journal se remplit quand le bot tourne.")]));
+  if(suivre && (bas || conteneur.dataset.premier !== "1")){ conteneur.scrollTop = conteneur.scrollHeight; conteneur.dataset.premier = "1"; }
+}
+async function rafraichirJournal(force){
+  if(!$("#page-journal").classList.contains("visible")) return;
+  try{ const n = await lire(source); if(n || force) remplir($("#j-lignes"), journaux[source].lignes, $("#j-filtre").value, $("#j-suivre").checked); }catch(e){}
+}
+$("#j-source").replaceChildren(...[["bot","Console du bot"],["tours","Journal tours"],["forteresses","Journal forteresses"]].map(([v,t]) =>
+  el("button",{type:"button", class: v === source ? "on" : "", "data-v":v, onclick:() => { source = v; $("#j-lignes").dataset.premier = ""; document.querySelectorAll("#j-source button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); rafraichirJournal(true); }}, t)));
+$("#j-filtre").addEventListener("input", () => rafraichirJournal(true));
+
+/* ------------------------------------------------------------------ boucle */
+$("#j-rafraichir").addEventListener("click", async () => {
+  const b = $("#j-rafraichir"); b.disabled = true; $("#j-rafraichi").textContent = "Rechargement…";
+  for(const k of Object.keys(journaux)) journaux[k] = {pos:-1, lignes:[]};     // tout est relu depuis les fichiers
+  $("#j-lignes").dataset.premier = "";
+  try{
+    const d = await api("/api/etat"); if(serveur){ serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; dessinerEtat(); }
+    await rafraichirJournal(true);
+    $("#j-rafraichi").textContent = "Rechargé à " + new Date().toLocaleTimeString("fr-FR");
+  }catch(e){ $("#j-rafraichi").textContent = "L'interface ne répond pas : relance outils\\lancer_interface.bat."; }
+  b.disabled = false;
+});
+
+// ---------- mises a jour (GitHub)
+let infoMaj = null;
+function dessinerMaj(){
+  const d = infoMaj; if(!d) return;
+  const loc = d.locale ? "version " + d.locale.version : "version inconnue";
+  const notes = $("#maj-notes"); notes.innerHTML = "";
+  let texte;
+  if(d.erreur) texte = "Installée : " + loc + ". " + d.erreur.replace("Impossible de joindre GitHub", "Impossible de vérifier les mises à jour") + " (vérifié à " + d.verifie_a + ")";
+  else if(d.a_faire){
+    texte = "Installée : " + loc + ". Nouvelle version " + d.distante.version + (d.distante.date ? " du " + d.distante.date : "") + " disponible.";
+    (d.distante.nouveautes || []).forEach(n => notes.append(el("li", {}, n)));
+  } else texte = "Installée : " + loc + " : c'est la dernière (vérifié à " + d.verifie_a + ").";
+  $("#maj-texte").textContent = texte;
+  $("#maj-installer").hidden = !d.a_faire;
+  const ancien = $("#bandeau-maj"); if(ancien) ancien.remove();
+  if(d.a_faire){
+    document.querySelector(".contenu").prepend(el("div", {class:"bandeau-maj", id:"bandeau-maj"},
+      el("span", {}, el("b", {}, "Mise à jour disponible : "), "version " + d.distante.version + " (tu as la " + (d.locale ? d.locale.version : "?") + ")."),
+      el("div", {class:"espace"}),
+      el("button", {class:"bouton principal", onclick: installerMaj}, "Mettre à jour"),
+      el("button", {class:"bouton", onclick: () => { aller("accueil"); $("#carte-maj").scrollIntoView({behavior:"smooth"}); }}, "Voir les nouveautés")));
+  }
+}
+async function verifierMaj(forcer){
+  $("#maj-msg").textContent = forcer ? "Vérification…" : "";
+  try{ infoMaj = await api("/api/maj" + (forcer ? "?forcer=1" : "")); dessinerMaj(); $("#maj-msg").textContent = ""; }
+  catch(e){ $("#maj-msg").textContent = "Vérification impossible : relance l'interface."; }
+}
+async function installerMaj(){
+  if(serveur.bot && !["arrete", undefined].includes(serveur.bot.etat)){
+    aller("accueil"); $("#maj-msg").textContent = "Arrête d'abord le bot (bouton Arrêter proprement), puis clique sur Mettre à jour."; return;
+  }
+  document.querySelectorAll("#maj-installer, .bandeau-maj .bouton").forEach(b => b.disabled = true);
+  $("#maj-msg").textContent = "Téléchargement et installation… (ne ferme rien)";
+  try{
+    const r = await api("/api/maj/installer", {});
+    const fin = r.deja ? "Déjà à jour (version " + r.version + ")." :
+      "Version " + r.version + " installée (ancienne version gardée dans captures\\sauvegardes). " +
+      "Ferme la fenêtre noire de l'interface, puis relance outils\\lancer_interface.bat.";
+    $("#maj-msg").textContent = fin;
+    const b = $("#bandeau-maj"); if(b){ b.innerHTML = ""; b.append(el("span", {}, el("b", {}, "Mise à jour installée. "), r.deja ? fin :
+      "Ferme la fenêtre noire de l'interface, puis relance outils\\lancer_interface.bat.")); }
+    $("#maj-installer").hidden = true;
+  }catch(e){
+    $("#maj-msg").textContent = (e.erreurs || ["Mise à jour impossible."]).join(" ");
+    document.querySelectorAll("#maj-installer, .bandeau-maj .bouton").forEach(b => b.disabled = false);
+  }
+}
+$("#maj-verifier").addEventListener("click", () => verifierMaj(true));
+$("#maj-installer").addEventListener("click", installerMaj);
+
+async function majEtat(){
+  try{ const d = await api("/api/etat"); serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; dessinerEtat(); }catch(e){}
+}
+async function debut(){
+  serveur = await api("/api/etat");
+  if(serveur.version !== VERSION){
+    document.querySelector(".contenu").prepend(el("div",{class:"carte", style:"border-color:var(--err);background:var(--errbg)"},
+      el("h2",{}, "L'interface a été mise à jour"), el("p",{class:"aide", style:"margin:0;color:var(--text)"},
+        "Ferme la fenêtre noire de l'interface, puis relance outils\\lancer_interface.bat : sinon certaines actions (ex. page Compte) ne marchent pas.")));
+  }
+  $("#pseudo").textContent = serveur.pseudo ? serveur.pseudo : "compte non renseigné";
+  const l = serveur.config.lanceur || {};
+  (l.modules || serveur.modules.map(m => m.nom)).forEach(m => choixModules.add(m));
+  $("#l-duree").value = l.duree || ""; $("#l-max").value = l.max_attaques || ""; $("#l-simu").checked = !!l.simulation; $("#l-ecran").checked = l.ecran_allume !== false;
+  chargerFormulaires(); dessinerModules(); dessinerEtat(); dessinerCompte();
+  let page = "accueil"; try{ page = localStorage.getItem("gge-page") || "accueil"; }catch(e){}
+  aller(TITRES[page] ? page : "accueil");
+  rafraichirJournal(true);
+  verifierMaj(false);
+  setInterval(() => verifierMaj(false), 30 * 60 * 1000);
+  setInterval(() => rafraichirJournal(false), 1500);
+  setInterval(majEtat, 4000);
+}
+debut().catch(e => { document.body.innerHTML = '<p style="padding:40px;color:#ff8e7e">Interface injoignable : lance outils\\lancer_interface.bat</p>'; });
+</script>
+</body>
+</html>

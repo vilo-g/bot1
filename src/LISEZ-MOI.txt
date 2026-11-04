@@ -1,0 +1,13 @@
+Code du bot.
+
+session.py       connexion automatique au jeu + deconnexion propre (utilise outils/test_envoi.py et connexion_auto.py)
+connexion_bot.py test de la connexion seule        (outils\lancer_bot_connexion.bat)
+combat.py        formules du jeu : plafonds de soldats, bonus des commandants, vagues
+tours.py         module tours : assistant de configuration + boucle d'attaque   (outils\lancer_bot_tours.bat)
+interface.py     INTERFACE GRAPHIQUE (page http://127.0.0.1:8770, avec interface.html)   (outils\lancer_interface.bat)
+coffre.py        pseudo + mot de passe enregistres depuis l'interface (captures/identifiants.json, chiffre par Windows)
+eveil.py         garde le PC et l'ecran allumes pendant que le bot travaille (sinon le verrouillage coupe le jeu)
+bot.py           LANCEUR COMMUN : une connexion, choix des modules (tours, forteresses, les deux)   (outils\lancer_bot.bat)
+forteresses.py   module forteresses : carte du jeu (minuteurs), soldat le plus rapide, boucle d'attaque   (outils\lancer_bot_forteresses.bat)
+
+Documentation : docs/interface.md, docs/lanceur.md, docs/module-tours.md, docs/module-forteresses.md

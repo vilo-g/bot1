@@ -1,0 +1,13 @@
+# Rien de personnel ne doit partir sur GitHub
+config.json
+profil-chrome/
+captures/*
+!captures/items.json
+!captures/LISEZ-MOI.txt
+copie-pour-un-ami.zip
+*.maj-tmp
+__pycache__/
+*.pyc
+# notes de developpement avec des donnees du compte / captures d'un autre bot
+docs/protocole.md
+docs/exemple-bot/
