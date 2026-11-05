@@ -1,8 +1,10 @@
 {
-  "version": 3,
-  "date": "04/11/2026",
+  "version": 4,
+  "date": "05/11/2026",
   "nouveautes": [
-    "Forteresses : une forteresse prise par un autre joueur est retirée de la liste (la carte est relue tout de suite), au lieu d'être réessayée en boucle.",
-    "Forteresses et tours : une cible dont le jeu ne donne pas les infos est laissée de côté 1, 5, 15 puis 30 min (avant : chaque minute, avec une pause des tours)."
+    "Nouveau module Achats (page Achats de l'interface) : à partir d'un seuil de pièces, le bot dépense 10 % du seuil en engins, répartis par royaume puis par engin, sans jamais descendre sous le seuil moins 10 %.",
+    "Tours : option d'achat automatique d'échelles en bois (moins de 3000 dans un royaume des tours -> 10 000 achetées, seulement avec plus de 5 M de pièces), faite AVANT l'attaque quand le stock est bas, même à 0 au lancement.",
+    "Correction : le bot ne se déconnecte plus sans raison à l'arrivée d'une armée quand le module Achats est lancé.",
+    "Une erreur inattendue dans un module n'arrête plus tout le bot : seul ce module s'arrête et l'erreur complète est écrite dans le journal."
   ]
 }

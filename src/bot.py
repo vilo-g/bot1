@@ -38,14 +38,16 @@ import json
 import os
 import sys
 import time
+import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tours        # noqa: E402
 import eveil        # noqa: E402
 import forteresses  # noqa: E402
+import achats       # noqa: E402
 from tours import ArretModule, demander, duree  # noqa: E402
 
-MODULES = [tours, forteresses]          # ordre = numero affiche (1 = tours, 2 = forteresses...)
+MODULES = [tours, forteresses, achats]  # ordre = numero affiche (1 = tours, 2 = forteresses, 3 = achats...)
 RUBRIQUE = "lanceur"
 VERIF_SESSION = 30                      # secondes max entre deux verifications que la connexion est vivante
 PRIORITE_DEFAUT = 50                    # module sans LANCEUR_PRIORITE (plus petit = plus prioritaire)
@@ -141,8 +143,16 @@ def routeur_cat(entrees):
     """Un message de retour d'armee (cat) est donne a TOUS les modules : seul celui qui a envoye cette armee le reconnait."""
     def router(payload):
         for e in entrees:
-            e.module._retour(payload)
+            retour = getattr(e.module, "_retour", None)      # un module sans armee (achats) n'a rien a reconnaitre
+            if retour is not None:
+                retour(payload)
     return router
+
+
+def texte_erreur(ex):
+    """Erreur inattendue (bug) -> lignes lisibles pour la console et captures/journal_bot.txt (fichier et ligne du probleme)."""
+    lignes = [l.rstrip() for l in traceback.format_exception(type(ex), ex, ex.__traceback__) for l in l.splitlines()]
+    return [l for l in lignes if l.strip()][-12:]
 
 
 CHIEN_DE_GARDE = 120                    # secondes : un passage de module plus long est signale (et la connexion verifiee)
@@ -223,12 +233,21 @@ async def ordonnancer(entrees, horloge=time.time, dormir=asyncio.sleep, vivante=
             e.module.max_attaques = e.module.nb_attaques + (max_attaques - total)      # le module s'arrete pile au total demande
         try:
             attente = await passage_surveille(e, vivante, sortie, arret)
-        except ArretModule as ex:
-            if ex.args and str(ex.args[0]).startswith("SESSION COUPEE"):
-                raise
-            e.arrete = str(ex)
+        except tours.T.ErreurCDP:
+            raise
+        except Exception as ex:                       # bug dans un module : on le note en entier, ce module s'arrete, les autres continuent
+            if isinstance(ex, ArretModule):
+                if ex.args and str(ex.args[0]).startswith("SESSION COUPEE"):
+                    raise
+                texte = str(ex)
+            else:
+                texte = "ERREUR INATTENDUE (%s: %s) - envoie ces lignes pour correction :" % (type(ex).__name__, ex)
+            e.arrete = texte
             sortie("")
-            sortie("[%s] ARRET DE CE MODULE : %s" % (e.etiquette, ex))
+            sortie("[%s] ARRET DE CE MODULE : %s" % (e.etiquette, texte))
+            if not isinstance(ex, ArretModule):
+                for ligne in texte_erreur(ex):
+                    sortie("[%s]   %s" % (e.etiquette, ligne))
             restants = [x.etiquette for x in entrees if x.arrete is None]
             if restants:
                 sortie("Les autres modules continuent : %s." % ", ".join(restants))
@@ -266,8 +285,15 @@ async def preparer(args, lire_sync=None, sortie=print, modules=None):
         sortie("#" * 66)
         sortie(" MODULE %s" % nom.upper())
         sortie("#" * 66)
-        cfg = m.lanceur_config(args, lire_sync, sortie)
-        prets.append((m, cfg, m.lanceur_ressources(cfg, sortie)))
+        try:
+            cfg = m.lanceur_config(args, lire_sync, sortie)
+            prets.append((m, cfg, m.lanceur_ressources(cfg, sortie)))
+        except ArretModule as ex:
+            if len(choix) == 1:
+                raise
+            sortie("[%s] MODULE NON DEMARRE : %s" % (m.LANCEUR_ETIQUETTE, ex))   # les autres modules demarrent quand meme
+    if not prets:
+        raise ArretModule("Aucun module pret : arret.")
     return prets
 
 
@@ -343,8 +369,10 @@ def battement_etat(modules, debut, horloge=time.time, fichier=None, tous_les=3):
         if t - dernier[0] < tous_les:
             return
         dernier[0] = t
-        ecrire_etat({"etat": "en_marche", "pid": os.getpid(), "modules": modules, "debut": debut, "maj": t,
-                     "attaques": {e.nom: e.module.nb_attaques for e in entrees},
+        pieces = next((getattr(e.module.partage, "pieces", None) for e in entrees if getattr(e.module, "partage", None)), None)
+        ecrire_etat({"etat": "en_marche", "pid": os.getpid(), "modules": modules, "debut": debut, "maj": t, "pieces": pieces,
+                     "achats": {e.nom: e.module.nb_achats for e in entrees if hasattr(e.module, "nb_achats")},
+                     "attaques": {e.nom: e.module.nb_attaques for e in entrees if not hasattr(e.module, "nb_achats")},
                      "arretes": {e.nom: e.arrete for e in entrees if e.arrete}}, fichier)
     return battre
 
@@ -391,6 +419,10 @@ async def principal(args):
         sortie("ERREUR : %s" % e)
     except (KeyboardInterrupt, asyncio.CancelledError):
         sortie("\nArret demande.")
+    except Exception as e:                                       # bug : jamais d'arret sans explication
+        sortie("ERREUR INATTENDUE (%s: %s) : le bot s'arrete. Envoie ces lignes pour correction :" % (type(e).__name__, e))
+        for ligne in texte_erreur(e):
+            sortie("   " + ligne)
     finally:
         if eveille is not None:
             eveille.__exit__(None, None, None)

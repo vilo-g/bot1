@@ -34,6 +34,7 @@ import bot          # noqa: E402
 import coffre       # noqa: E402
 import zipfile      # noqa: E402
 import maj          # noqa: E402
+import achats       # noqa: E402
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(ICI, "interface.html")
@@ -41,7 +42,7 @@ PORT = 8770
 DOSSIER_IMAGES = os.path.join(ICI, "images")
 NOMS_UNITES = {215: "Vierge à bouclier niv. 10", 6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-04-maj"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-05-achats"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -168,6 +169,11 @@ def normaliser_tours(data, ancienne=None):
             b["rayon"] = r
         regl[str(k)] = b
     cfg["reglages"] = regl
+    achat = data.get("achat_echelles", ancienne.get("achat_echelles", False))
+    if not isinstance(achat, bool):
+        erreurs.append("Achat automatique d'échelles : oui ou non.")
+    else:
+        cfg["achat_echelles"] = achat
     cfg.setdefault("chateaux", {})
     cfg.setdefault("niveau_min", 0)
     cfg.setdefault("vagues_base", tours.NB_VAGUES_BASE)
@@ -213,6 +219,50 @@ def normaliser_forteresses(data, ancienne=None, autres=None):
     cfg.setdefault("vagues_base", tours.NB_VAGUES_BASE)
     cfg.setdefault("avec_bonus", False)
     if not erreurs and not forteresses.config_valide(cfg):
+        erreurs.append("Configuration incomplète.")
+    if erreurs:
+        raise ErreurSaisie(erreurs)
+    return cfg
+
+
+def normaliser_achats(data, ancienne=None):
+    """Reglages du module achats -> rubrique "achats", ou ErreurSaisie."""
+    ancienne = ancienne if isinstance(ancienne, dict) else {}
+    erreurs = []
+    cfg = {k: v for k, v in ancienne.items() if k not in ("seuil", "royaumes", "parts", "engins")}
+    seuil = _entier(data.get("seuil"), "Seuil de pièces", achats.SEUIL_MIN, achats.PIECES_MAX, erreurs)
+    if seuil is not None:
+        cfg["seuil"] = seuil
+    cfg["royaumes"] = _royaumes(data.get("royaumes"), (0, 1, 2, 3), erreurs)
+    parts, engins = {}, {}
+    total = 0
+    for k in cfg["royaumes"] or []:
+        nom = "Royaume %s" % tours.ROYAUMES[k]
+        p = _entier((data.get("parts") or {}).get(str(k)), "%s, part des pièces" % nom, 1, 100, erreurs)
+        if p is not None:
+            parts[str(k)] = p
+            total += p
+        src = (data.get("engins") or {}).get(str(k))
+        if not isinstance(src, dict) or not src:
+            erreurs.append("%s : choisis au moins un engin." % nom)
+            continue
+        e, t = {}, 0
+        for w, v in src.items():
+            if not str(w).isdigit() or int(w) not in achats.ENGINS:
+                erreurs.append("%s : engin inconnu (%s)." % (nom, w))
+                continue
+            v = _entier(v, "%s, %s" % (nom, achats.NOMS_ENGINS[int(w)]), 1, 100, erreurs)
+            if v is not None:
+                e[str(int(w))] = v
+                t += v
+        if e and t != 100:
+            erreurs.append("%s : la répartition des engins doit faire 100 %% (actuellement %d %%)." % (nom, t))
+        engins[str(k)] = e
+    if cfg["royaumes"] and len(parts) == len(cfg["royaumes"]) and total != 100:
+        erreurs.append("La répartition entre royaumes doit faire 100 %% (actuellement %d %%)." % total)
+    cfg["parts"], cfg["engins"] = parts, engins
+    cfg.setdefault("commandants", [])
+    if not erreurs and not achats.config_valide(cfg):
         erreurs.append("Configuration incomplète.")
     if erreurs:
         raise ErreurSaisie(erreurs)
@@ -311,8 +361,9 @@ def demarrer_bot(lanceur, popen=subprocess.Popen):
         tout = tours.lire_config()
         for nom in lanceur["modules"]:
             m = bot.par_nom()[nom]
-            rub = {"tours": "tours", "forteresses": forteresses.RUBRIQUE}[nom]
-            valide = tours.config_valide if nom == "tours" else forteresses.config_valide
+            rub, valide = {"tours": ("tours", tours.config_valide),
+                           "forteresses": (forteresses.RUBRIQUE, forteresses.config_valide),
+                           "achats": (achats.RUBRIQUE, achats.config_valide)}[nom]
             if not valide((tout or {}).get(rub)):
                 raise ErreurSaisie(["Module %s : réglages incomplets, enregistre-les d'abord." % m.LANCEUR_NOM])
         try:
@@ -337,7 +388,13 @@ def arreter_bot():
 def tout_etat():
     tout = tours.lire_config()
     tout = tout if isinstance(tout, dict) else {}
-    return {"config": {"tours": tout.get("tours"), "forteresses": tout.get(forteresses.RUBRIQUE), "lanceur": tout.get(bot.RUBRIQUE)},
+    prix = achats.prix_engins() if os.path.exists(tours.FICHIER_ITEMS) else {w: p for w, (_, _, p) in achats.ENGINS.items()}
+    return {"config": {"tours": tout.get("tours"), "forteresses": tout.get(forteresses.RUBRIQUE), "lanceur": tout.get(bot.RUBRIQUE),
+                       "achats": tout.get(achats.RUBRIQUE)},
+            "engins": [{"id": w, "nom": achats.NOMS_ENGINS[w], "prix": prix[w],
+                        "image": "images/engins/%d.png" % w if os.path.exists(os.path.join(DOSSIER_IMAGES, "engins", "%d.png" % w)) else None}
+                       for w in achats.ENGINS],
+            "seuil_min": achats.SEUIL_MIN, "pieces_max": achats.PIECES_MAX, "part_budget": achats.PART_BUDGET,
             "pseudo": tout.get("pseudo"), "bot": etat_bot(),
             "modules": [{"nom": m.LANCEUR_NOM, "priorite": getattr(m, "LANCEUR_PRIORITE", bot.PRIORITE_DEFAUT)} for m in bot.MODULES],
             "royaumes": {str(k): v for k, v in tours.ROYAUMES.items()}, "soldat_tours": tours.ID_SOLDAT,
@@ -390,6 +447,8 @@ def enregistrer(rubrique, data):
             cfg = normaliser_forteresses(data, tout.get(forteresses.RUBRIQUE), autres if isinstance(autres, list) else [])
         elif rubrique == "lanceur":
             cfg = normaliser_lanceur(data, tout.get(bot.RUBRIQUE))
+        elif rubrique == "achats":
+            cfg = normaliser_achats(data, tout.get(achats.RUBRIQUE))
         else:
             raise ErreurSaisie(["Rubrique inconnue."])
         tours.memoriser_config(cfg, rubrique={"forteresses": forteresses.RUBRIQUE, "lanceur": bot.RUBRIQUE}.get(rubrique, rubrique))

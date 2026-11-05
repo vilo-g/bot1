@@ -21,7 +21,7 @@ Tourne en local sur le PC de chaque joueur. Les identifiants ne quittent jamais 
 | `docs/`     | Le protocole (`protocole.md`), les questions ouvertes (`a-decouvrir.md`), la conception (`conception.md`) et les captures du bot d'exemple (`exemple-bot/`) |
 | `outils/`   | `observer.py` (observe), `test_envoi.py` (fonctions de base du jeu, utilisées par le bot), `connexion_auto.py` (connexion), `telecharger_items.py` (données du jeu), et les lanceurs `.bat` |
 | `captures/` | Journaux enregistrés par `observer.py` (PRIVÉ, voir plus bas) |
-| `src/`      | Le code du bot : `session.py` (connexion/déconnexion), `combat.py` (formules du jeu), `tours.py` (module tours), `forteresses.py` (module forteresses), `bot.py` (lanceur commun), `interface.py` + `interface.html` (interface graphique) |
+| `src/`      | Le code du bot : `session.py` (connexion/déconnexion), `combat.py` (formules du jeu), `tours.py` (module tours), `forteresses.py` (module forteresses), `achats.py` (module achats : surplus de pièces dépensé en engins), `bot.py` (lanceur commun), `interface.py` + `interface.html` (interface graphique) |
 
 ## Lancer le bot
 
@@ -69,6 +69,8 @@ Tourne en local sur le PC de chaque joueur. Les identifiants ne quittent jamais 
 - [x] Module tours : présélections (mode P, lues avec `gas`) codées, à valider sur le vrai jeu
 - [x] Module tours : réglages séparés par royaume (mode, soldat, côtés/présélections, échelles, cheval, rayon), commandants communs
 - [x] Module forteresses : assistant (commandants propres, royaumes 1/2/3, réglages par royaume, distance max), forteresses lues sur la carte du jeu avec leur minuteur, soldat le plus rapide, présélections (`src/forteresses.py`), à valider sur le vrai jeu
+- [x] Module achats : à partir d'un seuil de pièces, 10 % du seuil dépensés en engins, répartis par royaume puis par engin (page Achats de l'interface)
+- [x] Module tours : option d'achat automatique d'échelles en bois (moins de 3000 -> 10 000 achetées si plus de 5 M de pièces)
 
 ## Attention
 

@@ -44,6 +44,21 @@ header{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:
 header h1{font-size:19px;margin:0;font-weight:600;letter-spacing:.2px}
 header .sous{color:var(--muted);font-size:13px}
 header .espace{flex:1}
+.ligne-seuil{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.repartition{display:grid;gap:8px;margin-top:16px}
+.part{display:grid;grid-template-columns:150px 110px 1fr;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.part input{width:100%;text-align:right}
+.part .somme{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.total{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:13px}
+.total .puce{font-variant-numeric:tabular-nums}
+.engins{display:grid;gap:8px}
+.engin{display:grid;grid-template-columns:54px 1fr 110px auto;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.engin .vignette{width:54px;height:54px;border-radius:9px;background:var(--panel3);display:grid;place-items:center;overflow:hidden}
+.engin .vignette img{max-width:46px;max-height:46px}
+.engin .infos small{color:var(--muted);display:block;font-variant-numeric:tabular-nums}
+.engin input{width:100%;text-align:right}
+.engin .actions button{border:1px solid var(--line2);background:var(--panel);border-radius:8px;width:30px;height:30px;cursor:pointer}
+.carte-unite .cadre img.engin-img{object-fit:contain;padding:14px}
 .bandeau-maj{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;margin-bottom:18px;border-radius:var(--r);
   background:var(--infobg);border:1px solid rgba(95,168,232,.4)}
 .bandeau-maj b{color:var(--info)}
@@ -197,6 +212,7 @@ input.faux{border-color:var(--err)}
       <div class="titre">Modules</div>
       <button data-page="tours"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21V10L6 8V4h3v2h2V4h2v2h2V4h3v4l-2 2v11"/><path d="M5 21h14M11 21v-4a1 1 0 0 1 2 0v4"/></svg>Tours<span class="pastille" id="p-tours">-</span></button>
       <button data-page="forteresses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V11h3V8h3v3h6V8h3v3h3v10"/><path d="M3 21h18M10 21v-4h4v4M12 3v5M12 3l4 1.5L12 6"/></svg>Forteresses<span class="pastille" id="p-forteresses">-</span></button>
+      <button data-page="achats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4"/><path d="M3 10.5v4c0 1.4 2.7 2.5 6 2.5 1 0 2-.1 2.8-.3"/><circle cx="17" cy="16" r="4.5"/><path d="M17 14v4M15 16h4"/></svg>Achats<span class="pastille" id="p-achats">-</span></button>
       <div class="titre">Suivi</div>
       <button data-page="journal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>Journal</button>
     </div>
@@ -302,6 +318,11 @@ input.faux{border-color:var(--err)}
           <div class="royaumes" id="t-royaumes"></div>
           <div id="t-blocs"></div>
         </div>
+        <div class="carte">
+          <h2>Échelles en bois</h2>
+          <p class="aide">Seulement dans les royaumes choisis ci-dessus, dans le château de départ des tours. Jamais avant une attaque de forteresse.</p>
+          <label class="interrupteur"><input type="checkbox" id="t-achat"><i></i>Racheter des échelles automatiquement : moins de 3 000 → le bot en achète 10 000 (2,2 M de pièces), seulement s'il reste plus de 5 M de pièces</label>
+        </div>
         <div class="barre"><div class="msg" id="t-msg">Aucune modification.</div>
           <button class="bouton" data-annuler="tours">Annuler</button><button class="bouton principal" data-enregistrer="tours">Enregistrer</button></div>
         <ul class="erreurs" id="t-erreurs"></ul>
@@ -336,6 +357,31 @@ input.faux{border-color:var(--err)}
         <ul class="erreurs" id="f-erreurs"></ul>
       </section>
 
+      <!-- ===================== ACHATS -->
+      <section class="page" id="page-achats">
+        <div class="carte">
+          <h2>Quand acheter</h2>
+          <p class="aide">Le jeu garde au plus 2 147 483 647 pièces : tout ce qui dépasse est perdu. Dès que les pièces atteignent ce seuil,
+            le bot dépense <b>10 % du seuil</b> en engins, répartis comme indiqué ci-dessous. Toujours après les forteresses et les tours.</p>
+          <div class="ligne-seuil">
+            <input type="text" id="a-seuil" inputmode="numeric" placeholder="ex. 2 000 000 000" style="max-width:260px">
+            <div class="segment" id="a-seuil-rapide"></div>
+          </div>
+          <div class="msg-champ" id="a-seuil-err"></div>
+          <p class="aide" id="a-budget" style="margin:10px 0 0"></p>
+        </div>
+        <div class="carte">
+          <h2>Royaumes</h2>
+          <p class="aide">Les engins arrivent dans le château de départ de chaque royaume (le même que pour les tours).</p>
+          <div class="royaumes" id="a-royaumes"></div>
+          <div id="a-parts"></div>
+        </div>
+        <div id="a-blocs"></div>
+        <div class="barre"><div class="msg" id="a-msg">Aucune modification.</div>
+          <button class="bouton" id="a-annuler">Annuler</button><button class="bouton principal" id="a-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="a-erreurs"></ul>
+      </section>
+
       <!-- ===================== JOURNAL -->
       <section class="page" id="page-journal">
         <div class="outils-journal">
@@ -359,10 +405,10 @@ const NOMS = {0:"vert",1:"sables",2:"glacier",3:"feu"};
 const COULEURS = {0:"var(--k0)",1:"var(--k1)",2:"var(--k2)",3:"var(--k3)"};
 const COTES = [["F","Flanc gauche"],["FF","Deux flancs"],["A","Avant"],["AF","Avant + flanc"],["AFF","Avant + 2 flancs"]];
 const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
-const VERSION = "2026-11-04-maj";     // doit etre egale a VERSION dans interface.py
+const VERSION = "2026-11-05-achats";     // doit etre egale a VERSION dans interface.py
 let serveur = null;            // dernier /api/etat
-const etat = {tours:null, forteresses:null};      // formulaires en cours
-const sale = {tours:false, forteresses:false};
+const etat = {tours:null, forteresses:null, achats:null};      // formulaires en cours
+const sale = {tours:false, forteresses:false, achats:false};
 
 async function api(chemin, corps){
   const opt = corps === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-GGE-Bot":"1"}, body:JSON.stringify(corps)};
@@ -388,7 +434,8 @@ function cmdListe(t){ return String(t||"").split(";").map(x=>x.trim()).filter(x=
 
 /* ------------------------------------------------------------------ navigation */
 const TITRES = {accueil:["Tableau de bord","Lancer le bot et suivre ce qu'il fait"], compte:["Compte","Nom du compte et mot de passe, gardés sur ce PC"], tours:["Module tours","Réglages enregistrés dans config.json (rubrique tours)"],
-  forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
+  forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"],
+  achats:["Module achats","Dépenser le surplus de pièces en engins (rubrique achats)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
 function aller(page){
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("visible", p.id === "page-"+page));
   document.querySelectorAll("#menu button").forEach(b => b.classList.toggle("actif", b.dataset.page === page));
@@ -404,21 +451,22 @@ function reglTours(r){ const b = Object.assign(defautTours(), r || {}); if(!(r &
 function defautFort(){ return {mode:"auto", cotes:"F", cheval:"F", distance_plumes:100, distance_max:50, vagues_remplies:2, presets:[1,1,1,1]}; }
 function chargerFormulaires(){
   const ct = serveur.config.tours || {}, cf = serveur.config.forteresses || {};
-  etat.tours = {commandants: cmdTexte(ct.commandants), royaumes:[...(ct.royaumes||[])], reglages:{}};
+  etat.tours = {commandants: cmdTexte(ct.commandants), royaumes:[...(ct.royaumes||[])], reglages:{}, achat_echelles: !!ct.achat_echelles};
   for(const k of [0,1,2,3]) etat.tours.reglages[k] = reglTours((ct.reglages||{})[k]);
   etat.forteresses = {commandants: cmdTexte(cf.commandants), royaumes:[...(cf.royaumes||[])], reglages:{},
     reserve: Object.assign({secondes:0, max:1}, cf.reserve || {})};
   for(const k of [1,2,3]) etat.forteresses.reglages[k] = Object.assign(defautFort(), (cf.reglages||{})[k] || {});
-  sale.tours = sale.forteresses = false;
-  dessinerTours(); dessinerFort(); marquer("tours"); marquer("forteresses");
+  etat.achats = etatAchats(serveur.config.achats);
+  sale.tours = sale.forteresses = sale.achats = false;
+  dessinerTours(); dessinerFort(); dessinerAchats(); marquer("tours"); marquer("forteresses"); marquer("achats");
   for(const id of ["t-cmd", "f-cmd"]) if($("#" + id).value) verifierCommandants(id);   // reglages enregistres faux : signales tout de suite
 }
 function marquer(mod, texte, classe){
-  const m = mod === "tours" ? $("#t-msg") : $("#f-msg");
+  const m = $("#" + {tours:"t", forteresses:"f", achats:"a"}[mod] + "-msg");
   m.className = "msg " + (classe || (sale[mod] ? "sale" : ""));
   m.textContent = texte || (sale[mod] ? "Modifications non enregistrées." : "Aucune modification.");
 }
-function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ mod === "tours" ? dessinerTours() : dessinerFort(); } }
+function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats})[mod](); } pastilles(); }
 
 /* ------------------------------------------------------------------ blocs communs a un royaume */
 function curseur(min, max, pas, valeur, unite, poser){
@@ -462,6 +510,7 @@ function drapeau(k){
 function dessinerTours(){
   const s = etat.tours;
   const cmd = $("#t-cmd"); if(document.activeElement !== cmd) cmd.value = s.commandants;
+  $("#t-achat").checked = !!s.achat_echelles;
   const zone = $("#t-royaumes"); zone.replaceChildren();
   for(const k of [0,1,2,3]){
     const on = s.royaumes.includes(k);
@@ -503,6 +552,7 @@ function verifierCommandants(id){
   $("#" + id).classList.toggle("faux", !!err); $("#" + id + "-err").textContent = err;
   return !err;
 }
+$("#t-achat").addEventListener("change", e => { etat.tours.achat_echelles = e.target.checked; changer("tours", false); });
 $("#t-cmd").addEventListener("input", e => { etat.tours.commandants = e.target.value; verifierCommandants("t-cmd"); changer("tours", false); dessinerReserveInfo(); });
 
 /* ------------------------------------------------------------------ unites des tours (images) */
@@ -616,6 +666,7 @@ function versServeur(mod){
     if(mod === "tours" && b.mode === "presets" && Array.isArray(b.soldats)) b.soldats = b.soldats.slice(0, 1); if(b.cheval !== "CF") delete b.distance_plumes; regl[k] = b; }
   const d = {commandants: s.commandants, royaumes: s.royaumes, reglages: regl};
   if(mod === "forteresses") d.reserve = {secondes: +s.reserve.secondes || 0, max: +s.reserve.max || 1};
+  if(mod === "tours") d.achat_echelles = !!s.achat_echelles;
   return d;
 }
 document.querySelectorAll("[data-enregistrer]").forEach(b => b.addEventListener("click", async () => {
@@ -645,9 +696,156 @@ document.querySelectorAll("[data-annuler]").forEach(b => b.addEventListener("cli
 window.addEventListener("beforeunload", e => { if(sale.tours || sale.forteresses){ e.preventDefault(); e.returnValue = ""; } });
 
 /* ------------------------------------------------------------------ tableau de bord */
-function configOk(nom){ const c = serveur && serveur.config[nom]; return !!(c && c.commandants && c.commandants.length && c.royaumes && c.royaumes.length); }
+/* ------------------------------------------------------------------ module achats */
+function fmtN(n){ return Math.round(+n || 0).toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " "); }
+function etatAchats(c){
+  c = c || {};
+  const e = {seuil: c.seuil || "", royaumes:[...(c.royaumes || [])], parts:{}, engins:{}};
+  for(const k of e.royaumes){ e.parts[k] = (c.parts || {})[k] || 0; e.engins[k] = Object.assign({}, (c.engins || {})[k] || {}); }
+  return e;
+}
+function egaliser(obj, cles){
+  const n = cles.length; if(!n) return;
+  const base = Math.floor(100 / n); let reste = 100 - base * n;
+  cles.forEach(k => { obj[k] = base + (reste > 0 ? 1 : 0); if(reste > 0) reste--; });
+  for(const k of Object.keys(obj)) if(!cles.map(String).includes(String(k))) delete obj[k];
+}
+function seuilNombre(v){ const d = String(v).replace(/[\s\u00a0\u202f.]/g, ""); return /^\d+$/.test(d) ? +d : NaN; }
+function erreursAchats(a){
+  const err = [], s = seuilNombre(a.seuil);
+  if(isNaN(s)) err.push("Seuil : écris un nombre de pièces (ex. 2 000 000 000).");
+  else if(s < (serveur.seuil_min || 1e7) || s > (serveur.pieces_max || 2147483647))
+    err.push("Seuil : entre " + fmtN(serveur.seuil_min || 1e7) + " et " + fmtN(serveur.pieces_max || 2147483647) + " pièces.");
+  if(!a.royaumes.length) err.push("Royaumes : coche au moins un royaume.");
+  const tp = a.royaumes.reduce((x, k) => x + (+a.parts[k] || 0), 0);
+  if(a.royaumes.length && tp !== 100) err.push("Répartition entre royaumes : " + tp + " % au lieu de 100 %.");
+  for(const k of a.royaumes){
+    const e = a.engins[k] || {}, ids = Object.keys(e);
+    if(!ids.length){ err.push(NOMS[k][0].toUpperCase() + NOMS[k].slice(1) + " : choisis au moins un engin."); continue; }
+    const t = ids.reduce((x, w) => x + (+e[w] || 0), 0);
+    if(t !== 100) err.push(NOMS[k][0].toUpperCase() + NOMS[k].slice(1) + " : répartition des engins " + t + " % au lieu de 100 %.");
+  }
+  return err;
+}
+function engin(id){ return (serveur.engins || []).find(x => x.id === +id) || {id:+id, nom:"Engin " + id, prix:0, image:null}; }
+function champPct(valeur, poser){
+  const i = el("input",{type:"number", min:1, max:100, step:1, value:valeur});
+  i.addEventListener("input", () => { poser(i.value === "" ? 0 : Math.round(+i.value)); changer("achats", false); dessinerSommesAchats(); });
+  return el("div",{style:"display:flex;align-items:center;gap:6px"}, i, el("span",{}, "%"));
+}
+function totalPuce(t){ return el("span",{class:"puce " + (t === 100 ? "ok" : "err")}, "total " + t + " %"); }
+function dessinerAchats(){
+  const a = etat.achats; if(!a) return;
+  const champ = $("#a-seuil");
+  if(document.activeElement !== champ) champ.value = a.seuil === "" ? "" : (isNaN(seuilNombre(a.seuil)) ? a.seuil : fmtN(seuilNombre(a.seuil)));
+  $("#a-seuil-rapide").replaceChildren(...[[1e9,"1 Md"],[1.5e9,"1,5 Md"],[2e9,"2 Md"],[2.1e9,"2,1 Md"]].map(([v,t]) =>
+    el("button",{type:"button", class: seuilNombre(a.seuil) === v ? "on" : "", onclick:() => { a.seuil = v; changer("achats"); }}, t)));
+  const zone = $("#a-royaumes"); zone.replaceChildren();
+  for(const k of [0,1,2,3]){
+    const on = a.royaumes.includes(k);
+    const t = tuileRoyaume(k, on, 0, () => {
+      if(on){ a.royaumes = a.royaumes.filter(x => x !== k); delete a.engins[k]; }
+      else { a.royaumes = [...a.royaumes, k]; a.engins[k] = a.engins[k] || {}; }
+      egaliser(a.parts, a.royaumes); changer("achats"); });
+    t.querySelector(".drapeau").replaceChildren(drapeau(k)); zone.append(t);
+  }
+  const parts = $("#a-parts"); parts.replaceChildren();
+  if(a.royaumes.length > 1){
+    const liste = el("div",{class:"repartition"});
+    for(const k of a.royaumes)
+      liste.append(el("div",{class:"part"}, el("b",{style:"color:" + COULEURS[k]}, NOMS[k][0].toUpperCase() + NOMS[k].slice(1)),
+        champPct(a.parts[k], v => { a.parts[k] = v; }), el("span",{class:"somme", "data-somme-royaume":k})));
+    parts.append(el("h2",{style:"margin-top:18px"}, "Répartition des pièces entre royaumes"), liste,
+      el("div",{class:"total", id:"a-total-royaumes"}),
+      el("button",{type:"button", class:"bouton", style:"margin-top:8px", onclick:() => { egaliser(a.parts, a.royaumes); changer("achats"); }}, "Répartir également"));
+  } else if(a.royaumes.length === 1){ a.parts[a.royaumes[0]] = 100; }
+  const blocs = $("#a-blocs"); blocs.replaceChildren();
+  for(const k of a.royaumes){
+    const e = a.engins[k] = a.engins[k] || {};
+    const liste = el("div",{class:"engins"});
+    for(const w of Object.keys(e)){
+      const g = engin(w);
+      liste.append(el("div",{class:"engin"},
+        el("div",{class:"vignette"}, g.image ? el("img",{src:g.image, alt:g.nom}) : String(g.id)),
+        el("div",{class:"infos"}, el("b",{}, g.nom), el("small",{"data-somme-engin": k + ":" + w})),
+        champPct(e[w], v => { e[w] = v; }),
+        el("div",{class:"actions"}, el("button",{type:"button", title:"Retirer", onclick:() => { delete e[w]; egaliser(e, Object.keys(e)); changer("achats"); }}, "×"))));
+    }
+    if(Object.keys(e).length < (serveur.engins || []).length)
+      liste.append(el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerieEngins(k)}, el("span",{class:"plus"}, "+"), "Ajouter un engin"));
+    blocs.append(el("details",{class:"bloc-royaume", style:"--c:" + COULEURS[k], open:true},
+      el("summary",{}, drapeau(k), "Engins achetés au " + NOMS[k], el("span",{class:"resume", "data-somme-bloc":k})),
+      el("div",{class:"corps"}, liste,
+        el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"}, el("div",{class:"total", style:"margin:0", "data-total-engins":k}),
+          Object.keys(e).length > 1 ? el("button",{type:"button", class:"bouton", onclick:() => { egaliser(e, Object.keys(e)); changer("achats"); }}, "Répartir également") : null))));
+  }
+  dessinerSommesAchats();
+}
+function dessinerSommesAchats(){
+  const a = etat.achats, s = seuilNombre(a.seuil), budget = isNaN(s) ? 0 : Math.floor(s * (serveur.part_budget || 10) / 100);
+  const err = isNaN(s) && a.seuil !== "" ? "Écris un nombre de pièces." : "";
+  $("#a-seuil-err").textContent = err; $("#a-seuil").classList.toggle("faux", !!err);
+  $("#a-budget").textContent = budget ? "À chaque fois : " + fmtN(budget) + " pièces d'engins (10 % de " + fmtN(s) + ")." : "";
+  const tr = $("#a-total-royaumes");
+  if(tr){ const t = a.royaumes.reduce((x, k) => x + (+a.parts[k] || 0), 0); tr.replaceChildren(totalPuce(t), t === 100 ? "" : el("span",{class:"aide", style:"margin:0"}, "La somme doit faire 100 %.")); }
+  for(const k of a.royaumes){
+    const bk = Math.floor(budget * (+a.parts[k] || 0) / 100);
+    document.querySelectorAll('[data-somme-royaume="' + k + '"]').forEach(x => x.textContent = budget ? fmtN(bk) + " pièces" : "");
+    document.querySelectorAll('[data-somme-bloc="' + k + '"]').forEach(x => x.textContent = budget ? fmtN(bk) + " pièces à chaque achat" : "indique d'abord le seuil");
+    const e = a.engins[k] || {}; const t = Object.keys(e).reduce((x, w) => x + (+e[w] || 0), 0);
+    document.querySelectorAll('[data-total-engins="' + k + '"]').forEach(x => x.replaceChildren(...(Object.keys(e).length ? [totalPuce(t)] : [])));
+    for(const w of Object.keys(e)){
+      const g = engin(w), be = Math.floor(bk * (+e[w] || 0) / 100), q = g.prix ? Math.floor(be / g.prix) : 0;
+      document.querySelectorAll('[data-somme-engin="' + k + ":" + w + '"]').forEach(x => x.textContent =
+        fmtN(g.prix) + " pièces l'unité" + (budget ? " · " + fmtN(q) + " achetés (" + fmtN(be) + " pièces)" : ""));
+    }
+  }
+}
+function ouvrirGalerieEngins(k){
+  const e = etat.achats.engins[k];
+  const fermer = () => { fond.remove(); document.removeEventListener("keydown", echap); };
+  const echap = ev => { if(ev.key === "Escape") fermer(); };
+  const fond = el("div",{class:"fond-modal", onclick:ev => { if(ev.target === fond) fermer(); }});
+  const grille = el("div",{class:"galerie"});
+  for(const g of serveur.engins || []){
+    const pris = String(g.id) in e;
+    grille.append(el("button",{type:"button", class:"carte-unite" + (pris ? " prise" : ""), disabled:pris,
+      onclick:() => { e[g.id] = 0; egaliser(e, Object.keys(e)); fermer(); changer("achats"); }},
+      el("div",{class:"cadre"}, g.image ? el("img",{src:g.image, alt:g.nom, class:"engin-img"}) : el("div",{class:"sans-image"}, String(g.id))),
+      el("b",{}, g.nom), el("small",{}, fmtN(g.prix) + " pièces l'unité"),
+      pris ? el("span",{class:"puce ok"}, "déjà choisi") : el("span",{class:"puce"}, "n° " + g.id)));
+  }
+  fond.append(el("div",{class:"modal"}, el("div",{class:"tete-modal"}, el("div",{}, el("h2",{}, "Choisir un engin"),
+      el("p",{class:"aide", style:"margin:2px 0 0"}, "Acheté au " + NOMS[k] + ", dans le château de départ. Les pièces sont réparties également, modifiables ensuite.")),
+    el("button",{type:"button", class:"fermer", title:"Fermer", onclick:fermer}, "×")), grille));
+  document.body.append(fond); document.addEventListener("keydown", echap);
+}
+$("#a-seuil").addEventListener("input", e => { etat.achats.seuil = e.target.value.trim(); changer("achats", false); dessinerSommesAchats(); });
+$("#a-seuil").addEventListener("blur", () => { const a = etat.achats, v = seuilNombre(a.seuil); if(!isNaN(v)) $("#a-seuil").value = fmtN(v);
+  $("#a-seuil-rapide").querySelectorAll("button").forEach(b => b.classList.remove("on")); });
+$("#a-annuler").addEventListener("click", () => { etat.achats = etatAchats(serveur.config.achats); sale.achats = false; dessinerAchats(); marquer("achats"); pastilles(); $("#a-erreurs").replaceChildren(); });
+$("#a-enregistrer").addEventListener("click", async () => {
+  const liste = $("#a-erreurs"); liste.replaceChildren();
+  const a = etat.achats, err = erreursAchats(a);
+  if(err.length){ marquer("achats", "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x))); return; }
+  const corps = {seuil: seuilNombre(a.seuil), royaumes: a.royaumes, parts:{}, engins:{}};
+  for(const k of a.royaumes){ corps.parts[k] = +a.parts[k]; corps.engins[k] = {}; for(const w of Object.keys(a.engins[k])) corps.engins[k][w] = +a.engins[k][w]; }
+  try{
+    await api("/api/config/achats", corps);
+    sale.achats = false; marquer("achats", "Enregistré dans config.json.", "ok");
+    serveur = await api("/api/etat"); pastilles(); dessinerModules();
+  }catch(ex){
+    marquer("achats", "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
+  }
+});
+function configOk(nom){
+  const c = serveur && serveur.config[nom];
+  if(nom === "achats") return !!(c && c.seuil && c.royaumes && c.royaumes.length && !erreursAchats(etatAchats(c)).length);
+  return !!(c && c.commandants && c.commandants.length && c.royaumes && c.royaumes.length);
+}
 function pastilles(){
-  for(const nom of ["tours","forteresses"]){
+  for(const nom of ["tours","forteresses","achats"]){
     const p = $("#p-"+nom); if(!p || !serveur) continue;
     const ok = configOk(nom); p.textContent = sale[nom] ? "modifié" : ok ? "prêt" : "à régler"; p.className = "pastille" + (ok && !sale[nom] ? " ok" : "");
   }
@@ -655,7 +853,8 @@ function pastilles(){
 const choixModules = new Set();
 function dessinerModules(){
   const zone = $("#choix-modules"); zone.replaceChildren();
-  const desc = {tours:"Tours les plus proches, couronne par couronne.", forteresses:"Forteresses lues sur la carte, minuteur personnel."};
+  const desc = {tours:"Tours les plus proches, couronne par couronne.", forteresses:"Forteresses lues sur la carte, minuteur personnel.",
+    achats:"Surplus de pièces dépensé en engins, après les attaques."};
   for(const m of serveur.modules){
     const ok = configOk(m.nom), on = choixModules.has(m.nom);
     const cb = el("input",{type:"checkbox", checked:on, onchange:e => { e.target.checked ? choixModules.add(m.nom) : choixModules.delete(m.nom); dessinerModules(); }});
@@ -679,6 +878,9 @@ function dessinerEtat(){
   const pe = $("#puce-etat"); pe.textContent = marche ? "Travaille" : attente ? "Connexion" : "Arrêté"; pe.className = "puce" + (marche ? " ok" : attente ? " or" : "");
   const ch = $("#chiffres"); ch.replaceChildren();
   if(marche){
+    if(b.pieces != null) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Pièces du compte"), el("b",{}, fmtN(b.pieces))));
+    for(const [nom, n] of Object.entries(b.achats || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Achats d'engins"), el("b",{}, String(n)),
+        (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
     for(const [nom, n] of Object.entries(b.attaques || {}))
       ch.append(el("div",{class:"chiffre"}, el("small",{}, "Attaques " + nom), el("b",{}, String(n)),
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
@@ -687,7 +889,7 @@ function dessinerEtat(){
 }
 $("#b-demarrer").addEventListener("click", async () => {
   $("#l-erreurs").replaceChildren(); $("#l-msg").textContent = "";
-  if(sale.tours || sale.forteresses){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
+  if(sale.tours || sale.forteresses || sale.achats){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
   const corps = {modules:[...choixModules], duree:$("#l-duree").value.trim(), max_attaques: $("#l-max").value ? +$("#l-max").value : null, simulation:$("#l-simu").checked, ecran_allume:$("#l-ecran").checked};
   try{ await api("/api/demarrer", corps); $("#l-msg").textContent = "Démarré : regarde la fenêtre du bot."; }
   catch(e){ $("#l-erreurs").replaceChildren(...(e.erreurs||["Erreur"]).map(x => el("li",{},x))); }

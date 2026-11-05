@@ -72,6 +72,14 @@ ZONES_RELUES_PAR_PASSAGE = 3    # zones relues au plus par passage (les plus pro
 VERIFS_MAX_PAR_PASSAGE = 10     # tours verifiees (relues) au plus par passage : au-dela, pause courte et message (jamais de boucle sans fin)
 LARGEUR_CRAN = 13              # cases : la carte est lue par couronnes de cette largeur autour du chateau (= une zone gaa)
 SANS_INFO_PAUSES = (60, 300, 900, 1800)   # cible dont le jeu ne donne pas les infos : laissee de cote 1 min, 5, 15, puis 30 min
+# Achat automatique d'echelles en bois (option "achat_echelles" du module tours) : message sbp, comme l'armurier du jeu
+ECHELLES_SEUIL = 3000           # en dessous, le bot en rachete dans le chateau de depart du royaume
+ECHELLES_LOT = 10000            # quantite rachetee d'un coup...
+ACHAT_PAR_MESSAGE = 1000        # ... par paquets de 1000 (comme l'interface du jeu)
+PIECES_RESERVE = 5000000        # jamais d'achat qui ferait descendre les pieces sous 5 millions
+PAQUET_ECHELLES = 28            # paquet de l'armurier "Scaling ladder" (items.json : packages)
+PRIX_ECHELLE = 220              # pieces par echelle (items.json : packagePriceC1 du paquet 28)
+PAUSE_ACHAT = 600               # secondes avant de reessayer un achat refuse / sans assez de pieces
 COMMANDANT_REFUSE = 180         # secondes : commandant refuse 2 fois de suite (sans doute pas au chateau) laisse de cote
 REFUS_MAX = 5                   # refus de suite (avec au moins 3 commandants differents) avant l'arret du module
 CIBLE_REFUSEE = (1800, 10800)   # cible ignoree par le serveur : laissee de cote 30 min, puis 3 h si elle est encore refusee
@@ -484,6 +492,9 @@ def resume_config(cfg):
     for kid in cfg["royaumes"]:
         l.append("ROYAUME %d (%s) :" % (kid, ROYAUMES[kid]))
         l += ["    " + x for x in lignes_reglages(cfg["reglages"][str(kid)])]
+    if cfg.get("achat_echelles"):
+        l.append("achat automatique d'echelles : moins de %d dans un royaume des tours -> %d achetees (si plus de %d M de pieces)"
+                 % (ECHELLES_SEUIL, ECHELLES_LOT, PIECES_RESERVE // 1000000))
     return l
 
 
@@ -985,6 +996,7 @@ class Partage:
         self.routeur = None
         self.priorites = {}
         self.urgences = {}
+        self.pieces = None                 # pieces du compte (message gcu du jeu), None tant qu'on ne les a pas vues
         self.signe_de_vie = lambda: None   # lanceur : met a jour l'etat du bot pendant un long passage (l'interface le voit vivant)
 
     def urgence_prioritaire(self, nom):
@@ -1041,6 +1053,8 @@ class ModuleTours:
         self.cran = {}             # royaume -> nombre de couronnes deja lues
         self._crans = {}           # royaume -> [[zones de la couronne 0], [couronne 1], ...]
         self.refus_commandant = {}  # commandant -> cibles refusees de suite pour lui (2 = il n'est sans doute pas au chateau)
+        self.echelles = {}         # royaume -> echelles en bois dans le chateau de depart (lu dans adi / sbp)
+        self.achat_pause = {}      # royaume -> instant avant lequel on ne retente pas d'acheter des echelles
         self.refus_suite = []      # commandants des refus consecutifs (tous commandants confondus)
         # armees encore en route au lancement precedent : gardees dans captures/etat_<module>.json (pas de journal = tests : rien)
         if fichier_etat is JOURNAL_DEFAUT:
@@ -1138,6 +1152,8 @@ class ModuleTours:
             if m[0] == "cat":
                 (self.partage.routeur or self._retour)(m[2])      # lanceur commun : chaque module reconnait ses armees
             else:
+                if m[0] == "gcu" and m[1] == 0:
+                    self._noter_pieces(T.json_ou_none(m[2]))
                 restant.append(m)
         self.jeu.recus[:] = restant
 
@@ -1311,19 +1327,25 @@ class ModuleTours:
         return frais
 
     # ---------------------------------------------------------------- une attaque
-    async def attaquer(self, pos, tour, kid):
-        cx, cy = self.sources[kid]["x"], self.sources[kid]["y"]
-        tx, ty = tour[1], tour[2]
-        cle = (kid, tx, ty)
-        nom = "%s %s (%d,%d)" % (self.NOM_CIBLE, ROYAUMES[kid], tx, ty)
-        vus = set()
-        for essai in range(2):                     # pas de reponse : un 2e essai (le jeu en perd parfois une)
+    async def _demander_infos(self, cx, cy, tx, ty, kid, vus):
+        """Infos d'attaque de la cible (adi / abi) ; pas de reponse : un 2e essai (le jeu en perd parfois une)."""
+        rep = None
+        for essai in range(2):
             await self._vider()
             await self.jeu.envoyer(self.CMD_INFO, {"SX": cx, "SY": cy, "TX": tx, "TY": ty, "KID": kid})
             rep = await self.jeu.attendre(self.CMD_INFO, 15 if essai == 0 else 10)
             if rep:
                 break
             vus |= {m[0] for m in self.jeu.recus}
+        return rep
+
+    async def attaquer(self, pos, tour, kid):
+        cx, cy = self.sources[kid]["x"], self.sources[kid]["y"]
+        tx, ty = tour[1], tour[2]
+        cle = (kid, tx, ty)
+        nom = "%s %s (%d,%d)" % (self.NOM_CIBLE, ROYAUMES[kid], tx, ty)
+        vus = set()
+        rep = await self._demander_infos(cx, cy, tx, ty, kid, vus)
         if not rep or rep[1] != 0:
             # le jeu ne donne pas les infos d'une cible deja attaquee / prise par un autre joueur (la carte la dit encore libre
             # jusqu'a sa prochaine relecture) : 1 min, puis 5 min, 15 min, 30 min, pour ne pas bloquer les autres attaques
@@ -1346,6 +1368,16 @@ class ModuleTours:
             return False
         self.sans_info.pop(cle, None)
         adi = T.json_ou_none(rep[2]) or {}
+        if isinstance((adi.get("gui") or {}).get("I"), list):
+            self.echelles[kid] = combat.inventaire_depuis_adi(adi["gui"]["I"]).get(ID_ECHELLE, 0)
+            # option achat d'echelles : stock trop bas -> achat AVANT de partir (sinon l'attaque partirait sans echelles),
+            # puis infos relues pour construire l'attaque avec le nouveau stock
+            if self.echelles[kid] < ECHELLES_SEUIL and await self._acheter_echelles([kid]):
+                rep2 = await self._demander_infos(cx, cy, tx, ty, kid, set())
+                adi2 = T.json_ou_none(rep2[2]) if rep2 and rep2[1] == 0 else None
+                if isinstance(adi2, dict) and isinstance((adi2.get("gui") or {}).get("I"), list):
+                    adi = adi2
+                    self.echelles[kid] = combat.inventaire_depuis_adi(adi["gui"]["I"]).get(ID_ECHELLE, 0)
         try:
             cra, info = self._construire(adi, pos, tour, kid, (cx, cy))
         except CibleEnAttente as e:
@@ -1397,6 +1429,11 @@ class ModuleTours:
                            texte_vagues(info), tt))
             self.refus_commandant.pop(pos, None)
             self.refus_suite = []
+            if kid in self.echelles:                    # echelles parties avec l'attaque (le prochain adi donne le vrai stock)
+                try:
+                    self.echelles[kid] -= sum(q for v in cra["A"] for c in ("L", "M", "R") for w, q in v[c]["T"] if w == ID_ECHELLE)
+                except (KeyError, TypeError, ValueError):
+                    pass
             self._sauver_etat()
             return True
         self.echecs += 1
@@ -1440,6 +1477,90 @@ class ModuleTours:
             raise ArretModule("%d refus de suite avec %d commandants differents : le module s'arrete pour ne pas insister. Regarde "
                               "les messages du serveur ci-dessus (ou captures/journal_tours.txt)." % (len(self.refus_suite), len(set(self.refus_suite))))
         return False
+
+    def _noter_pieces(self, d):
+        """Message gcu (ou bloc gcu d'une reponse) : {"C1": pieces, "C2": rubis}."""
+        if isinstance(d, dict) and isinstance(d.get("C1"), (int, float)) and not isinstance(d.get("C1"), bool):
+            self.partage.pieces = int(d["C1"])
+
+    # ---------------------------------------------------------------- achat automatique d'echelles en bois
+    async def _acheter_echelles(self, royaumes=None):
+        """Option "achat_echelles" : dans chaque royaume des tours ou le chateau de depart a moins de ECHELLES_SEUIL echelles,
+        en achete ECHELLES_LOT (paquets de 1000), seulement si les pieces restent au-dessus de PIECES_RESERVE. Jamais avant
+        une attaque de forteresse (module prioritaire) ; jamais en simulation. Renvoie le nombre d'echelles achetees."""
+        total = 0
+        if not self.cfg.get("achat_echelles") or self.simulation:
+            return total
+        actifs = self._royaumes_actifs()
+        for kid in (actifs if royaumes is None else [k for k in royaumes if k in actifs]):
+            t = self.horloge()
+            n = self.echelles.get(kid)
+            if n is None or n >= ECHELLES_SEUIL or self.achat_pause.get(kid, 0) > t:
+                continue
+            if self.partage.urgence_prioritaire(self.NOM_MODULE):
+                return total                             # une forteresse d'abord : l'achat se fera au passage suivant
+            if self.partage.pieces is None:
+                await self._demander_pieces()
+            nom = "royaume %d (%s)" % (kid, ROYAUMES[kid])
+            if self.partage.pieces is None:
+                self.achat_pause[kid] = t + 60
+                self._attente_msg("pieces-inconnues", "   achat d'echelles (%s, %d en stock) : nombre de pieces pas encore connu, "
+                                  "nouvel essai dans 1 min." % (nom, n))
+                continue
+            prix = PRIX_ECHELLE * ACHAT_PAR_MESSAGE
+            if self.partage.pieces - prix < PIECES_RESERVE:
+                self.achat_pause[kid] = t + PAUSE_ACHAT
+                self._attente_msg("pieces-%d" % kid, "   achat d'echelles (%s, %d en stock) : pas assez de pieces (%s, il faut garder %s) : "
+                                  "en attente." % (nom, n, f"{self.partage.pieces:,}".replace(",", " "), f"{PIECES_RESERVE:,}".replace(",", " ")))
+                continue
+            total += await self._acheter_lot(kid, n, nom)
+        return total
+
+    async def _demander_pieces(self):
+        """Pieces pas encore vues (le jeu les envoie a chaque gain) : on les demande au jeu (gcu), sans rien changer."""
+        try:
+            await self._vider()
+            await self.jeu.envoyer("gcu", {})
+            rep = await self.jeu.attendre("gcu", 5)
+            if rep and rep[1] == 0:
+                self._noter_pieces(T.json_ou_none(rep[2]))
+        except T.ErreurCDP:
+            pass
+
+    async def _acheter_lot(self, kid, n, nom):
+        src = self.sources[kid]
+        t0, avant_pieces = self.horloge(), self.partage.pieces
+        # comme le jeu : on selectionne d'abord le chateau de depart du royaume (l'achat arrive dans le chateau selectionne)
+        if src.get("id") is not None:
+            await self._vider()
+            await self.jeu.envoyer("jca", {"CID": src["id"], "KID": kid})
+            await self.jeu.attendre("jaa", 10)
+        achete, avant = 0, n
+        while achete < ECHELLES_LOT:
+            if self.partage.urgence_prioritaire(self.NOM_MODULE):
+                break                                    # une forteresse est devenue attaquable : elle passe d'abord
+            if self.partage.pieces - PRIX_ECHELLE * ACHAT_PAR_MESSAGE < PIECES_RESERVE:
+                break
+            await self._vider()
+            await self.jeu.envoyer("sbp", {"PID": PAQUET_ECHELLES, "BT": 0, "TID": 27, "AMT": ACHAT_PAR_MESSAGE, "KID": kid, "AID": -1,
+                                           "PC2": -1, "BA": 0, "PWR": 0, "_PO": -1})
+            rep = await self.jeu.attendre("sbp", 10)
+            d = T.json_ou_none(rep[2]) if rep else None
+            if not rep or rep[1] != 0 or not isinstance(d, dict):
+                self.achat_pause[kid] = self.horloge() + PAUSE_ACHAT
+                self._noter("   ACHAT D'ECHELLES refuse (%s) : %s. Nouvel essai dans %s."
+                            % (nom, "code %s : %s" % (rep[1], str(rep[2])[:120]) if rep else "pas de reponse du jeu", duree(PAUSE_ACHAT)))
+                break
+            achete += ACHAT_PAR_MESSAGE
+            self._noter_pieces(d.get("gcu"))
+            stock = combat.inventaire_depuis_adi((d.get("gui") or {}).get("I", []))
+            self.echelles[kid] = stock.get(ID_ECHELLE, (self.echelles.get(kid) or 0) + ACHAT_PAR_MESSAGE)
+            await self.dormir(0.5)
+        if achete:
+            self._noter("ACHAT : %d echelles en bois au %s (stock %d -> %d), pieces %s -> %s."
+                        % (achete, nom, avant, self.echelles.get(kid, avant + achete),
+                           f"{avant_pieces:,}".replace(",", " "), f"{self.partage.pieces:,}".replace(",", " ")))
+        return achete
 
     async def _apres_sans_info(self, cle):
         """Cible dont le jeu n'a pas donne les infos : les modules peuvent verifier aussitot sur la carte (forteresses).
@@ -1486,7 +1607,12 @@ class ModuleTours:
         return [p for p in self.cfg["commandants"] if p not in self.absents and p not in interdits and self.libre_a.get(p, 0) <= t]
 
     async def cycle(self):
-        """Un passage : renvoie le nombre de secondes a attendre avant le suivant."""
+        """Un passage : les attaques d'abord, puis (option) l'achat d'echelles ; renvoie les secondes avant le suivant."""
+        attente = await self._cycle()
+        await self._acheter_echelles()
+        return attente
+
+    async def _cycle(self):
         await self._absorber()
         t = self.horloge()
         self.en_route = {k: v for k, v in self.en_route.items() if v[1] > t - 3600}
