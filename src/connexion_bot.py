@@ -87,12 +87,19 @@ async def principal(args):
         print("\nArret demande.")
 
 
-async def _vivante(jeu):
-    try:
-        r = await jeu._eval("(globalThis.__ggeSock && globalThis.__ggeSock.readyState)===1")
-        return bool(r.get("result", {}).get("value"))
-    except Exception:
-        return False
+async def _vivante(jeu, essais=3, pause=5):
+    """True si le WebSocket du jeu est ouvert. Chrome qui tarde a repondre (page du jeu occupee quelques secondes) n'est pas
+    une connexion perdue : on reessaie ; False seulement si le jeu dit que le socket est ferme ou si Chrome reste muet."""
+    for n in range(essais):
+        try:
+            r = await jeu._eval("(globalThis.__ggeSock && globalThis.__ggeSock.readyState)===1")
+            return bool(r.get("result", {}).get("value"))
+        except asyncio.TimeoutError:
+            if n + 1 < essais:
+                await asyncio.sleep(pause)
+        except Exception:
+            return False
+    return False
 
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
 {
-  "version": 4,
-  "date": "05/11/2026",
+  "version": 5,
+  "date": "06/11/2026",
   "nouveautes": [
-    "Nouveau module Achats (page Achats de l'interface) : à partir d'un seuil de pièces, le bot dépense 10 % du seuil en engins, répartis par royaume puis par engin, sans jamais descendre sous le seuil moins 10 %.",
-    "Tours : option d'achat automatique d'échelles en bois (moins de 3000 dans un royaume des tours -> 10 000 achetées, seulement avec plus de 5 M de pièces), faite AVANT l'attaque quand le stock est bas, même à 0 au lancement.",
-    "Correction : le bot ne se déconnecte plus sans raison à l'arrivée d'une armée quand le module Achats est lancé.",
-    "Une erreur inattendue dans un module n'arrête plus tout le bot : seul ce module s'arrête et l'erreur complète est écrite dans le journal."
+    "Quand Chrome met trop de temps à répondre (par exemple en revenant sur la page du jeu après un long moment), le module n'est plus arrêté : le bot vérifie la connexion et reprend 10 s plus tard. Il ne s'arrête que si ça se répète 5 fois de suite.",
+    "Un Chrome lent n'est plus pris pour une connexion perdue (vérification refaite 3 fois avant de conclure).",
+    "Forteresses : le nombre de commandants gardés par la réservation peut aller jusqu'au nombre de commandants du module."
   ]
 }

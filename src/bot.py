@@ -125,6 +125,7 @@ class Entree:
         self.prochain = 0.0
         self.arrete = None          # raison de l'arret de ce module
         self.urgence_ignoree_jusqua = float("-inf")
+        self.lents = 0              # reponses trop lentes de Chrome de suite (voir ordonnancer)
 
     def urgent(self, t):
         """Le module a une attaque a faire TOUT DE SUITE (ex. forteresse attaquable + commandant libre) ?"""
@@ -155,6 +156,8 @@ def texte_erreur(ex):
     return [l for l in lignes if l.strip()][-12:]
 
 
+LENTS_MAX = 5              # Chrome muet 5 passages de suite pour un module : ce module s'arrete
+PAUSE_LENT = 10            # secondes avant de reprendre apres une reponse trop lente de Chrome
 CHIEN_DE_GARDE = 120                    # secondes : un passage de module plus long est signale (et la connexion verifiee)
 
 
@@ -233,6 +236,24 @@ async def ordonnancer(entrees, horloge=time.time, dormir=asyncio.sleep, vivante=
             e.module.max_attaques = e.module.nb_attaques + (max_attaques - total)      # le module s'arrete pile au total demande
         try:
             attente = await passage_surveille(e, vivante, sortie, arret)
+            e.lents = 0
+        except asyncio.TimeoutError:
+            # Chrome n'a pas repondu a temps (page du jeu occupee, PC charge) : ce n'est pas un bug du module. On verifie que
+            # le jeu est toujours connecte, puis le module reprend ; il ne s'arrete que si ca se repete
+            e.lents += 1
+            if vivante is not None and not await vivante():
+                raise ArretModule("SESSION COUPEE : Chrome ne repond plus ou le jeu est deconnecte. Tous les modules s'arretent.")
+            if e.lents >= LENTS_MAX:
+                texte = ("Chrome n'a pas repondu a temps %d fois de suite (page du jeu bloquee ?). Recharge la page du jeu "
+                         "ou relance le bot." % e.lents)
+                e.arrete = texte
+                sortie("")
+                sortie("[%s] ARRET DE CE MODULE : %s" % (e.etiquette, texte))
+                continue
+            sortie("[%s] Chrome a mis plus de 20 s a repondre (page du jeu occupee ?) ; la connexion est bonne, le module "
+                   "reprend dans %d s." % (e.etiquette, PAUSE_LENT))
+            e.prochain = horloge() + PAUSE_LENT
+            continue
         except tours.T.ErreurCDP:
             raise
         except Exception as ex:                       # bug dans un module : on le note en entier, ce module s'arrete, les autres continuent

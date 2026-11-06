@@ -210,7 +210,7 @@ def normaliser_forteresses(data, ancienne=None, autres=None):
     sec = _entier(r.get("secondes", 0), "Réservation, secondes", 0, forteresses.RESERVE_MAX_SECONDES, erreurs)
     communs = forteresses.commandants_communs(cfg["commandants"] or [], autres if autres is not None else forteresses.autres_commandants())
     if sec:
-        mx = _entier(r.get("max"), "Réservation, maximum", 1, max(1, len(communs)), erreurs)
+        mx = _entier(r.get("max"), "Réservation, maximum", 1, max(1, len(cfg["commandants"] or []), len(communs)), erreurs)
         cfg["reserve"] = {"secondes": sec, "max": mx or 1}
     else:
         cfg["reserve"] = {"secondes": 0, "max": 1}

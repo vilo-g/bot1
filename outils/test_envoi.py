@@ -99,7 +99,11 @@ class Navigateur:
         f = asyncio.get_running_loop().create_future()
         self.attente[i] = f
         await self.ws.send(json.dumps(msg))
-        m = await asyncio.wait_for(f, timeout)
+        try:
+            m = await asyncio.wait_for(f, timeout)
+        except asyncio.TimeoutError:
+            self.attente.pop(i, None)            # Chrome n'a pas repondu a temps (page du jeu occupee) : pas de reste en attente
+            raise
         if "error" in m:
             raise ErreurCDP(m["error"].get("message", str(m["error"])))
         return m.get("result", {})
