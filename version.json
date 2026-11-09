@@ -1,11 +1,8 @@
 {
-  "version": 6,
+  "version": 7,
   "date": "09/11/2026",
   "nouveautes": [
-    "Nouveau module Défense (page Défense) : quand un château est attaqué au-delà du seuil choisi, tous ses soldats partent en soutien chez le membre de l'alliance en protection le plus proche (commandant choisi par royaume d'abord, 10 types de soldats par commandant), puis sont rappelés après l'attaque. Les autres modules sont en pause sur ce monde pendant l'attaque. Option : ouvrir la porte (rubis) si l'attaque est vue trop tard.",
-    "Nouveau module Transferts (page Transferts) : la ressource spéciale de chaque royaume (fer, charbon, huile, verre) et le bois/pierre en trop sont envoyés vers les royaumes qui en manquent, accélération possible avec les passe-temps 1 h.",
-    "Forteresses : carte lue par lots de 8 zones (beaucoup plus rapide) et démarrage non bloqué : les autres modules partent tout de suite, les minuteurs se relisent à côté.",
-    "Tours et forteresses : plus d'arrêt quand les soldats sont tous partis en attaque, le module attend leur retour et reprend dès qu'ils rentrent. La carte des forteresses continue d'être lue dans un royaume sans soldats.",
-    "Outil de capture des messages du jeu (outils/lancer_capture.bat)."
+    "Forteresses : au démarrage, les minuteurs des forteresses déjà connues sont relus en premier (quelques secondes) ; la lecture complète d'un monde jamais lu se fait ensuite sans mettre les tours en pause.",
+    "Le message « pause : un module prioritaire… » ne s'affiche plus en boucle."
   ]
 }

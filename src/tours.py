@@ -1721,7 +1721,8 @@ class ModuleTours:
             if self.max_attaques and self.nb_attaques >= self.max_attaques:
                 return 0
         if cede:
-            self._noter("   pause : un module prioritaire (forteresses) a une attaque a faire, il passe d'abord ; reprise juste apres.")
+            self._attente_msg("pause-prioritaire", "   pause : un module prioritaire (forteresses ou defense) a quelque chose a faire "
+                              "tout de suite, il passe d'abord ; reprise juste apres.")
             return 1
         self._verifier_stock()
         return 5

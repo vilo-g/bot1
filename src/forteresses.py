@@ -943,6 +943,9 @@ class ModuleForteresses(tours.ModuleTours):
                 raise ArretModule("Aucun des commandants choisis n'existe dans ta liste : arret.")
             attente = max(5, min(restants) - t)
             self._attente_msg("commandants", "En attente : un commandant revient au plus tard dans %s." % duree(attente))
+            if self._releve_initiale and self._a_relire:
+                await self._rafraichir()
+                return 0.1
             if self._lecture_en_cours():
                 await self._lire_morceau()           # la lecture de la carte continue pendant que les commandants sont partis
                 return PAUSE_LECTURE
@@ -952,7 +955,9 @@ class ModuleForteresses(tours.ModuleTours):
             return min(attente, 3)
         if self.releve_t is None or (self._lecture_complete_a_refaire() and t - self.releve_t >= REFRAICHIR):
             await self.releve()                      # au demarrage, ou si la 1re lecture a rate : (re)lance la lecture par morceaux
-        if self._lecture_en_cours():
+        if self._releve_initiale and self._a_relire:
+            await self._rafraichir()                 # demarrage : minuteurs des positions memorisees d'abord (quelques secondes)
+        elif self._lecture_en_cours():
             await self._lire_morceau()               # 1re lecture : quelques zones, puis on attaque ce qui a ete trouve
         else:
             await self._rafraichir()                 # minuteurs : quelques zones par passage seulement
