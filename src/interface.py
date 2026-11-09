@@ -35,6 +35,8 @@ import coffre       # noqa: E402
 import zipfile      # noqa: E402
 import maj          # noqa: E402
 import achats       # noqa: E402
+import defense      # noqa: E402
+import transferts   # noqa: E402
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(ICI, "interface.html")
@@ -42,7 +44,7 @@ PORT = 8770
 DOSSIER_IMAGES = os.path.join(ICI, "images")
 NOMS_UNITES = {215: "Vierge à bouclier niv. 10", 6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-05-achats"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-08-transferts"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -354,6 +356,50 @@ def arguments_lancement(lanceur):
     return args
 
 
+def normaliser_defense(data, ancienne=None):
+    """Reglages du module defense -> rubrique "defense", ou ErreurSaisie."""
+    ancienne = ancienne if isinstance(ancienne, dict) else {}
+    erreurs = []
+    cfg = {k: v for k, v in ancienne.items() if k not in ("seuil", "porte", "secondes_porte", "commandants_royaumes", "min_par_type")}
+    mp = _entier(data.get("min_par_type", defense.MIN_PAR_TYPE), "Soldats minimum par type", 1, defense.SEUIL_MAX, erreurs)
+    if mp is not None:
+        cfg["min_par_type"] = mp
+    cr = {}
+    for k, v in (data.get("commandants_royaumes") or {}).items():
+        if str(k) in ("0", "1", "2", "3") and v not in (None, ""):
+            n = _entier(v, "Commandant prioritaire %s" % tours.ROYAUMES[int(k)], 1, 99, erreurs)
+            if n is not None:
+                cr[str(k)] = n
+    cfg["commandants_royaumes"] = cr
+    seuil = _entier(data.get("seuil"), "Nombre de soldats de l'attaque", 1, defense.SEUIL_MAX, erreurs)
+    sp = _entier(data.get("secondes_porte", defense.SECONDES_PORTE), "Secondes avant l'arrivée (porte)", 5, 600, erreurs)
+    if seuil is not None:
+        cfg["seuil"] = seuil
+    if sp is not None:
+        cfg["secondes_porte"] = sp
+    cfg["porte"] = bool(data.get("porte"))
+    cfg["commandants"] = []
+    if not erreurs and not defense.config_valide(cfg):
+        erreurs.append("Configuration incomplète.")
+    if erreurs:
+        raise ErreurSaisie(erreurs)
+    return cfg
+
+
+def normaliser_transferts(data, ancienne=None):
+    """Reglages du module transferts -> rubrique "transferts", ou ErreurSaisie."""
+    erreurs = []
+    cfg = {k: v for k, v in (ancienne if isinstance(ancienne, dict) else {}).items() if k not in ("min_envoi", "accelerer")}
+    m = _entier(data.get("min_envoi", transferts.MIN_ENVOI), "Quantité minimum par envoi", 1, 100000000, erreurs)
+    if m is not None:
+        cfg["min_envoi"] = m
+    cfg["accelerer"] = bool(data.get("accelerer"))
+    cfg["commandants"] = []
+    if erreurs:
+        raise ErreurSaisie(erreurs)
+    return cfg
+
+
 def demarrer_bot(lanceur, popen=subprocess.Popen):
     with _verrou:
         if etat_bot()["etat"] != "arrete":
@@ -363,7 +409,9 @@ def demarrer_bot(lanceur, popen=subprocess.Popen):
             m = bot.par_nom()[nom]
             rub, valide = {"tours": ("tours", tours.config_valide),
                            "forteresses": (forteresses.RUBRIQUE, forteresses.config_valide),
-                           "achats": (achats.RUBRIQUE, achats.config_valide)}[nom]
+                           "achats": (achats.RUBRIQUE, achats.config_valide),
+                           "defense": (defense.RUBRIQUE, defense.config_valide),
+                           "transferts": (transferts.RUBRIQUE, transferts.config_valide)}[nom]
             if not valide((tout or {}).get(rub)):
                 raise ErreurSaisie(["Module %s : réglages incomplets, enregistre-les d'abord." % m.LANCEUR_NOM])
         try:
@@ -390,7 +438,9 @@ def tout_etat():
     tout = tout if isinstance(tout, dict) else {}
     prix = achats.prix_engins() if os.path.exists(tours.FICHIER_ITEMS) else {w: p for w, (_, _, p) in achats.ENGINS.items()}
     return {"config": {"tours": tout.get("tours"), "forteresses": tout.get(forteresses.RUBRIQUE), "lanceur": tout.get(bot.RUBRIQUE),
-                       "achats": tout.get(achats.RUBRIQUE)},
+                       "achats": tout.get(achats.RUBRIQUE), "defense": tout.get(defense.RUBRIQUE),
+                       "transferts": tout.get(transferts.RUBRIQUE)},
+            "prix_porte_max": defense.PRIX_PORTE_MAX,
             "engins": [{"id": w, "nom": achats.NOMS_ENGINS[w], "prix": prix[w],
                         "image": "images/engins/%d.png" % w if os.path.exists(os.path.join(DOSSIER_IMAGES, "engins", "%d.png" % w)) else None}
                        for w in achats.ENGINS],
@@ -449,6 +499,10 @@ def enregistrer(rubrique, data):
             cfg = normaliser_lanceur(data, tout.get(bot.RUBRIQUE))
         elif rubrique == "achats":
             cfg = normaliser_achats(data, tout.get(achats.RUBRIQUE))
+        elif rubrique == "defense":
+            cfg = normaliser_defense(data, tout.get(defense.RUBRIQUE))
+        elif rubrique == "transferts":
+            cfg = normaliser_transferts(data, tout.get(transferts.RUBRIQUE))
         else:
             raise ErreurSaisie(["Rubrique inconnue."])
         tours.memoriser_config(cfg, rubrique={"forteresses": forteresses.RUBRIQUE, "lanceur": bot.RUBRIQUE}.get(rubrique, rubrique))

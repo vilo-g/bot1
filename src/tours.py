@@ -996,6 +996,7 @@ class Partage:
         self.routeur = None
         self.priorites = {}
         self.urgences = {}
+        self.royaumes_bloques = set()      # module defense : royaumes attaques (les autres modules y sont en pause)
         self.pieces = None                 # pieces du compte (message gcu du jeu), None tant qu'on ne les a pas vues
         self.signe_de_vie = lambda: None   # lanceur : met a jour l'etat du bot pendant un long passage (l'interface le voit vivant)
 
@@ -1037,6 +1038,7 @@ class ModuleTours:
         self.partage = partage if partage is not None else Partage()   # etat commun aux modules de la session
         self.journal = FICHIER_JOURNAL if journal is JOURNAL_DEFAUT else journal
         self.libre_a = libre_a if libre_a is not None else self.partage.libre_a   # numero de commandant -> instant ou il revient
+        self.royaume_du_commandant = {}   # commandant -> royaume de sa derniere attaque (ses soldats y reviennent)
         self.zones_ratees = 0      # relectures de la carte ratees de suite (avant une attaque)
         self.unites = None         # fiches des unites (items.json) : complement des preselections par la plus forte attaque
         self.restriction = None    # None, ou fonction -> commandants que ce module n'a pas le droit de prendre (en plus des reservations du partage)
@@ -1182,9 +1184,34 @@ class ModuleTours:
         return self.cfg["reglages"][str(kid)]
 
     def _royaumes_actifs(self):
-        """Royaumes choisis qui ont encore des soldats (ceux en pause 'sans stock' sont laisses de cote)."""
+        """Royaumes choisis qui ont encore des soldats (ceux en pause 'sans stock' sont laisses de cote) et ou il n'y a pas
+        d'attaque en cours (module defense : pause sur ce royaume)."""
+        bloques = getattr(self.partage, "royaumes_bloques", None) or ()
+        return [k for k in self._royaumes_avec_stock() if k not in bloques]
+
+    def _royaumes_avec_stock(self):
+        self._reprendre_retours()
         t = self.horloge()
         return [k for k in self.cfg["royaumes"] if self.sans_stock.get(k, 0) <= t]
+
+    def _reprendre_retours(self):
+        """Royaume laisse de cote faute de soldats : des qu'un commandant parti de ce royaume est rentre (ses soldats avec lui),
+        le royaume est repris tout de suite, sans attendre la fin des 5 minutes."""
+        t = self.horloge()
+        for kid, fin in list(self.sans_stock.items()):
+            if fin <= t:
+                continue
+            debut = fin - PAUSE_SANS_STOCK
+            rentres = [p for p, k in self.royaume_du_commandant.items() if k == kid and debut < self.libre_a.get(p, 0) <= t]
+            if rentres:
+                del self.sans_stock[kid]
+                self._noter("   soldats revenus au %s (commandant %s) : le royaume est repris."
+                            % (ROYAUMES.get(kid, kid), ";".join(str(p) for p in sorted(rentres))))
+
+    def _soldats_en_route(self):
+        """True si au moins un commandant (de n'importe quel module) est parti et doit revenir avec ses soldats."""
+        t = self.horloge()
+        return any(v > t for v in self.libre_a.values())
 
     def _couronnes(self, kid):
         """Zones de 13x13 autour du chateau du royaume, rangees par couronnes de 13 cases (0 = autour du chateau, 1 = de 13 a 26...)."""
@@ -1422,6 +1449,7 @@ class ModuleTours:
             self.nb_attaques += 1
             # borne haute de securite (aller + retour identiques) ; remplacee par la vraie duree des l'arrivee (message cat)
             self.libre_a[pos] = self.horloge() + 2 * tt + 15
+            self.royaume_du_commandant[pos] = kid
             self.en_route[cle] = (pos, self.horloge() + tt)
             self.engagees[cle] = self.horloge() + tt + self.ATTENTE_APRES_ATTAQUE
             self._noter("ATTAQUE %d : commandant %d (%s) -> %s niv %s, dist %.1f, mode %s, soldat %s, cheval %s, %s, trajet %s s"
@@ -1699,7 +1727,13 @@ class ModuleTours:
         return 5
 
     def _verifier_stock(self):
-        if not self._royaumes_actifs():
+        if not self._royaumes_avec_stock():
+            if self._soldats_en_route():
+                t = self.horloge()
+                retour = min(v for v in self.libre_a.values() if v > t)
+                self._attente_msg("sans-soldats", "Plus de soldats disponibles pour l'instant : le module attend le retour des "
+                                  "soldats partis en attaque (premier retour dans %s)." % duree(retour - t))
+                return
             blocs = [self._reglages(k) for k in self.cfg["royaumes"]]
             unites = "/".join(str(u) for u in sorted({x for b in blocs for x in soldats_de(b)}))
             modes = {b["mode"] for b in blocs}

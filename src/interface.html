@@ -213,6 +213,8 @@ input.faux{border-color:var(--err)}
       <button data-page="tours"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21V10L6 8V4h3v2h2V4h2v2h2V4h3v4l-2 2v11"/><path d="M5 21h14M11 21v-4a1 1 0 0 1 2 0v4"/></svg>Tours<span class="pastille" id="p-tours">-</span></button>
       <button data-page="forteresses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V11h3V8h3v3h6V8h3v3h3v10"/><path d="M3 21h18M10 21v-4h4v4M12 3v5M12 3l4 1.5L12 6"/></svg>Forteresses<span class="pastille" id="p-forteresses">-</span></button>
       <button data-page="achats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4"/><path d="M3 10.5v4c0 1.4 2.7 2.5 6 2.5 1 0 2-.1 2.8-.3"/><circle cx="17" cy="16" r="4.5"/><path d="M17 14v4M15 16h4"/></svg>Achats<span class="pastille" id="p-achats">-</span></button>
+      <button data-page="defense"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Défense<span class="pastille" id="p-defense">-</span></button>
+      <button data-page="transferts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>Transferts<span class="pastille" id="p-transferts">-</span></button>
       <div class="titre">Suivi</div>
       <button data-page="journal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>Journal</button>
     </div>
@@ -382,6 +384,71 @@ input.faux{border-color:var(--err)}
         <ul class="erreurs" id="a-erreurs"></ul>
       </section>
 
+      <!-- ===================== DEFENSE -->
+      <section class="page" id="page-defense">
+        <div class="carte">
+          <h2>Quand réagir</h2>
+          <p class="aide">Quand une attaque part vers un de tes châteaux, le jeu l'annonce avec une estimation du nombre de soldats
+            (ton bailli la précise en approchant ; le bot décide dès l'apparition de l'attaque). À partir du nombre ci-dessous,
+            <b>tous les soldats du château attaqué</b> (pas les engins) partent en soutien chez le membre de l'alliance
+            <b>en protection</b> le plus proche, sur le même monde. Ils sont rappelés dès que l'attaque est passée.
+            Pendant ce temps, les autres modules sont en pause sur ce monde seulement.</p>
+          <div class="grille g3">
+            <label class="champ">Réagir à partir de (soldats dans l'attaque)<input type="number" id="d-seuil" min="1" placeholder="ex. 500"></label>
+          </div>
+          <div class="segment" id="d-seuil-rapide" style="margin-top:10px"></div>
+          <div class="grille g3" style="margin-top:16px">
+            <label class="champ">N'envoyer un type de soldat qu'à partir de<input type="number" id="d-min" min="1" placeholder="ex. 100"></label>
+          </div>
+          <p class="aide" style="margin:8px 0 0">Les types de soldats moins nombreux restent au château : pas de commandant pris pour
+            quelques miettes. Chaque commandant emmène jusqu'à 10 types de soldats, les plus nombreux d'abord.</p>
+        </div>
+        <div class="carte">
+          <h2>Commandants</h2>
+          <p class="aide">Pour chaque monde, le commandant qui emmène en premier les soldats les plus nombreux (par exemple celui
+            qui baisse le coût des envois de troupes). S'il reste des soldats, le bot complète avec d'autres commandants libres,
+            d'abord ceux qu'aucun module n'utilise. Numéros comme dans le jeu ; laisse vide pour laisser le bot choisir.</p>
+          <div class="grille g4" id="d-cmds"></div>
+        </div>
+        <div class="carte">
+          <h2>Porte de secours (rubis)</h2>
+          <p class="aide">Si l'attaque est vue trop tard, ou si les soldats n'ont pas pu partir, le bot peut ouvrir la porte du château :
+            les soldats restés ne sont pas tués. L'ouverture est payée en rubis (450 lors de la capture) ; le bot refuse au-delà de
+            <span id="d-prix-max">2000</span> rubis.</p>
+          <div class="grille g3">
+            <div class="champ">Activer<label class="interrupteur" style="margin-top:6px"><input type="checkbox" id="d-porte"><i></i>Ouvrir la porte si besoin</label></div>
+            <label class="champ">Secondes avant l'arrivée de l'attaque<input type="number" id="d-sec" min="5" max="600"></label>
+          </div>
+        </div>
+        <div class="barre"><div class="msg" id="d-msg">Aucune modification.</div>
+          <button class="bouton" id="d-annuler">Annuler</button><button class="bouton principal" id="d-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="d-erreurs"></ul>
+      </section>
+
+      <!-- ===================== TRANSFERTS -->
+      <section class="page" id="page-transferts">
+        <div class="carte">
+          <h2>Répartition des ressources entre les royaumes</h2>
+          <p class="aide">Toutes les 5 minutes, le bot lit les ressources de tous tes châteaux et envoie :</p>
+          <ul class="aide" style="margin:0 0 10px 18px">
+            <li><b>la ressource spéciale de chaque royaume</b> (vert : fer, glacier : charbon, sables : huile, pics de feu : verre)
+              vers les autres royaumes qui en manquent, dans l'ordre vert, glacier, sables, feu ;</li>
+            <li><b>le bois et la pierre</b> des royaumes où le module tours tourne, quand ils y sont pleins, vers les royaumes
+              où il ne tourne pas et qui en manquent.</li>
+          </ul>
+          <p class="aide">Pas de réserve gardée au départ : les tours et les fiefs remplissent au fur et à mesure. Les royaumes attaqués
+            (module défense) sont laissés de côté pendant l'attaque.</p>
+          <div class="grille g3">
+            <label class="champ">Quantité minimum par envoi (par ressource)<input type="number" id="r-min" min="1"></label>
+            <div class="champ">Accélérer les envois<label class="interrupteur" style="margin-top:6px"><input type="checkbox" id="r-acc"><i></i>Passe-temps 1 h (2 par envoi)</label></div>
+          </div>
+          <p class="aide" style="margin:8px 0 0">Sans accélération, un envoi met 2 h à arriver.</p>
+        </div>
+        <div class="barre"><div class="msg" id="r-msg">Aucune modification.</div>
+          <button class="bouton" id="r-annuler">Annuler</button><button class="bouton principal" id="r-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="r-erreurs"></ul>
+      </section>
+
       <!-- ===================== JOURNAL -->
       <section class="page" id="page-journal">
         <div class="outils-journal">
@@ -405,10 +472,10 @@ const NOMS = {0:"vert",1:"sables",2:"glacier",3:"feu"};
 const COULEURS = {0:"var(--k0)",1:"var(--k1)",2:"var(--k2)",3:"var(--k3)"};
 const COTES = [["F","Flanc gauche"],["FF","Deux flancs"],["A","Avant"],["AF","Avant + flanc"],["AFF","Avant + 2 flancs"]];
 const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
-const VERSION = "2026-11-05-achats";     // doit etre egale a VERSION dans interface.py
+const VERSION = "2026-11-08-transferts";     // doit etre egale a VERSION dans interface.py
 let serveur = null;            // dernier /api/etat
-const etat = {tours:null, forteresses:null, achats:null};      // formulaires en cours
-const sale = {tours:false, forteresses:false, achats:false};
+const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null};      // formulaires en cours
+const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false};
 
 async function api(chemin, corps){
   const opt = corps === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-GGE-Bot":"1"}, body:JSON.stringify(corps)};
@@ -435,7 +502,9 @@ function cmdListe(t){ return String(t||"").split(";").map(x=>x.trim()).filter(x=
 /* ------------------------------------------------------------------ navigation */
 const TITRES = {accueil:["Tableau de bord","Lancer le bot et suivre ce qu'il fait"], compte:["Compte","Nom du compte et mot de passe, gardés sur ce PC"], tours:["Module tours","Réglages enregistrés dans config.json (rubrique tours)"],
   forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"],
-  achats:["Module achats","Dépenser le surplus de pièces en engins (rubrique achats)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
+  achats:["Module achats","Dépenser le surplus de pièces en engins (rubrique achats)"],
+  defense:["Module défense","Mettre les soldats à l'abri quand un château est attaqué (rubrique defense)"],
+  transferts:["Module transferts","Répartir les ressources entre les royaumes (rubrique transferts)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
 function aller(page){
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("visible", p.id === "page-"+page));
   document.querySelectorAll("#menu button").forEach(b => b.classList.toggle("actif", b.dataset.page === page));
@@ -457,16 +526,19 @@ function chargerFormulaires(){
     reserve: Object.assign({secondes:0, max:1}, cf.reserve || {})};
   for(const k of [1,2,3]) etat.forteresses.reglages[k] = Object.assign(defautFort(), (cf.reglages||{})[k] || {});
   etat.achats = etatAchats(serveur.config.achats);
-  sale.tours = sale.forteresses = sale.achats = false;
-  dessinerTours(); dessinerFort(); dessinerAchats(); marquer("tours"); marquer("forteresses"); marquer("achats");
+  etat.defense = etatDefense(serveur.config.defense);
+  etat.transferts = etatTransferts(serveur.config.transferts);
+  sale.tours = sale.forteresses = sale.achats = sale.defense = sale.transferts = false;
+  dessinerTours(); dessinerFort(); dessinerAchats(); dessinerDefense(); dessinerTransferts();
+  marquer("tours"); marquer("forteresses"); marquer("achats"); marquer("defense"); marquer("transferts");
   for(const id of ["t-cmd", "f-cmd"]) if($("#" + id).value) verifierCommandants(id);   // reglages enregistres faux : signales tout de suite
 }
 function marquer(mod, texte, classe){
-  const m = $("#" + {tours:"t", forteresses:"f", achats:"a"}[mod] + "-msg");
+  const m = $("#" + {tours:"t", forteresses:"f", achats:"a", defense:"d", transferts:"r"}[mod] + "-msg");
   m.className = "msg " + (classe || (sale[mod] ? "sale" : ""));
   m.textContent = texte || (sale[mod] ? "Modifications non enregistrées." : "Aucune modification.");
 }
-function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats})[mod](); } pastilles(); }
+function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats, defense:dessinerDefense, transferts:dessinerTransferts})[mod](); } pastilles(); }
 
 /* ------------------------------------------------------------------ blocs communs a un royaume */
 function curseur(min, max, pas, valeur, unite, poser){
@@ -840,13 +912,85 @@ $("#a-enregistrer").addEventListener("click", async () => {
     liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
   }
 });
+/* ------------------------------------------------------------------ module defense */
+function etatDefense(c){ c = c || {}; const cr = {}; for(const k of [0,1,2,3]) cr[k] = (c.commandants_royaumes||{})[k] != null ? String(c.commandants_royaumes[k]) : "";
+  return {seuil: c.seuil != null ? String(c.seuil) : "", porte: !!c.porte, secondes_porte: String(c.secondes_porte || 30), cmds: cr,
+          min_par_type: String(c.min_par_type || 100)}; }
+function erreursDefense(d){
+  const err = [], s = +d.seuil, sp = +d.secondes_porte;
+  if(!/^\d+$/.test(String(d.seuil).trim()) || s < 1) err.push("Indique à partir de combien de soldats dans l'attaque le bot réagit (1 ou plus).");
+  if(!/^\d+$/.test(String(d.secondes_porte).trim()) || sp < 5 || sp > 600) err.push("Porte : entre 5 et 600 secondes avant l'arrivée.");
+  if(!/^\d+$/.test(String(d.min_par_type).trim()) || +d.min_par_type < 1) err.push("Indique à partir de combien de soldats un type est envoyé (1 ou plus).");
+  for(const k of [0,1,2,3]){ const v = String(d.cmds[k]||"").trim(); if(v && (!/^\d+$/.test(v) || +v < 1 || +v > 99)) err.push("Commandant du " + NOMS[k] + " : un numéro entre 1 et 99 (ou vide)."); }
+  return err;
+}
+function dessinerDefense(){
+  const d = etat.defense; if(!d) return;
+  if(document.activeElement !== $("#d-seuil")) $("#d-seuil").value = d.seuil;
+  if(document.activeElement !== $("#d-sec")) $("#d-sec").value = d.secondes_porte;
+  if(document.activeElement !== $("#d-min")) $("#d-min").value = d.min_par_type;
+  $("#d-porte").checked = d.porte; $("#d-sec").disabled = !d.porte;
+  const zc = $("#d-cmds");
+  if(!zc.children.length) for(const k of [0,1,2,3]){
+    const i = el("input",{type:"number", min:"1", max:"99", placeholder:"au choix du bot", id:"d-cmd-"+k});
+    i.addEventListener("input", e => { etat.defense.cmds[k] = e.target.value.trim(); changer("defense", false); });
+    zc.append(el("label",{class:"champ"}, "Commandant " + NOMS[k], i));
+  }
+  for(const k of [0,1,2,3]){ const i = $("#d-cmd-"+k); if(document.activeElement !== i) i.value = d.cmds[k]; }
+  $("#d-prix-max").textContent = fmtN(serveur.prix_porte_max || 2000);
+  $("#d-seuil-rapide").replaceChildren(...[100, 500, 1000, 5000].map(v => el("button",{type:"button", class: +d.seuil === v ? "on" : "",
+    onclick:() => { d.seuil = String(v); changer("defense"); }}, fmtN(v) + " soldats")));
+}
+$("#d-seuil").addEventListener("input", e => { etat.defense.seuil = e.target.value.trim(); changer("defense", false); });
+$("#d-min").addEventListener("input", e => { etat.defense.min_par_type = e.target.value.trim(); changer("defense", false); });
+$("#d-sec").addEventListener("input", e => { etat.defense.secondes_porte = e.target.value.trim(); changer("defense", false); });
+$("#d-porte").addEventListener("change", e => { etat.defense.porte = e.target.checked; changer("defense"); });
+$("#d-annuler").addEventListener("click", () => { etat.defense = etatDefense(serveur.config.defense); sale.defense = false; dessinerDefense(); marquer("defense"); pastilles(); $("#d-erreurs").replaceChildren(); });
+$("#d-enregistrer").addEventListener("click", async () => {
+  const liste = $("#d-erreurs"); liste.replaceChildren();
+  const d = etat.defense, err = erreursDefense(d);
+  if(err.length){ marquer("defense", "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x))); return; }
+  try{
+    const cr = {}; for(const k of [0,1,2,3]) if(String(d.cmds[k]||"").trim()) cr[k] = +d.cmds[k];
+    const r = await api("/api/config/defense", {seuil: +d.seuil, porte: d.porte, secondes_porte: +d.secondes_porte, commandants_royaumes: cr, min_par_type: +d.min_par_type});
+    serveur.config.defense = r.config; sale.defense = false; marquer("defense", "Enregistré dans config.json.", "ok"); pastilles(); dessinerModules();
+  }catch(ex){
+    marquer("defense", "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
+  }
+});
+/* ------------------------------------------------------------------ module transferts */
+function etatTransferts(c){ c = c || {}; return {min_envoi: String(c.min_envoi || 10000), accelerer: !!c.accelerer}; }
+function erreursTransferts(r){ return (/^\d+$/.test(String(r.min_envoi).trim()) && +r.min_envoi >= 1) ? [] : ["Indique la quantité minimum par envoi (1 ou plus)."]; }
+function dessinerTransferts(){
+  const r = etat.transferts; if(!r) return;
+  if(document.activeElement !== $("#r-min")) $("#r-min").value = r.min_envoi;
+  $("#r-acc").checked = r.accelerer;
+}
+$("#r-min").addEventListener("input", e => { etat.transferts.min_envoi = e.target.value.trim(); changer("transferts", false); });
+$("#r-acc").addEventListener("change", e => { etat.transferts.accelerer = e.target.checked; changer("transferts"); });
+$("#r-annuler").addEventListener("click", () => { etat.transferts = etatTransferts(serveur.config.transferts); sale.transferts = false; dessinerTransferts(); marquer("transferts"); pastilles(); $("#r-erreurs").replaceChildren(); });
+$("#r-enregistrer").addEventListener("click", async () => {
+  const liste = $("#r-erreurs"); liste.replaceChildren();
+  const r = etat.transferts, err = erreursTransferts(r);
+  if(err.length){ marquer("transferts", "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x))); return; }
+  try{
+    const rep = await api("/api/config/transferts", {min_envoi: +r.min_envoi, accelerer: r.accelerer});
+    serveur.config.transferts = rep.config; sale.transferts = false; marquer("transferts", "Enregistré dans config.json.", "ok"); pastilles(); dessinerModules();
+  }catch(ex){
+    marquer("transferts", "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
+  }
+});
 function configOk(nom){
   const c = serveur && serveur.config[nom];
+  if(nom === "transferts") return !!(c && !erreursTransferts(etatTransferts(c)).length);
+  if(nom === "defense") return !!(c && c.seuil && !erreursDefense(etatDefense(c)).length);
   if(nom === "achats") return !!(c && c.seuil && c.royaumes && c.royaumes.length && !erreursAchats(etatAchats(c)).length);
   return !!(c && c.commandants && c.commandants.length && c.royaumes && c.royaumes.length);
 }
 function pastilles(){
-  for(const nom of ["tours","forteresses","achats"]){
+  for(const nom of ["tours","forteresses","achats","defense","transferts"]){
     const p = $("#p-"+nom); if(!p || !serveur) continue;
     const ok = configOk(nom); p.textContent = sale[nom] ? "modifié" : ok ? "prêt" : "à régler"; p.className = "pastille" + (ok && !sale[nom] ? " ok" : "");
   }
@@ -855,11 +999,13 @@ const choixModules = new Set();
 function dessinerModules(){
   const zone = $("#choix-modules"); zone.replaceChildren();
   const desc = {tours:"Tours les plus proches, couronne par couronne.", forteresses:"Forteresses lues sur la carte, minuteur personnel.",
-    achats:"Surplus de pièces dépensé en engins, après les attaques."};
+    achats:"Surplus de pièces dépensé en engins, après les attaques.",
+    defense:"Château attaqué : soldats à l'abri chez un membre protégé de l'alliance, puis rappelés.",
+    transferts:"Ressources réparties entre les royaumes (spéciale de chaque royaume, bois et pierre en trop)."};
   for(const m of serveur.modules){
     const ok = configOk(m.nom), on = choixModules.has(m.nom);
     const cb = el("input",{type:"checkbox", checked:on, onchange:e => { e.target.checked ? choixModules.add(m.nom) : choixModules.delete(m.nom); dessinerModules(); }});
-    zone.append(el("label",{class: on ? "on" : ""}, cb, el("div",{}, el("b",{}, m.nom[0].toUpperCase() + m.nom.slice(1) + "  "),
+    zone.append(el("label",{class: on ? "on" : ""}, cb, el("div",{}, el("b",{}, ({defense:"Défense"})[m.nom] || (m.nom[0].toUpperCase() + m.nom.slice(1)) + "  "),
       m.priorite === Math.min(...serveur.modules.map(x=>x.priorite)) ? el("span",{class:"puce or"},"prioritaire") : null, " ",
       el("span",{class:"puce " + (ok ? "ok" : "err")}, ok ? "réglages OK" : "à régler"), el("small",{style:"display:block;margin-top:4px"}, desc[m.nom] || ""))));
   }
@@ -882,6 +1028,11 @@ function dessinerEtat(){
     if(b.pieces != null) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Pièces du compte"), el("b",{}, fmtN(b.pieces))));
     for(const [nom, n] of Object.entries(b.achats || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Achats d'engins"), el("b",{}, String(n)),
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
+    for(const [nom, n] of Object.entries(b.transferts || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Transferts"),
+        el("b",{}, String(n)), el("small",{}, "envoi(s) de ressources")));
+    for(const [nom, v] of Object.entries(b.defense || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Défense"),
+        el("b",{}, String(v[1])), el("small",{}, v[0] + " attaque(s) vue(s), " + v[1] + " mise(s) à l'abri"),
+        (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
     for(const [nom, n] of Object.entries(b.attaques || {}))
       ch.append(el("div",{class:"chiffre"}, el("small",{}, "Attaques " + nom), el("b",{}, String(n)),
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
@@ -890,7 +1041,7 @@ function dessinerEtat(){
 }
 $("#b-demarrer").addEventListener("click", async () => {
   $("#l-erreurs").replaceChildren(); $("#l-msg").textContent = "";
-  if(sale.tours || sale.forteresses || sale.achats){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
+  if(sale.tours || sale.forteresses || sale.achats || sale.defense || sale.transferts){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
   const corps = {modules:[...choixModules], duree:$("#l-duree").value.trim(), max_attaques: $("#l-max").value ? +$("#l-max").value : null, simulation:$("#l-simu").checked, ecran_allume:$("#l-ecran").checked};
   try{ await api("/api/demarrer", corps); $("#l-msg").textContent = "Démarré : regarde la fenêtre du bot."; }
   catch(e){ $("#l-erreurs").replaceChildren(...(e.erreurs||["Erreur"]).map(x => el("li",{},x))); }

@@ -1,9 +1,11 @@
 {
-  "version": 5,
-  "date": "06/11/2026",
+  "version": 6,
+  "date": "09/11/2026",
   "nouveautes": [
-    "Quand Chrome met trop de temps à répondre (par exemple en revenant sur la page du jeu après un long moment), le module n'est plus arrêté : le bot vérifie la connexion et reprend 10 s plus tard. Il ne s'arrête que si ça se répète 5 fois de suite.",
-    "Un Chrome lent n'est plus pris pour une connexion perdue (vérification refaite 3 fois avant de conclure).",
-    "Forteresses : le nombre de commandants gardés par la réservation peut aller jusqu'au nombre de commandants du module."
+    "Nouveau module Défense (page Défense) : quand un château est attaqué au-delà du seuil choisi, tous ses soldats partent en soutien chez le membre de l'alliance en protection le plus proche (commandant choisi par royaume d'abord, 10 types de soldats par commandant), puis sont rappelés après l'attaque. Les autres modules sont en pause sur ce monde pendant l'attaque. Option : ouvrir la porte (rubis) si l'attaque est vue trop tard.",
+    "Nouveau module Transferts (page Transferts) : la ressource spéciale de chaque royaume (fer, charbon, huile, verre) et le bois/pierre en trop sont envoyés vers les royaumes qui en manquent, accélération possible avec les passe-temps 1 h.",
+    "Forteresses : carte lue par lots de 8 zones (beaucoup plus rapide) et démarrage non bloqué : les autres modules partent tout de suite, les minuteurs se relisent à côté.",
+    "Tours et forteresses : plus d'arrêt quand les soldats sont tous partis en attaque, le module attend leur retour et reprend dès qu'ils rentrent. La carte des forteresses continue d'être lue dans un royaume sans soldats.",
+    "Outil de capture des messages du jeu (outils/lancer_capture.bat)."
   ]
 }

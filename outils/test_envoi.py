@@ -195,6 +195,7 @@ class Jeu:
         self.session = None
         self.contexte = None     # id du contexte JavaScript qui contient le socket
         self.recus = []          # [(commande, code, payload_texte)]
+        self.ecouteurs = []      # fonctions(message) appelees pour chaque message recu (ex. module defense : attaques annoncees)
 
     async def _eval(self, expression):
         p = {"expression": expression, "returnByValue": True}
@@ -275,7 +276,13 @@ class Jeu:
         for texte in r.get("result", {}).get("value") or []:
             m = RE_MSG.match(texte)
             if m:
-                self.recus.append((m.group(1), int(m.group(3)), m.group(4)))
+                msg = (m.group(1), int(m.group(3)), m.group(4))
+                for f in self.ecouteurs:
+                    try:
+                        f(msg)
+                    except Exception:
+                        pass
+                self.recus.append(msg)
 
     async def cra_sortants(self):
         r = await self._eval("(()=>{const a=globalThis.__ggeCra||[];globalThis.__ggeCra=[];return a;})()")

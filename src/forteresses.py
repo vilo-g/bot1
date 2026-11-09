@@ -43,8 +43,9 @@ FICHIER_JOURNAL = os.path.join(tours.DOSSIER_CAPTURES, "journal_forteresses.txt"
 FICHIER_CARTE = os.path.join(tours.DOSSIER_CAPTURES, "carte_forteresses.json")
 ROYAUMES_FORTERESSES = (1, 2, 3)      # le royaume vert (0) n'a pas de forteresse
 REFRAICHIR = 300                      # secondes entre deux relectures des minuteurs sur la carte
-ZONES_PAR_PASSAGE = 3                 # relecture des minuteurs par petits morceaux (environ 2 s) : les autres modules ne sont pas bloques
-ZONES_LECTURE_PAR_PASSAGE = 4         # 1re lecture de la carte par morceaux de 4 zones (environ 3 s) entre deux attaques
+ZONES_PAR_PASSAGE = 16                # relecture des minuteurs par petits morceaux (2 lots, environ 1 s) : les autres modules ne sont pas bloques
+PAR_LOT = 8                           # zones de carte demandees d'un coup, sans attendre chaque reponse (le jeu en demande 8 a 10 a la fois)
+ZONES_LECTURE_PAR_PASSAGE = 16        # 1re lecture de la carte par morceaux de 16 zones (2 lots, environ 1 s) entre deux attaques
 LECTURE_PAR_MORCEAUX = True           # False : la 1re lecture est faite en entier au demarrage, avant toute attaque (ancien mode)
 PAUSE_LECTURE = 0.3                   # pause entre deux morceaux : les autres modules (tours) passent entre deux
 ESSAIS_PAR_COMMANDANT = 8             # forteresses essayees au plus pour un commandant et un passage
@@ -129,7 +130,7 @@ def estimation_premiere_lecture(distance_max, x=None, y=None):
         n = math.ceil((2 * distance_max + 1) / 13) ** 2
     else:
         n = len(zones_cercle(x, y, distance_max))
-    return n, n * (T.PAUSE_ENTRE_GAA + 0.25)
+    return n, math.ceil(n / PAR_LOT) * (T.PAUSE_ENTRE_GAA + 0.35)
 
 
 def questions_royaume(lire, sortie, kid, ancien=None):
@@ -402,6 +403,8 @@ class ModuleForteresses(tours.ModuleTours):
         self.fort = {}               # (royaume, x, y) -> {"niveau": n, "dispo": instant ou elle est attaquable}
         self.releve_t = None         # instant de la derniere lecture des minuteurs
         self._a_relire = []          # [(royaume, zone)] : relecture des minuteurs en cours, quelques zones par passage
+        self._releve_initiale = False  # minuteurs des positions memorisees relus au demarrage (prioritaire, quelques secondes)
+        self.raisons = {}            # zone -> pourquoi elle n'a pas ete lue (derniere lecture)
         self._lecture = {}           # royaume -> 1re lecture de la carte EN COURS (par morceaux, entre deux attaques)
 
     # ---------------------------------------------------------------- construction (soldat le plus rapide, zone forteresse)
@@ -424,9 +427,20 @@ class ModuleForteresses(tours.ModuleTours):
                                         fiches_outils=self.fiches_outils, zone=combat.ZONE_FORTERESSE, unites=self.unites)
 
     def _verifier_stock(self):
-        if not self._royaumes_actifs():
-            raise ArretModule("Plus aucun soldat offensif utilisable dans le chateau de depart d'aucun des royaumes choisis : "
-                              "arret du module.")
+        if not self._royaumes_avec_stock():
+            if self._soldats_en_route():                 # des soldats reviennent d'attaque : le module attend leur retour
+                t = self.horloge()
+                retour = min(v for v in self.libre_a.values() if v > t)
+                self._attente_msg("sans-soldats", "Plus de soldats disponibles pour l'instant : le module attend le retour des "
+                                  "soldats partis en attaque (premier retour dans %s)." % duree(retour - t))
+                return
+            raise ArretModule("Plus aucun soldat offensif utilisable dans le chateau de depart d'aucun des royaumes choisis, et "
+                              "aucun soldat en route pour revenir : arret du module.")
+
+    def _royaumes_carte(self):
+        """Royaumes dont la carte est lue : tous ceux choisis, meme sans soldats pour le moment (sauf attaque en cours)."""
+        bloques = getattr(self.partage, "royaumes_bloques", None) or ()
+        return [k for k in self.cfg["royaumes"] if k not in bloques]
 
     # ---------------------------------------------------------------- carte memorisee (positions seulement)
     def _charger_carte(self):
@@ -470,24 +484,55 @@ class ModuleForteresses(tours.ModuleTours):
             pass
 
     # ---------------------------------------------------------------- lecture de la carte (gaa)
+    async def _lire_carres(self, kid, carres, delai=10):
+        """Plusieurs zones de 13x13 cases demandees d'un coup (PAR_LOT a la fois, sans attendre chaque reponse, comme le jeu)
+        -> {zone: forteresses libres [(x, y, niveau, minuteur)] ou None si pas lue (raison dans self.raisons[zone])}.
+        Chaque reponse est rattachee a sa zone par les positions des objets qu'elle contient (le jeu repond dans l'ordre ;
+        une reponse a une demande du jeu lui-meme, pour une autre zone, est ignoree)."""
+        res = {}
+        for i in range(0, len(carres), PAR_LOT):
+            lot = list(carres[i:i + PAR_LOT])
+            await self._vider()
+            for c in lot:
+                await self.jeu.envoyer("gaa", {"KID": kid, "AX1": c[0], "AY1": c[1], "AX2": c[2], "AY2": c[3]})
+            attente, mauvaise = list(lot), None
+            for _ in range(len(lot) + 6):
+                if not attente:
+                    break
+                rep = await self.jeu.attendre("gaa", delai)
+                if not rep:
+                    break
+                d = T.json_ou_none(rep[2])
+                if rep[1] != 0 or not isinstance(d, dict):
+                    c = attente.pop(0)                   # erreur : le jeu repond dans l'ordre des demandes
+                    res[c] = None
+                    self.raisons[c] = "le jeu repond par une erreur (code %s) : %s" % (rep[1], str(rep[2])[:70])
+                    continue
+                ai = d.get("AI", [])
+                if d.get("KID", kid) != kid or not isinstance(ai, list):
+                    mauvaise = "reponse pour un autre royaume ou sans liste d'objets (KID %s)" % d.get("KID")
+                    continue
+                pos = [(e[1], e[2]) for e in ai if isinstance(e, list) and len(e) >= 3 and isinstance(e[1], int) and isinstance(e[2], int)]
+                if pos:
+                    score, c = max((sum(1 for x, y in pos if dans_carre(z, x, y)), -n, z) for n, z in enumerate(attente))[0::2]
+                    if score == 0:
+                        continue                         # zone demandee par le jeu lui-meme (carte affichee) : pas a nous
+                else:
+                    c = attente[0]
+                attente.remove(c)
+                res[c] = [f for f in (forteresse_libre(e) for e in ai) if f]
+            for c in attente:
+                res[c] = None
+                self.raisons[c] = mauvaise or "pas de reponse en %d s" % delai
+            await self.dormir(T.PAUSE_ENTRE_GAA)
+        return res
+
     async def _lire_carre(self, kid, carre, delai=10):
-        """Une zone de 13x13 cases -> forteresses libres [(x, y, niveau, minuteur)] ; None si le jeu n'a pas repondu
-        (la raison est dans self.raison)."""
-        await self._vider()
-        await self.jeu.envoyer("gaa", {"KID": kid, "AX1": carre[0], "AY1": carre[1], "AX2": carre[2], "AY2": carre[3]})
-        rep = await self.jeu.attendre("gaa", delai)
-        await self.dormir(T.PAUSE_ENTRE_GAA)
-        if not rep:
-            self.raison = "pas de reponse en %d s" % delai
-            return None
-        d = T.json_ou_none(rep[2])
-        if rep[1] != 0 or not isinstance(d, dict):
-            self.raison = "le jeu repond par une erreur (code %s) : %s" % (rep[1], str(rep[2])[:70])
-            return None
-        if d.get("KID", kid) != kid or not isinstance(d.get("AI", []), list):
-            self.raison = "reponse pour un autre royaume ou sans liste d'objets (KID %s)" % d.get("KID")
-            return None
-        return [f for f in (forteresse_libre(e) for e in d.get("AI", [])) if f]
+        """Une seule zone -> forteresses libres, ou None (raison dans self.raison)."""
+        fs = (await self._lire_carres(kid, [carre], delai))[carre]
+        if fs is None:
+            self.raison = self.raisons.get(carre, "?")
+        return fs
 
     async def _lire_royaume(self, kid, complet):
         """Lit la carte du royaume : en entier (toutes les zones jusqu'a la distance maximale) ou seulement les zones qui
@@ -505,27 +550,29 @@ class ModuleForteresses(tours.ModuleTours):
             for (x, y, niv, minu) in fs:
                 vues[(x, y)] = (niv, minu, t)
 
-        for i, c in enumerate(carres):
-            fs = await self._lire_carre(kid, c)
-            if fs is None:
-                echecs.append(c)
-                raisons[c] = self.raison
-            else:
-                noter(fs)
-            if complet and len(carres) >= 40 and (i + 1) / len(carres) >= prochain and (i + 1) < len(carres):
+        for i in range(0, len(carres), PAR_LOT):
+            lu = await self._lire_carres(kid, carres[i:i + PAR_LOT])
+            for c, fs in lu.items():
+                if fs is None:
+                    echecs.append(c)
+                    raisons[c] = self.raisons.get(c, "?")
+                else:
+                    noter(fs)
+            fait = min(i + PAR_LOT, len(carres))
+            if complet and len(carres) >= 40 and fait / len(carres) >= prochain and fait < len(carres):
                 self._noter("   ... %d %% de la carte du royaume %d (%s) lue, %d forteresse(s) trouvee(s)."
-                            % (round(100 * (i + 1) / len(carres)), kid, ROYAUMES[kid], len(vues)))
-                prochain += 0.25
+                            % (round(100 * fait / len(carres)), kid, ROYAUMES[kid], len(vues)))
+                while prochain <= fait / len(carres):
+                    prochain += 0.25
         for _ in range(2):                                  # zones sans reponse : on les retente tout de suite, 2 fois
             if not echecs:
                 break
             await self.dormir(1)
             encore = []
-            for c in echecs:
-                fs = await self._lire_carre(kid, c, delai=6)
+            for c, fs in (await self._lire_carres(kid, echecs, delai=6)).items():
                 if fs is None:
                     encore.append(c)
-                    raisons[c] = self.raison
+                    raisons[c] = self.raisons.get(c, "?")
                 else:
                     noter(fs)
             echecs = encore
@@ -536,7 +583,7 @@ class ModuleForteresses(tours.ModuleTours):
         lus = set()
         nouveau = {}
         gardees = []
-        for kid in self._royaumes_actifs():
+        for kid in self._royaumes_carte():
             src, dmax = self.sources[kid], self._reglages(kid)["distance_max"]
             nom = "royaume %d (%s)" % (kid, ROYAUMES[kid])
             if kid in self._lecture:
@@ -544,6 +591,15 @@ class ModuleForteresses(tours.ModuleTours):
             complet = kid not in self.carte or self.lu_jusqua.get(kid, 0) < dmax
             if complet:
                 self._demarrer_lecture(kid)             # lue par morceaux entre deux attaques : les attaques commencent tout de suite
+                continue
+            if LECTURE_PAR_MORCEAUX and self.releve_t is None:
+                # demarrage avec les positions memorisees : les minuteurs sont relus a cote (par lots, quelques secondes),
+                # sans bloquer le demarrage des autres modules
+                connues, rates = self.carte.get(kid, {}), self.manquantes.get(kid, {})
+                laissees = self.abandonnees.get(kid, ())
+                self._a_relire += [(kid, c) for c in zones_cercle(src["x"], src["y"], dmax)
+                                   if c not in laissees and (c in rates or any(dans_carre(c, x, y) for (x, y) in connues))]
+                self._releve_initiale = True
                 continue
             vues, echecs, nb_zones, raisons = await self._lire_royaume(kid, False)
             rates = self.manquantes.setdefault(kid, {})
@@ -629,7 +685,7 @@ class ModuleForteresses(tours.ModuleTours):
 
     def _lecture_complete_a_refaire(self):
         """Royaume dont la carte n'a jamais ete lue en entier jusqu'a la distance maximale (1re lecture ratee), hors lecture en cours."""
-        return [k for k in self._royaumes_actifs() if k not in self._lecture
+        return [k for k in self._royaumes_carte() if k not in self._lecture
                 and (k not in self.carte or self.lu_jusqua.get(k, 0) < self._reglages(k)["distance_max"])]
 
     # ---------------------------------------------------------------- 1re lecture de la carte, par morceaux
@@ -648,7 +704,7 @@ class ModuleForteresses(tours.ModuleTours):
 
     def _lecture_en_cours(self):
         """True s'il reste des zones a lire dans un royaume actif (1re lecture par morceaux)."""
-        actifs = set(self._royaumes_actifs())
+        actifs = set(self._royaumes_carte())
         return any(k in actifs and st["zones"] for k, st in self._lecture.items())
 
     def avancement_lecture(self):
@@ -662,25 +718,29 @@ class ModuleForteresses(tours.ModuleTours):
     async def _lire_morceau(self, nb=None):
         """Lit au plus `nb` zones de la 1re lecture (tous royaumes : la zone la plus proche de SON chateau d'abord). Une zone sans
         reponse est remise a la fin (ESSAIS_ZONE essais en tout). Royaume termine : carte memorisee (voir _finir_lecture)."""
-        for _ in range(nb or ZONES_LECTURE_PAR_PASSAGE):
-            actifs = set(self._royaumes_actifs())
+        faites = 0
+        while faites < (nb or ZONES_LECTURE_PAR_PASSAGE):
+            actifs = set(self._royaumes_carte())
             prets = [k for k, st in self._lecture.items() if k in actifs and st["zones"]]
             if not prets:
                 break
             kid = min(prets, key=lambda k: distance_zone(self._lecture[k]["zones"][0][0], self.sources[k]["x"], self.sources[k]["y"]))
             st = self._lecture[kid]
-            c, essais = st["zones"].pop(0)
-            fs = await self._lire_carre(kid, c, delai=10 if essais == 0 else 6)
-            if fs is None:
-                st["raisons"][c] = self.raison
-                if essais + 1 < ESSAIS_ZONE:
-                    st["zones"].append((c, essais + 1))      # retentee a la fin de la lecture
-                else:
-                    st["echecs"].append(c)
-            else:
+            lot = [st["zones"].pop(0) for _ in range(min(PAR_LOT, len(st["zones"]), (nb or ZONES_LECTURE_PAR_PASSAGE) - faites))]
+            faites += len(lot)
+            lus = await self._lire_carres(kid, [c for c, _ in lot], delai=10 if all(e == 0 for _, e in lot) else 6)
+            src, dmax = self.sources[kid], self._reglages(kid)["distance_max"]
+            for c, essais in lot:
+                fs = lus.get(c)
+                if fs is None:
+                    st["raisons"][c] = self.raisons.get(c, "?")
+                    if essais + 1 < ESSAIS_ZONE:
+                        st["zones"].append((c, essais + 1))  # retentee a la fin de la lecture
+                    else:
+                        st["echecs"].append(c)
+                    continue
                 st["faites"] += 1
                 lu = self.horloge()
-                src, dmax = self.sources[kid], self._reglages(kid)["distance_max"]
                 for (x, y, niv, minu) in fs:
                     st["vues"][(x, y)] = niv
                     self.carte.setdefault(kid, {})[(x, y)] = niv
@@ -736,7 +796,7 @@ class ModuleForteresses(tours.ModuleTours):
         if not self._a_relire:
             if t - self.releve_t < REFRAICHIR:
                 return
-            for kid in self._royaumes_actifs():
+            for kid in self._royaumes_carte():
                 if kid in self._lecture:
                     continue                             # 1re lecture en cours : ses minuteurs sont tout frais
                 src, dmax = self.sources[kid], self._reglages(kid)["distance_max"]
@@ -745,24 +805,38 @@ class ModuleForteresses(tours.ModuleTours):
                 self._a_relire += [(kid, c) for c in zones_cercle(src["x"], src["y"], dmax)
                                    if c not in laissees and (c in rates or any(dans_carre(c, x, y) for (x, y) in connues))]
             self.releve_t = t
-        for _ in range(ZONES_PAR_PASSAGE):
-            if not self._a_relire:
-                break
-            kid, c = self._a_relire.pop(0)
-            if kid not in self._royaumes_actifs():
+        faites = 0
+        while self._a_relire and faites < ZONES_PAR_PASSAGE:
+            kid = self._a_relire[0][0]
+            lot = []
+            while self._a_relire and self._a_relire[0][0] == kid and len(lot) < min(PAR_LOT, ZONES_PAR_PASSAGE - faites):
+                lot.append(self._a_relire.pop(0)[1])
+            faites += len(lot)
+            if kid not in self._royaumes_carte():
                 continue
-            fs = await self._lire_carre(kid, c, delai=6)
-            rates = self.manquantes.setdefault(kid, {})
-            if fs is None:                               # pas de reponse : on garde les dernieres valeurs connues
-                rates[c] = rates.get(c, 0) + 1
-                if rates[c] >= ESSAIS_ZONE:
-                    del rates[c]
-                    self.abandonnees.setdefault(kid, set()).add(c)
-                    self._noter("   royaume %d (%s) : la zone x %d a %d, y %d a %d ne repond jamais : elle est ignoree."
-                                % (kid, ROYAUMES[kid], c[0], c[2], c[1], c[3]))
-                continue
-            rates.pop(c, None)
-            self._appliquer_zone(kid, c, fs)
+            for c, fs in (await self._lire_carres(kid, lot, delai=6)).items():
+                self._zone_relue(kid, c, fs)
+        if not self._a_relire and self._releve_initiale:
+            self._releve_initiale = False
+            for kid in self._royaumes_carte():
+                if kid not in self._lecture:
+                    n = sum(1 for k in self.fort if k[0] == kid)
+                    dispo = sum(1 for k, f in self.fort.items() if k[0] == kid and f["dispo"] <= self.horloge() + 1)
+                    self._noter("   minuteurs relus : royaume %d (%s), %d forteresse(s) dans la distance maximale, %d attaquable(s) "
+                                "maintenant." % (kid, ROYAUMES[kid], n, dispo))
+
+    def _zone_relue(self, kid, c, fs):
+        rates = self.manquantes.setdefault(kid, {})
+        if fs is None:                                   # pas de reponse : on garde les dernieres valeurs connues
+            rates[c] = rates.get(c, 0) + 1
+            if rates[c] >= ESSAIS_ZONE:
+                del rates[c]
+                self.abandonnees.setdefault(kid, set()).add(c)
+                self._noter("   royaume %d (%s) : la zone x %d a %d, y %d a %d ne repond jamais : elle est ignoree."
+                            % (kid, ROYAUMES[kid], c[0], c[2], c[1], c[3]))
+            return
+        rates.pop(c, None)
+        self._appliquer_zone(kid, c, fs)
 
     def _appliquer_zone(self, kid, c, fs):
         """Zone relue : minuteurs a jour ; une forteresse connue qui n'y est plus libre (prise par un joueur) est retiree."""
@@ -815,6 +889,8 @@ class ModuleForteresses(tours.ModuleTours):
     def urgence(self):
         """True si une forteresse est attaquable MAINTENANT et qu'un commandant de ce module est libre (commandants gardes par la
         reservation compris) : le lanceur fait alors passer ce module tout de suite, les autres s'interrompent."""
+        if self._releve_initiale and self._a_relire:
+            return True                                  # demarrage : minuteurs relus d'abord (quelques secondes)
         if not self._libres():
             return False
         t = self.horloge()
@@ -832,11 +908,19 @@ class ModuleForteresses(tours.ModuleTours):
         """Premiere lecture de la carte (au demarrage, avant la boucle) : positions memorisees ou lecture complete."""
         self._charger_carte()
         await self.releve()
-        for kid in self._royaumes_actifs():
+        for kid in self._royaumes_carte():
             dmax = self._reglages(kid)["distance_max"]
             if kid in self._lecture:
                 self.sortie("  - royaume %d (%s) : lecture de la carte jusqu'a %d cases en cours (%d zones) : les forteresses "
                             "trouvees sont attaquees pendant la lecture." % (kid, ROYAUMES[kid], dmax, self._lecture[kid]["total"]))
+                continue
+            if any(k == kid for k, _ in self._a_relire):
+                src = self.sources[kid]
+                n = sum(1 for (x, y) in self.carte.get(kid, {}) if math.hypot(x - src["x"], y - src["y"]) <= dmax)
+                nz = sum(1 for k, _ in self._a_relire if k == kid)
+                self.sortie("  - royaume %d (%s) : %d forteresse(s) connue(s) dans la distance maximale (%d cases) ; minuteurs relus "
+                            "a cote (%d zones, environ %s), les autres modules demarrent tout de suite."
+                            % (kid, ROYAUMES[kid], n, dmax, nz, duree(math.ceil(nz / PAR_LOT) * (T.PAUSE_ENTRE_GAA + 0.35))))
                 continue
             n = sum(1 for k, f in self.fort.items() if k[0] == kid)
             dispo = sum(1 for k, f in self.fort.items() if k[0] == kid and f["dispo"] <= self.horloge() + 1)
@@ -862,6 +946,9 @@ class ModuleForteresses(tours.ModuleTours):
             if self._lecture_en_cours():
                 await self._lire_morceau()           # la lecture de la carte continue pendant que les commandants sont partis
                 return PAUSE_LECTURE
+            if self._a_relire:
+                await self._rafraichir()
+                return 0.1 if self._releve_initiale else min(attente, 2)
             return min(attente, 3)
         if self.releve_t is None or (self._lecture_complete_a_refaire() and t - self.releve_t >= REFRAICHIR):
             await self.releve()                      # au demarrage, ou si la 1re lecture a rate : (re)lance la lecture par morceaux
@@ -877,6 +964,10 @@ class ModuleForteresses(tours.ModuleTours):
                 self._attente_msg("lecture", "Lecture de la carte en cours (%d %%) : rien d'attaquable pour l'instant "
                                   "(%d commandant(s) pret(s))." % (self.avancement_lecture(), len(libres)))
                 return PAUSE_LECTURE
+            if self._releve_initiale and self._a_relire:
+                self._attente_msg("minuteurs", "Lecture des minuteurs des forteresses en cours (%d zone(s) restante(s))."
+                                  % len(self._a_relire))
+                return 0.1
             if proch is None:
                 self._attente_msg("aucune-forteresse", "Aucune forteresse dans la distance choisie (%d commandant(s) pret(s)) : "
                                   "nouvelle lecture de la carte dans %s." % (len(libres), duree(REFRAICHIR - (t - self.releve_t))))

@@ -243,6 +243,8 @@ class ModuleAchats:
             if self.partage.urgence_prioritaire(self.NOM_MODULE):
                 return
             k, w, q = self.plan[0]
+            if k in (getattr(self.partage, "royaumes_bloques", None) or ()):
+                return                                   # attaque en cours sur ce monde (module defense) : plus tard
             t = self.horloge()
             if self.pause.get(w, 0) > t:
                 self.plan.pop(0)
