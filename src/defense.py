@@ -143,6 +143,7 @@ class ModuleDefense:
         self.retours = {}          # cid -> instant ou les soldats rappeles sont rentres
         self.echecs = {}           # cid -> raison du dernier envoi rate (pendant l'attaque en cours)
         self.verif = {}            # cid -> instant de la derniere verification des soldats
+        self.abri_ok = set()       # chateaux vides avec succes pendant l'attaque en cours : plus de verification, pas de porte
         self.porte = {}            # cid -> porte ouverte jusqu'a
         self.alliance, self.alliance_lue = None, float("-inf")
         self.recus = []            # messages gam pas encore lus
@@ -214,9 +215,15 @@ class ModuleDefense:
         self._absorber()
         t = self.horloge()
         for a in self._actives(t):
-            if a["arrivee"] > t and (a["cid"] not in self.envois or self.verif.get(a["cid"], 0) + VERIF_SOLDATS <= t):
+            if a["arrivee"] > t and self._a_verifier(a["cid"], t):
                 return True
         return any(self._rappel_du(cid, t) for cid in self.envois)
+
+    def _a_verifier(self, cid, t):
+        """Envoi a (re)tenter : jamais une fois le chateau vide avec succes ; sinon au premier passage puis toutes les 20 s."""
+        if cid in self.abri_ok:
+            return False
+        return cid not in self.verif or self.verif[cid] + VERIF_SOLDATS <= t
 
     def _rappel_du(self, cid, t):
         return cid in self.envois and not any(a["cid"] == cid for a in self._actives(t))
@@ -244,11 +251,15 @@ class ModuleDefense:
         self._maj_pauses(t)
         for cid, liste in par_chateau.items():
             premiere = min(a["arrivee"] for a in liste)
-            if cid not in self.envois or self.verif.get(cid, 0) + VERIF_SOLDATS <= self.horloge():
-                await self._mettre_a_l_abri(cid, max(a["arrivee"] for a in liste))
+            if self._a_verifier(cid, self.horloge()):
+                await self._mettre_a_l_abri(cid, max(a["arrivee"] for a in liste), premiere)
             reste = premiere - self.horloge()
-            if (self.cfg["porte"] and reste <= self.cfg.get("secondes_porte", SECONDES_PORTE) and self.porte.get(cid, 0) <= self.horloge()
-                    and (cid in self.echecs or any(a["tardive"] for a in liste))):
+            # porte seulement si le module n'a PAS reussi a vider le chateau (aucun protege, infos ou envoi refuses, plus de
+            # commandant, attaque vue trop tard pour finir l'envoi) ; jamais quand tous les soldats sont partis.
+            if (self.cfg["porte"] and cid not in self.abri_ok and reste <= self.cfg.get("secondes_porte", SECONDES_PORTE)
+                    and self.porte.get(cid, 0) <= self.horloge()):
+                if cid not in self.echecs:
+                    self._noter("   %s : envoi des soldats pas termine a %d s de l'attaque." % (self._nom_chateau(cid), max(0, reste)))
                 await self._ouvrir_porte(cid)
         for cid in list(self.envois):
             if self._rappel_du(cid, self.horloge()):
@@ -258,6 +269,10 @@ class ModuleDefense:
             del self.attaques[mid]
         for cid in [c for c in self.echecs if c not in par_chateau]:
             del self.echecs[cid]
+        for cid in [c for c in self.abri_ok if c not in par_chateau]:
+            self.abri_ok.discard(cid)
+        for cid in [c for c in self.verif if c not in par_chateau]:
+            del self.verif[cid]
         self._maj_pauses(t)
         return PAUSE_ATTAQUE if (par_chateau or self.envois) else PAUSE_CALME
 
@@ -299,7 +314,7 @@ class ModuleDefense:
         libres.sort(key=lambda pc: (pc[0] != prioritaire, pc[0] in modules, pc[0]))
         return libres
 
-    async def _mettre_a_l_abri(self, cid, fin_attaque):
+    async def _mettre_a_l_abri(self, cid, fin_attaque, premiere=None):
         c = self.chateaux[cid]
         self.verif[cid] = self.horloge()
         cible = await self.protege_le_plus_proche(c["kid"], c["x"], c["y"])
@@ -309,7 +324,10 @@ class ModuleDefense:
             self.echecs[cid] = "aucun protege"
             return False
         dist, p = cible
-        rep = await self._demander("sdi", {"TX": p["x"], "TY": p["y"], "SX": c["x"], "SY": c["y"]}, delai=10)
+        # la reponse sdi est grosse (~86 Ko) et lente quand le jeu est charge : 20 s d'attente, moins si l'attaque est proche
+        marge = (premiere if premiere is not None else fin_attaque) - self.horloge() - self.cfg.get("secondes_porte", SECONDES_PORTE)
+        rep = await self._demander("sdi", {"TX": p["x"], "TY": p["y"], "SX": c["x"], "SY": c["y"]},
+                                   delai=max(6, min(20, marge)))
         d = T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None
         if not isinstance(d, dict):
             self.echecs[cid] = "infos"
@@ -328,6 +346,7 @@ class ModuleDefense:
             if cid not in self.envois:
                 self._noter("   aucun soldat dans %s : rien a envoyer." % self._nom_chateau(cid))
             self.echecs.pop(cid, None)
+            self.abri_ok.add(cid)
             return True
         tous.sort(key=lambda wn: (-wn[1], wn[0]))                 # les soldats les plus nombreux d'abord
         interdits = [w for w, _ in tous if self.soldats[w] is not None and c["kid"] not in self.soldats[w]]
@@ -343,6 +362,7 @@ class ModuleDefense:
                         % (n_total, self._nom_chateau(cid), p["nom"], p["x"], p["y"], dist, libres[0][0]))
             self.envois.setdefault(cid, [])
             self.echecs.pop(cid, None)
+            self.abri_ok.add(cid)
             return True
         # chaque commandant emmene les 10 types de soldats les plus nombreux (pas de limite de nombre) ; s'il reste des types,
         # le commandant suivant complete.
@@ -386,10 +406,14 @@ class ModuleDefense:
             if not reste:
                 break
         if envoyes:
-            self.echecs.pop(cid, None)
             if reste:
-                self._noter("   %d soldat(s) restent dans %s (plus de commandant libre ou envoi refuse)."
-                            % (sum(n for _, n in reste), self._nom_chateau(cid)))
+                self.echecs[cid] = "incomplet"
+                self._noter("   %d soldat(s) restent dans %s (plus de commandant libre ou envoi refuse) : nouvel essai dans %d s."
+                            % (sum(n for _, n in reste), self._nom_chateau(cid), VERIF_SOLDATS))
+            else:
+                self.echecs.pop(cid, None)
+                self.abri_ok.add(cid)
+                self._noter("   %s est vide : plus rien a envoyer, rappel apres l'attaque." % self._nom_chateau(cid))
             return True
         self.echecs[cid] = raison or "refuse"
         self._noter("   ECHEC de l'envoi des soldats de %s (%s) : nouvel essai dans %d s." % (self._nom_chateau(cid), raison, VERIF_SOLDATS))

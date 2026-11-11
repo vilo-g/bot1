@@ -323,6 +323,10 @@ async def preparer(args, lire_sync=None, sortie=print, modules=None):
 async def demarrer(jeu, prets, args, sortie=print, lire=None):
     """APRES la connexion : demarre chaque module (dans l'ordre choisi) -> liste d'Entree pour l'ordonnanceur."""
     partage = tours.Partage()
+    try:
+        partage.compte = str(tours.lire_config().get("pseudo") or "")
+    except Exception:
+        pass
     for m, cfg, _ in prets:
         partage.commandants[m.LANCEUR_CLE] = list(cfg["commandants"])
         partage.priorites[m.LANCEUR_CLE] = getattr(m, "LANCEUR_PRIORITE", PRIORITE_DEFAUT)

@@ -1,8 +1,11 @@
 {
-  "version": 7,
-  "date": "09/11/2026",
+  "version": 8,
+  "date": "11/11/2026",
   "nouveautes": [
-    "Forteresses : au démarrage, les minuteurs des forteresses déjà connues sont relus en premier (quelques secondes) ; la lecture complète d'un monde jamais lu se fait ensuite sans mettre les tours en pause.",
-    "Le message « pause : un module prioritaire… » ne s'affiche plus en boucle."
+    "Tours : nouvelle option « Déplacement accéléré » (+50 % de vitesse, 2500 rubis), achetée dès qu'elle est disponible, une fois par jour (après 8h30).",
+    "Forteresses : la carte est mémorisée par château ; changer de compte ne relance plus une lecture complète.",
+    "Défense : plus de nouvelles demandes une fois le château vidé ; la porte ne s'ouvre que si l'envoi des soldats a échoué ou n'est pas terminé à 30 s de l'attaque.",
+    "Transferts : un seul transfert à la fois vers un même royaume ; le suivant attend la fin du premier (ou part tout de suite si l'envoi est accéléré).",
+    "Les refus du jeu sans données sont maintenant bien lus (plus de faux « pas de réponse »)."
   ]
 }

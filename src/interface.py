@@ -171,6 +171,11 @@ def normaliser_tours(data, ancienne=None):
             b["rayon"] = r
         regl[str(k)] = b
     cfg["reglages"] = regl
+    dep = data.get("deplacement_accelere", ancienne.get("deplacement_accelere", False))
+    if not isinstance(dep, bool):
+        erreurs.append("Déplacement accéléré : oui ou non.")
+    else:
+        cfg["deplacement_accelere"] = dep
     achat = data.get("achat_echelles", ancienne.get("achat_echelles", False))
     if not isinstance(achat, bool):
         erreurs.append("Achat automatique d'échelles : oui ou non.")

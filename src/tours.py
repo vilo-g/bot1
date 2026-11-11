@@ -72,6 +72,14 @@ ZONES_RELUES_PAR_PASSAGE = 3    # zones relues au plus par passage (les plus pro
 VERIFS_MAX_PAR_PASSAGE = 10     # tours verifiees (relues) au plus par passage : au-dela, pause courte et message (jamais de boucle sans fin)
 LARGEUR_CRAN = 13              # cases : la carte est lue par couronnes de cette largeur autour du chateau (= une zone gaa)
 SANS_INFO_PAUSES = (60, 300, 900, 1800)   # cible dont le jeu ne donne pas les infos : laissee de cote 1 min, 5, 15, puis 30 min
+# Deplacement accelere (option "deplacement_accelere" du module tours) : effet global +50 % de vitesse, 2500 rubis, une fois par
+# jour (il s'arrete a 8h30). usg -> {"SGE": [effets achetables]} ; achat agb {"GEID": 2} -> code 440 + prix (CC2T) -> confirmation
+# agb {"cmdID": "agb", "GEID": 2, "CC2T": prix} -> code 0 (capture du 11/11)
+EFFET_DEPLACEMENT = 2
+PRIX_DEPLACEMENT_MAX = 2500
+VERIF_DEPLACEMENT = 300           # verification toutes les 5 min tant qu'il n'est pas achete
+RESET_DEPLACEMENT = (8, 30)       # heure locale de fin de l'effet (nouvelle journee d'achat)
+
 # Achat automatique d'echelles en bois (option "achat_echelles" du module tours) : message sbp, comme l'armurier du jeu
 ECHELLES_SEUIL = 3000           # en dessous, le bot en rachete dans le chateau de depart du royaume
 ECHELLES_LOT = 10000            # quantite rachetee d'un coup...
@@ -492,6 +500,9 @@ def resume_config(cfg):
     for kid in cfg["royaumes"]:
         l.append("ROYAUME %d (%s) :" % (kid, ROYAUMES[kid]))
         l += ["    " + x for x in lignes_reglages(cfg["reglages"][str(kid)])]
+    if cfg.get("deplacement_accelere"):
+        l.append("deplacement accelere (+50 %%, %d rubis) achete chaque jour des qu'il est disponible (fin a %dh%02d)"
+                 % (PRIX_DEPLACEMENT_MAX, RESET_DEPLACEMENT[0], RESET_DEPLACEMENT[1]))
     if cfg.get("achat_echelles"):
         l.append("achat automatique d'echelles : moins de %d dans un royaume des tours -> %d achetees (si plus de %d M de pieces)"
                  % (ECHELLES_SEUIL, ECHELLES_LOT, PIECES_RESERVE // 1000000))
@@ -997,6 +1008,8 @@ class Partage:
         self.priorites = {}
         self.urgences = {}
         self.royaumes_bloques = set()      # module defense : royaumes attaques (les autres modules y sont en pause)
+        self.rubis = None                  # rubis du compte (gcu C2)
+        self.compte = ""                   # pseudo du compte (achats une fois par jour notes par compte)
         self.pieces = None                 # pieces du compte (message gcu du jeu), None tant qu'on ne les a pas vues
         self.signe_de_vie = lambda: None   # lanceur : met a jour l'etat du bot pendant un long passage (l'interface le voit vivant)
 
@@ -1039,6 +1052,9 @@ class ModuleTours:
         self.journal = FICHIER_JOURNAL if journal is JOURNAL_DEFAUT else journal
         self.libre_a = libre_a if libre_a is not None else self.partage.libre_a   # numero de commandant -> instant ou il revient
         self.royaume_du_commandant = {}   # commandant -> royaume de sa derniere attaque (ses soldats y reviennent)
+        self.deplacement_verif = float("-inf")
+        self.deplacement_absent_note = False
+        self.fichier_effets = os.path.join(DOSSIER_CAPTURES, "effets.json")
         self.zones_ratees = 0      # relectures de la carte ratees de suite (avant une attaque)
         self.unites = None         # fiches des unites (items.json) : complement des preselections par la plus forte attaque
         self.restriction = None    # None, ou fonction -> commandants que ce module n'a pas le droit de prendre (en plus des reservations du partage)
@@ -1510,6 +1526,97 @@ class ModuleTours:
         """Message gcu (ou bloc gcu d'une reponse) : {"C1": pieces, "C2": rubis}."""
         if isinstance(d, dict) and isinstance(d.get("C1"), (int, float)) and not isinstance(d.get("C1"), bool):
             self.partage.pieces = int(d["C1"])
+        if isinstance(d, dict) and isinstance(d.get("C2"), (int, float)) and not isinstance(d.get("C2"), bool):
+            self.partage.rubis = int(d["C2"])
+
+    # ---------------------------------------------------------------- deplacement accelere (effet global, rubis)
+    def _journee(self):
+        """Journee d'achat du deplacement accelere : elle commence a 8h30 (heure du PC)."""
+        h, m = RESET_DEPLACEMENT
+        return time.strftime("%Y-%m-%d", time.localtime(self.horloge() - (h * 3600 + m * 60)))
+
+    def _prochain_reset(self):
+        """Prochain 8h30 (heure du PC) : avant, inutile de reverifier une fois l'achat fait."""
+        h, m = RESET_DEPLACEMENT
+        lt = time.localtime(self.horloge())
+        r = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, m, 0, 0, 0, -1))
+        return r if r > self.horloge() else time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday + 1, h, m, 0, 0, 0, -1))
+
+    def _effets(self):
+        try:
+            with open(self.fichier_effets, encoding="utf-8") as f:
+                d = json.load(f)
+            return d if isinstance(d, dict) else {}
+        except (OSError, ValueError, TypeError):
+            return {}
+
+    async def _deplacement_accelere(self):
+        """Option : achete le deplacement accelere (+50 %) une fois par journee, des que le jeu le propose."""
+        if not self.cfg.get("deplacement_accelere") or self.horloge() < self.deplacement_verif:
+            return
+        self.deplacement_verif = self.horloge() + VERIF_DEPLACEMENT
+        jour, cle = self._journee(), str(getattr(self.partage, "compte", "") or "compte")
+        if self._effets().get(cle) == jour:
+            self.deplacement_verif = self._prochain_reset() + 30   # deja achete : plus rien a faire avant 8h30
+            return
+        if self.partage.urgence_prioritaire(self.NOM_MODULE):
+            self.deplacement_verif = self.horloge() + 30
+            return
+        try:
+            await self._vider()
+            await self.jeu.envoyer("usg", {})
+            rep = await self.jeu.attendre("usg", 8)
+            d = T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None
+            if not isinstance(d, dict) or EFFET_DEPLACEMENT not in (d.get("SGE") or []):
+                if not self.deplacement_absent_note:
+                    self._noter("   deplacement accelere : pas encore disponible ; je reverifie toutes les %d min."
+                                % (VERIF_DEPLACEMENT // 60))
+                    self.deplacement_absent_note = True
+                return
+            if self.simulation:
+                self._noter("[SIMULATION] le deplacement accelere serait achete (%d rubis)." % PRIX_DEPLACEMENT_MAX)
+                return
+            await self._vider()
+            await self.jeu.envoyer("agb", {"GEID": EFFET_DEPLACEMENT})
+            rep = await self.jeu.attendre("agb", 8)
+            d = T.json_ou_none(rep[2]) if rep else None
+            prix = d.get("CC2T") if isinstance(d, dict) else None
+            if not rep or rep[1] != 440 or not isinstance(prix, int):
+                self._noter("   deplacement accelere : le jeu ne donne pas le prix (%s) ; nouvel essai dans %d min."
+                            % ("code %s" % rep[1] if rep else "pas de reponse", VERIF_DEPLACEMENT // 60))
+                return
+            if prix > PRIX_DEPLACEMENT_MAX:
+                self._noter("   deplacement accelere NON achete : le jeu demande %d rubis (plus de %d)." % (prix, PRIX_DEPLACEMENT_MAX))
+                return
+            rubis = getattr(self.partage, "rubis", None)
+            if rubis is None:
+                await self._demander_pieces()
+                rubis = getattr(self.partage, "rubis", None)
+            if rubis is not None and rubis < prix:
+                self._noter("   deplacement accelere NON achete : %d rubis, il en faut %d." % (rubis, prix))
+                return
+            await self._vider()
+            await self.jeu.envoyer("agb", {"cmdID": "agb", "GEID": EFFET_DEPLACEMENT, "CC2T": prix})
+            rep = await self.jeu.attendre("agb", 8)
+            await self._absorber()
+            if rep and rep[1] == 0:
+                effets = self._effets()
+                effets[cle] = jour
+                try:
+                    os.makedirs(os.path.dirname(self.fichier_effets), exist_ok=True)
+                    with open(self.fichier_effets, "w", encoding="utf-8") as f:
+                        json.dump(effets, f)
+                except OSError:
+                    pass
+                self.deplacement_absent_note = False
+                self.deplacement_verif = self._prochain_reset() + 30           # plus de verification avant 8h30
+                self._noter("DEPLACEMENT ACCELERE achete (+50 %% de vitesse, %d rubis ; rubis restants : %s). Prochain achat apres %dh%02d."
+                            % (prix, getattr(self.partage, "rubis", "?"), RESET_DEPLACEMENT[0], RESET_DEPLACEMENT[1]))
+            else:
+                self._noter("   achat du deplacement accelere refuse par le jeu (%s) ; nouvel essai dans %d min."
+                            % ("code %s" % rep[1] if rep else "pas de reponse", VERIF_DEPLACEMENT // 60))
+        except T.ErreurCDP:
+            pass
 
     # ---------------------------------------------------------------- achat automatique d'echelles en bois
     async def _acheter_echelles(self, royaumes=None):
@@ -1637,6 +1744,7 @@ class ModuleTours:
     async def cycle(self):
         """Un passage : les attaques d'abord, puis (option) l'achat d'echelles ; renvoie les secondes avant le suivant."""
         attente = await self._cycle()
+        await self._deplacement_accelere()
         await self._acheter_echelles()
         return attente
 

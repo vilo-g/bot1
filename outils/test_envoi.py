@@ -39,7 +39,7 @@ CDP_HTTP = "http://127.0.0.1:9222"
 MOTIF_SOCKET = "-game.goodgamestudios.com"   # le WebSocket principal du jeu (tous serveurs)
 ZONE_PAR_DEFAUT = "EmpireEx_3"             # utilisee seulement si la zone ne peut pas etre detectee
 PAUSE_ENTRE_GAA = 0.4                  # secondes entre deux demandes de carte
-RE_MSG = re.compile(r"^%xt%([^%]+)%(-?\d+)%(-?\d+)%(.*)%$", re.S)
+RE_MSG = re.compile(r"^%xt%([^%]+)%(-?\d+)%(-?\d+)(?:%(.*))?%$", re.S)   # sans donnees : "%xt%kgt%1%114%" (refus)
 
 
 class ErreurCDP(Exception):
@@ -276,7 +276,7 @@ class Jeu:
         for texte in r.get("result", {}).get("value") or []:
             m = RE_MSG.match(texte)
             if m:
-                msg = (m.group(1), int(m.group(3)), m.group(4))
+                msg = (m.group(1), int(m.group(3)), m.group(4) or "")
                 for f in self.ecouteurs:
                     try:
                         f(msg)

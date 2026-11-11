@@ -9,11 +9,13 @@ Regles (demande du 08/11) :
   - bois et pierre : seulement depuis les royaumes ou le module tours tourne (il les remplit) et quand ils y sont pleins,
     vers les royaumes ou le module tours ne tourne pas et qui en manquent (meme ordre) ;
   - pas de reserve gardee au depart (les tours et les fiefs remplissent au fur et a mesure) ;
+  - un seul envoi a la fois vers un meme royaume (le suivant attend la fin du premier) ;
   - un envoi met 2 h a arriver ; option : l'accelerer avec des passe-temps 1 h (2 par envoi).
 Messages du jeu (capture du 08/11) : dcl (ressources et capacites de tous les chateaux, tous royaumes), kpi (royaumes
 debloques, envois en cours RT), kgt (envoi : chateau source, royaume source, royaume cible, liste [ressource, quantite]),
 msk (passe-temps MS5 = 1 h sur l'envoi en cours vers un royaume).
 """
+import asyncio
 import os
 import sys
 import time
@@ -137,6 +139,7 @@ class ModuleTransferts:
         self.nb_attaques = 0
         self.nb_transferts = 0
         self.plus_de_passes = False
+        self.occupes = set()
 
     def _tours(self):
         if self.royaumes_tours is not None:
@@ -157,7 +160,8 @@ class ModuleTransferts:
             self.sortie("ressources des chateaux pas recues : nouvel essai dans 1 min.")
             return 60
         rep = await self._demander("kpi", {})
-        ouverts, en_route, _ = lire_kpi(T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None)
+        ouverts, en_route, restant = lire_kpi(T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None)
+        self.occupes = {k for k, rs in restant.items() if rs > 0}     # un seul envoi a la fois par royaume cible
         if not ouverts:
             ouverts = set(stocks)
         plan = plan_transferts(stocks, ouverts, en_route, self._tours(), getattr(self.partage, "royaumes_bloques", ()) or (),
@@ -165,6 +169,8 @@ class ModuleTransferts:
         for cid, src, dst, g in plan:
             if self.partage.urgence_prioritaire(self.NOM_MODULE):
                 return 5                                   # attaque ou forteresse d'abord : la suite au passage suivant
+            if dst in self.occupes:
+                continue                                   # envoi deja en route vers ce royaume : au passage suivant
             await self._envoyer(cid, src, dst, g)
         return PAUSE
 
@@ -180,31 +186,45 @@ class ModuleTransferts:
                 _, _, restant = lire_kpi(T.json_ou_none(rep[2]))
                 self.sortie("TRANSFERT %s -> %s : %s (arrivee dans %s)." % (nom_monde(src), nom_monde(dst), texte,
                                                                            duree(restant.get(dst, 7200))))
-                if self.cfg.get("accelerer"):
-                    await self._accelerer(dst)
+                self.occupes.add(dst)
+                if self.cfg.get("accelerer") and await self._accelerer(dst):
+                    self.occupes.discard(dst)              # arrive tout de suite : le royaume peut en recevoir un autre
+                    await asyncio.sleep(2)
+                return
+            # refus : un envoi vers ce royaume encore en route (le jeu n'en accepte qu'un a la fois par royaume) -> on attend
+            rep_kpi = await self._demander("kpi", {})
+            _, _, restant = lire_kpi(T.json_ou_none(rep_kpi[2]) if rep_kpi and rep_kpi[1] == 0 else None)
+            if dst in restant:
+                if essai == 0 and restant[dst] <= 15:            # envoi accelere en train d'arriver : quelques secondes
+                    await asyncio.sleep(restant[dst] + 3)
+                    continue
+                self.sortie("   transfert %s -> %s en attente : un envoi vers le %s est deja en route (%s) ; au passage suivant."
+                            % (nom_monde(src), nom_monde(dst), nom_monde(dst), duree(restant[dst])))
                 return
             if essai < 2 and all(q >= 2 * MIN_ENVOI for _, q in g):
                 g = [[r, q // 2] for r, q in g]            # refuse : peut-etre trop d'un coup -> moitie
                 texte = ", ".join("%s %s" % (fmt(q), NOMS_RES[r]) for r, q in g)
                 continue
             break
-        self.sortie("   transfert %s -> %s refuse par le jeu (%s)." % (nom_monde(src), nom_monde(dst),
-                                                                       "code %s" % rep[1] if rep else "pas de reponse"))
+        self.sortie("   transfert %s -> %s refuse par le jeu (%s : %s)." % (nom_monde(src), nom_monde(dst),
+                                                                       "code %s" % rep[1] if rep else "pas de reponse", texte))
 
     async def _accelerer(self, dst):
+        """-> True si l'envoi est arrive (le royaume cible est libre pour un autre envoi)."""
         if self.plus_de_passes:
-            return
+            return False
         for n in range(MAX_PASSES_PAR_ENVOI):
             rep = await self._demander("msk", {"MST": PASSE_ENVOI, "KID": str(dst), "TT": "2"})
             if not rep or rep[1] != 0:
                 self.plus_de_passes = True
                 self.sortie("   acceleration impossible (%s) : plus de passe-temps 1 h ? Les envois suivants ne seront plus "
                             "acceleres." % ("code %s" % rep[1] if rep else "pas de reponse"))
-                return
+                return False
             _, _, restant = lire_kpi(T.json_ou_none(rep[2]))
             if restant.get(dst, 0) <= 0:
                 self.sortie("   envoi accelere : arrive (%d passe-temps 1 h)." % (n + 1))
-                return
+                return True
+        return False
 
 
 # ============================================================================== branchement dans le lanceur commun (src/bot.py)

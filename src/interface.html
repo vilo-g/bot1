@@ -325,6 +325,12 @@ input.faux{border-color:var(--err)}
           <p class="aide">Seulement dans les royaumes choisis ci-dessus, dans le château de départ des tours. Jamais avant une attaque de forteresse.</p>
           <label class="interrupteur"><input type="checkbox" id="t-achat"><i></i>Racheter des échelles automatiquement : moins de 3 000 → le bot en achète 10 000 (2,2 M de pièces), seulement s'il reste plus de 5 M de pièces</label>
         </div>
+        <div class="carte">
+          <h2>Déplacement accéléré (rubis)</h2>
+          <p class="aide">Effet global +50 % de vitesse des déplacements (en plus des +10 % permanents), pour la journée : il s'arrête à 8h30.
+            Le bot le rachète une fois par jour dès que le jeu le propose (il vérifie toutes les 5 minutes), jamais au-delà de 2 500 rubis.</p>
+          <label class="interrupteur"><input type="checkbox" id="t-deplacement"><i></i>Acheter le déplacement accéléré chaque jour (2 500 rubis)</label>
+        </div>
         <div class="barre"><div class="msg" id="t-msg">Aucune modification.</div>
           <button class="bouton" data-annuler="tours">Annuler</button><button class="bouton principal" data-enregistrer="tours">Enregistrer</button></div>
         <ul class="erreurs" id="t-erreurs"></ul>
@@ -520,7 +526,7 @@ function reglTours(r){ const b = Object.assign(defautTours(), r || {}); if(!(r &
 function defautFort(){ return {mode:"auto", cotes:"F", cheval:"F", distance_plumes:100, distance_max:50, vagues_remplies:2, presets:[1,1,1,1]}; }
 function chargerFormulaires(){
   const ct = serveur.config.tours || {}, cf = serveur.config.forteresses || {};
-  etat.tours = {commandants: cmdTexte(ct.commandants), royaumes:[...(ct.royaumes||[])], reglages:{}, achat_echelles: !!ct.achat_echelles};
+  etat.tours = {commandants: cmdTexte(ct.commandants), royaumes:[...(ct.royaumes||[])], reglages:{}, achat_echelles: !!ct.achat_echelles, deplacement_accelere: !!ct.deplacement_accelere};
   for(const k of [0,1,2,3]) etat.tours.reglages[k] = reglTours((ct.reglages||{})[k]);
   etat.forteresses = {commandants: cmdTexte(cf.commandants), royaumes:[...(cf.royaumes||[])], reglages:{},
     reserve: Object.assign({secondes:0, max:1}, cf.reserve || {})};
@@ -583,6 +589,7 @@ function dessinerTours(){
   const s = etat.tours;
   const cmd = $("#t-cmd"); if(document.activeElement !== cmd) cmd.value = s.commandants;
   $("#t-achat").checked = !!s.achat_echelles;
+  $("#t-deplacement").checked = !!s.deplacement_accelere;
   const zone = $("#t-royaumes"); zone.replaceChildren();
   for(const k of [0,1,2,3]){
     const on = s.royaumes.includes(k);
@@ -625,6 +632,7 @@ function verifierCommandants(id){
   return !err;
 }
 $("#t-achat").addEventListener("change", e => { etat.tours.achat_echelles = e.target.checked; changer("tours", false); });
+$("#t-deplacement").addEventListener("change", e => { etat.tours.deplacement_accelere = e.target.checked; changer("tours", false); });
 $("#t-cmd").addEventListener("input", e => { etat.tours.commandants = e.target.value; verifierCommandants("t-cmd"); changer("tours", false); dessinerReserveInfo(); });
 
 /* ------------------------------------------------------------------ unites des tours (images) */
@@ -739,7 +747,7 @@ function versServeur(mod){
     if(mod === "tours" && b.mode === "presets" && Array.isArray(b.soldats)) b.soldats = b.soldats.slice(0, 1); if(b.cheval !== "CF") delete b.distance_plumes; regl[k] = b; }
   const d = {commandants: s.commandants, royaumes: s.royaumes, reglages: regl};
   if(mod === "forteresses") d.reserve = {secondes: +s.reserve.secondes || 0, max: +s.reserve.max || 1};
-  if(mod === "tours") d.achat_echelles = !!s.achat_echelles;
+  if(mod === "tours"){ d.achat_echelles = !!s.achat_echelles; d.deplacement_accelere = !!s.deplacement_accelere; }
   return d;
 }
 document.querySelectorAll("[data-enregistrer]").forEach(b => b.addEventListener("click", async () => {

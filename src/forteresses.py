@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import copy
 import json
+import time
 import math
 import os
 import sys
@@ -41,6 +42,7 @@ T = tours.T
 RUBRIQUE = "forteresses"
 FICHIER_JOURNAL = os.path.join(tours.DOSSIER_CAPTURES, "journal_forteresses.txt")
 FICHIER_CARTE = os.path.join(tours.DOSSIER_CAPTURES, "carte_forteresses.json")
+CARTES_GARDEES = 24                    # cartes memorisees (une par chateau de depart : plusieurs comptes, plusieurs royaumes)
 ROYAUMES_FORTERESSES = (1, 2, 3)      # le royaume vert (0) n'a pas de forteresse
 REFRAICHIR = 300                      # secondes entre deux relectures des minuteurs sur la carte
 ZONES_PAR_PASSAGE = 16                # relecture des minuteurs par petits morceaux (2 lots, environ 1 s) : les autres modules ne sont pas bloques
@@ -443,6 +445,11 @@ class ModuleForteresses(tours.ModuleTours):
         return [k for k in self.cfg["royaumes"] if k not in bloques]
 
     # ---------------------------------------------------------------- carte memorisee (positions seulement)
+    @staticmethod
+    def cle_carte(kid, src):
+        """Une carte memorisee PAR CHATEAU de depart (royaume + position) : changer de compte ne refait pas le scan complet."""
+        return "%d:%d:%d" % (kid, src["x"], src["y"])
+
     def _charger_carte(self):
         if not self.fichier_carte:
             return
@@ -451,10 +458,13 @@ class ModuleForteresses(tours.ModuleTours):
                 d = json.load(f)
         except (OSError, ValueError):
             return
+        if not isinstance(d, dict):
+            return
         for kid in self.cfg["royaumes"]:
             try:
-                b, src = d[str(kid)], self.sources[kid]
-                if b["chateau"] == [src["x"], src["y"]] and b["rayon"] >= self._reglages(kid)["distance_max"]:
+                src = self.sources[kid]
+                b = d.get(self.cle_carte(kid, src)) or d.get(str(kid))      # ancien fichier : une carte par royaume
+                if b and b["chateau"] == [src["x"], src["y"]] and b["rayon"] >= self._reglages(kid)["distance_max"]:
                     self.carte[kid] = {(int(x), int(y)): int(n) for x, y, n in b["forteresses"]}
                     self.lu_jusqua[kid] = b["rayon"]
                     self.manquantes[kid] = {tuple(int(v) for v in z): 0 for z in b.get("manquantes", []) if len(z) == 4}
@@ -471,11 +481,20 @@ class ModuleForteresses(tours.ModuleTours):
                 d = {}
         except (OSError, ValueError):
             d = {}
+        for k in [k for k in d if ":" not in k]:           # ancien format (une carte par royaume) : converti
+            b = d.pop(k)
+            try:
+                d.setdefault("%s:%d:%d" % (k, b["chateau"][0], b["chateau"][1]), b)
+            except (KeyError, TypeError, IndexError):
+                pass
         for kid in self.lu_jusqua:
             src = self.sources[kid]
-            d[str(kid)] = {"chateau": [src["x"], src["y"]], "rayon": self.lu_jusqua[kid],
-                           "forteresses": [[x, y, n] for (x, y), n in sorted(self.carte.get(kid, {}).items())],
-                           "manquantes": [list(z) for z in sorted(self.manquantes.get(kid, {}))]}
+            d[self.cle_carte(kid, src)] = {"chateau": [src["x"], src["y"]], "rayon": self.lu_jusqua[kid], "maj": int(time.time()),
+                                           "forteresses": [[x, y, n] for (x, y), n in sorted(self.carte.get(kid, {}).items())],
+                                           "manquantes": [list(z) for z in sorted(self.manquantes.get(kid, {}))]}
+        if len(d) > CARTES_GARDEES:                         # on garde les cartes les plus recentes
+            for k in sorted(d, key=lambda k: (d[k].get("maj", 0) if isinstance(d[k], dict) else 0))[:len(d) - CARTES_GARDEES]:
+                del d[k]
         try:
             os.makedirs(os.path.dirname(self.fichier_carte), exist_ok=True)
             with open(self.fichier_carte, "w", encoding="utf-8") as f:
