@@ -387,12 +387,15 @@ def ecrire_etat(etat, fichier=None):
         pass
 
 
-def battement_etat(modules, debut, horloge=time.time, fichier=None, tous_les=3):
-    """Fonction appelee a chaque tour de l'ordonnanceur : met a jour captures/bot_etat.json (au plus toutes les 3 s)."""
+def battement_etat(modules, debut, horloge=time.time, fichier=None, tous_les=3, compteur=None):
+    """Fonction appelee a chaque tour de l'ordonnanceur : met a jour captures/bot_etat.json (au plus toutes les 3 s)
+    et l'historique des sessions (pieces et rubis gagnes)."""
     dernier = [float("-inf")]
 
     def battre(entrees):
         t = horloge()
+        if compteur is not None:
+            compteur.sauver()
         if t - dernier[0] < tous_les:
             return
         dernier[0] = t
@@ -434,15 +437,31 @@ async def principal(args):
                               demander_identifiants=lambda: connexion_bot.demander_identifiants_ecran(args.pseudo)) as jeu:
             async def vivante():
                 return await connexion_bot._vivante(jeu)
+            compteur = None
+            if not args.simulation:
+                import sessions
+                compteur = sessions.Compteur(debut, str(tours.lire_config().get("pseudo") or ""))
+                if isinstance(getattr(jeu, "ecouteurs", None), list):
+                    jeu.ecouteurs.append(compteur.ecouter)     # pieces et rubis du compte a chaque changement (gcu)
+                try:
+                    await jeu.envoyer("gcu", {})              # valeurs de depart de la session
+                except Exception:
+                    pass
             try:
                 entrees = await demarrer(jeu, prets, args, sortie, lire_async)
-                battre = battement_etat(modules, debut)
+                battre = battement_etat(modules, debut, compteur=compteur)
                 if entrees:
                     entrees[0].module.partage.signe_de_vie = lambda: battre(entrees)   # aussi pendant un long passage d'un module
                 await ordonnancer(entrees, vivante=vivante, duree_max=args.duree, max_attaques=args.max_attaques, sortie=sortie,
                                   arret=lambda: os.path.exists(FICHIER_ARRET), battement=battre)
             except ArretModule as e:
                 sortie("\n" + str(e))
+            finally:
+                if compteur is not None:
+                    compteur.sauver(fin=True)
+                    s = compteur.session
+                    sortie("SESSION : %s, +%s pieces, +%s rubis." % (tours.duree(s["fin"] - s["debut"]),
+                                                                     f"{s['pieces']:,}".replace(",", " "), s["rubis"]))
     except ArretModule as e:
         sortie("\n" + str(e))
     except tours.T.ErreurCDP as e:

@@ -9,6 +9,8 @@ Regles (demande du 08/11) :
   - bois et pierre : seulement depuis les royaumes ou le module tours tourne (il les remplit) et quand ils y sont pleins,
     vers les royaumes ou le module tours ne tourne pas et qui en manquent (meme ordre) ;
   - pas de reserve gardee au depart (les tours et les fiefs remplissent au fur et a mesure) ;
+  - 3 types de ressources (base : bois, pierre, nourriture ; mondes : fer, charbon, huile, verre ; miel/hydromel, pas
+    geres) : un envoi ne contient qu'un seul type (plusieurs ressources du meme type ensemble), sinon le jeu refuse (code 2) ;
   - un seul envoi a la fois vers un meme royaume (le suivant attend la fin du premier) ;
   - un envoi met 2 h a arriver ; option : l'accelerer avec des passe-temps 1 h (2 par envoi).
 Messages du jeu (capture du 08/11) : dcl (ressources et capacites de tous les chateaux, tous royaumes), kpi (royaumes
@@ -28,6 +30,7 @@ T = tours.T
 RUBRIQUE = "transferts"
 SPECIALE = {0: "I", 2: "C", 1: "O", 3: "G"}         # vert fer, glacier charbon, sables huile, feu verre
 ORDRE = (0, 2, 1, 3)                               # vert, glacier, sables, pics de feu
+TYPE_RES = {"W": "base", "S": "base", "F": "base", "I": "monde", "C": "monde", "O": "monde", "G": "monde"}
 NOMS_RES = {"W": "bois", "S": "pierre", "I": "fer", "C": "charbon", "O": "huile", "G": "verre"}
 PLEIN = 0.98                                       # bois/pierre "pleins" a partir de 98 % de la capacite
 MIN_ENVOI = 10000
@@ -125,8 +128,9 @@ def plan_transferts(stocks, ouverts, en_route, royaumes_tours, bloques=(), min_e
                     continue
                 dispo[src][cid][r] -= q
                 manque[dst][r] -= q
-                envois.setdefault((cid, src, dst), []).append([r, q])
-    return [(cid, src, dst, g) for (cid, src, dst), g in envois.items()]
+                envois.setdefault((cid, src, dst, TYPE_RES[r]), []).append([r, q])
+    # le jeu refuse un envoi qui melange les types (base / ressources des mondes) : un envoi par type
+    return [(cid, src, dst, g) for (cid, src, dst, _), g in envois.items()]
 
 
 class ModuleTransferts:

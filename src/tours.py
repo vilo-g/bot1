@@ -92,6 +92,9 @@ COMMANDANT_REFUSE = 180         # secondes : commandant refuse 2 fois de suite (
 REFUS_MAX = 5                   # refus de suite (avec au moins 3 commandants differents) avant l'arret du module
 CIBLE_REFUSEE = (1800, 10800)   # cible ignoree par le serveur : laissee de cote 30 min, puis 3 h si elle est encore refusee
 ESSAIS_PAR_PASSAGE = 8          # cibles essayees au plus par passage (une cible refusee ne bloque pas le commandant)
+CODE_PAS_PRETE = 95             # abi/adi refuse alors que la carte la dit libre : le jeu la libere ~1 min plus tard (11/11)
+ESSAI_RAPIDE = 3                # code 95 : nouvel essai toutes les 3 s ...
+ESSAIS_RAPIDES_MAX = 240        # ... pendant 4 min au plus, puis 1 min, 5, 15, 30 min comme les autres refus
 PAUSE_SANS_STOCK = 300          # secondes pendant lesquelles un royaume sans soldat 216 est laisse de cote
 TYPES_CHATEAU = {1: "chateau", 12: "avant-poste"}   # types vus dans la liste des chateaux du compte (autres : "type N")
 
@@ -1064,6 +1067,8 @@ class ModuleTours:
         self.sans_stock = {}       # royaume -> instant jusqu'auquel on le laisse de cote (plus de soldat dans son chateau)
         self.refus_cibles = {}     # (royaume, x, y) -> nombre de fois ou le serveur a ignore une attaque sur cette cible
         self.sans_info = {}        # (royaume, x, y) -> demandes d'infos (adi/abi) restees sans reponse de suite
+        self.pas_prete = {}        # (royaume, x, y) -> 1er refus code 95 (essais toutes les 3 s)
+        self.pas_prete_carte = {}  # (royaume, x, y) -> derniere relecture de sa zone pendant ces essais
         self.nb_attaques = 0
         self.echecs = 0
         self._dernier_msg = ("", 0)
@@ -1389,6 +1394,28 @@ class ModuleTours:
         nom = "%s %s (%d,%d)" % (self.NOM_CIBLE, ROYAUMES[kid], tx, ty)
         vus = set()
         rep = await self._demander_infos(cx, cy, tx, ty, kid, vus)
+        if rep and rep[1] == CODE_PAS_PRETE and not self.sans_info.get(cle):
+            # la carte la dit libre mais le jeu ne la libere qu'un peu plus tard : on redemande toutes les 3 s pour partir au
+            # plus tot (premier arrive), sans bloquer les autres attaques ; la carte est relue au 1er refus puis toutes les 30 s
+            t = self.horloge()
+            debut = self.pas_prete.setdefault(cle, t)
+            if t - debut < ESSAIS_RAPIDES_MAX:
+                verdict = None
+                if t == debut or t - self.pas_prete_carte.get(cle, 0) >= 30:
+                    self.pas_prete_carte[cle] = t
+                    verdict = await self._apres_sans_info(cle)
+                if verdict:
+                    self.pas_prete.pop(cle, None)
+                    self._noter("   %s : le jeu refuse ses infos (code %d) ; %s." % (nom, rep[1], verdict))
+                    self._sauver_etat()
+                    return False
+                self.engagees[cle] = t + ESSAI_RAPIDE
+                if t == debut:
+                    self._noter("   %s : pas encore libre pour le jeu (code %d) alors que la carte la dit libre ; nouvel essai toutes "
+                                "les %d s pour partir des que possible." % (nom, rep[1], ESSAI_RAPIDE))
+                return False
+            self.pas_prete.pop(cle, None)
+            self.pas_prete_carte.pop(cle, None)
         if not rep or rep[1] != 0:
             # le jeu ne donne pas les infos d'une cible deja attaquee / prise par un autre joueur (la carte la dit encore libre
             # jusqu'a sa prochaine relecture) : 1 min, puis 5 min, 15 min, 30 min, pour ne pas bloquer les autres attaques
@@ -1402,6 +1429,12 @@ class ModuleTours:
                             % (nom, verdict))
                 self._sauver_etat()
                 return False
+            if rep and rep[1] == CODE_PAS_PRETE:
+                self._noter("   %s : toujours refusee par le jeu (code %d)%s : sans doute prise par un autre joueur ; nouvel "
+                            "essai dans %s." % (nom, rep[1], " apres %s d'essais" % duree(ESSAIS_RAPIDES_MAX) if n == 1 else
+                                                " (%de fois)" % n, duree(pause)))
+                self._sauver_etat()
+                return False
             self._noter("   %s : pas de reponse correcte aux infos d'attaque (%s)%s, on la saute %s."
                         % (nom, str(rep)[:120] if rep else "aucune reponse en 2 essais ; messages recus pendant l'attente : %s"
                            % (", ".join(sorted(vus)) or "aucun"),
@@ -1410,6 +1443,9 @@ class ModuleTours:
             self._sauver_etat()
             return False
         self.sans_info.pop(cle, None)
+        if cle in self.pas_prete:
+            self._noter("   %s : liberee par le jeu apres %s d'attente." % (nom, duree(self.horloge() - self.pas_prete.pop(cle))))
+            self.pas_prete_carte.pop(cle, None)
         adi = T.json_ou_none(rep[2]) or {}
         if isinstance((adi.get("gui") or {}).get("I"), list):
             self.echelles[kid] = combat.inventaire_depuis_adi(adi["gui"]["I"]).get(ID_ECHELLE, 0)

@@ -1,11 +1,12 @@
 {
-  "version": 8,
-  "date": "11/11/2026",
+  "version": 9,
+  "date": "12/11/2026",
   "nouveautes": [
-    "Tours : nouvelle option « Déplacement accéléré » (+50 % de vitesse, 2500 rubis), achetée dès qu'elle est disponible, une fois par jour (après 8h30).",
-    "Forteresses : la carte est mémorisée par château ; changer de compte ne relance plus une lecture complète.",
-    "Défense : plus de nouvelles demandes une fois le château vidé ; la porte ne s'ouvre que si l'envoi des soldats a échoué ou n'est pas terminé à 30 s de l'attaque.",
-    "Transferts : un seul transfert à la fois vers un même royaume ; le suivant attend la fin du premier (ou part tout de suite si l'envoi est accéléré).",
-    "Les refus du jeu sans données sont maintenant bien lus (plus de faux « pas de réponse »)."
+    "Interface : nouvel encadré « Sessions » (durée, pièces et rubis gagnés), avec les 10 dernières sessions et un bouton pour en supprimer une.",
+    "Forteresses : quand le jeu n'a pas encore libéré une forteresse (code 95), le bot réessaie toutes les 3 s pour partir dès que possible.",
+    "Forteresses : le message d'attente indique les forteresses attaquables mises de côté (plus de soldats, attaque en cours).",
+    "Interface forteresses : seules les vagues remplies affichent leur choix de présélection.",
+    "Défense : soutien toujours envoyé avec des plumes ; rien n'est envoyé si une porte ouverte couvre déjà l'attaque ; soldats rappelés aussitôt si l'attaquant retire son attaque.",
+    "Transferts : bois/pierre/nourriture et ressources des mondes partent dans des envois séparés (le jeu refuse de les mélanger)."
   ]
 }

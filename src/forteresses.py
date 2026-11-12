@@ -891,6 +891,25 @@ class ModuleForteresses(tours.ModuleTours):
         return None
 
     # ---------------------------------------------------------------- cibles
+    def _mises_de_cote(self, t):
+        """Texte : forteresses attaquables maintenant mais dans un royaume laisse de cote (plus de soldats, attaque en cours)."""
+        actifs = set(self._royaumes_actifs())
+        n = {}
+        for (kid, x, y), f in self.fort.items():
+            if kid not in actifs and f["dispo"] <= t + 1 and (kid, x, y) not in self.engagees:
+                n[kid] = n.get(kid, 0) + 1
+        morceaux, cles = [], []
+        for kid in sorted(n):
+            if self.sans_stock.get(kid, 0) > t:
+                why = "plus de soldats dans son chateau, nouvel essai dans %s" % duree(self.sans_stock[kid] - t)
+            elif kid in (getattr(self.partage, "royaumes_bloques", None) or ()):
+                why = "attaque en cours sur ce royaume"
+            else:
+                continue
+            morceaux.append("%d attaquable(s) au %s mais %s" % (n[kid], ROYAUMES.get(kid, kid), why))
+            cles.append("%s:%d" % (kid, n[kid]))
+        return ((" (" + " ; ".join(morceaux) + ")") if morceaux else ""), "-".join(cles)
+
     def _candidats(self):
         """[(distance, royaume, entree)] : forteresses attaquables maintenant, dans la distance maximale de LEUR royaume,
         pas deja engagees, la plus proche d'abord."""
@@ -920,7 +939,7 @@ class ModuleForteresses(tours.ModuleTours):
         """Secondes avant la prochaine forteresse attaquable (d'apres les minuteurs lus), ou None."""
         t = self.horloge()
         actifs = set(self._royaumes_actifs())
-        d = [f["dispo"] - t for (kid, x, y), f in self.fort.items() if kid in actifs and (kid, x, y) not in self.engagees]
+        d = [max(f["dispo"], self.engagees.get(k, 0)) - t for k, f in self.fort.items() if k[0] in actifs]
         return min(d) if d else None
 
     async def preparer_carte(self):
@@ -996,9 +1015,10 @@ class ModuleForteresses(tours.ModuleTours):
                 self._attente_msg("aucune-forteresse", "Aucune forteresse dans la distance choisie (%d commandant(s) pret(s)) : "
                                   "nouvelle lecture de la carte dans %s." % (len(libres), duree(REFRAICHIR - (t - self.releve_t))))
             else:
-                self._attente_msg("prochaine-%d" % (int(proch) // 600),
-                                  "Aucune forteresse attaquable pour le moment (%d commandant(s) pret(s)) : la prochaine dans %s."
-                                  % (len(libres), duree(proch)))
+                texte, cle = self._mises_de_cote(t)
+                self._attente_msg("prochaine-%d%s" % (int(proch) // 600, cle),
+                                  "Aucune forteresse attaquable pour le moment (%d commandant(s) pret(s)) : la prochaine dans %s.%s"
+                                  % (len(libres), duree(proch), texte))
             attente = min(max(proch, 0.5), 60) if proch is not None else 60   # reveil a la seconde ou la prochaine devient attaquable
             return min(attente, 2) if self._a_relire else attente               # relecture en cours : on continue bientot
         par_royaume = ", ".join("%s %d" % (ROYAUMES[k], sum(1 for c in cands if c[1] == k)) for k in sorted({c[1] for c in cands}))

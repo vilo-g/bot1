@@ -144,7 +144,11 @@ class ModuleDefense:
         self.echecs = {}           # cid -> raison du dernier envoi rate (pendant l'attaque en cours)
         self.verif = {}            # cid -> instant de la derniere verification des soldats
         self.abri_ok = set()       # chateaux vides avec succes pendant l'attaque en cours : plus de verification, pas de porte
-        self.porte = {}            # cid -> porte ouverte jusqu'a
+        self.porte = {}            # cid -> pas de nouvel essai d'ouverture de la porte avant
+        self.porte_fin = {}        # cid -> porte ouverte (protection) jusqu'a : lu dans dcl (OGT) ou apres notre ouverture
+        self.porte_lue = {}        # cid -> instant de la derniere lecture de la porte
+        self.porte_note = set()
+        self.couverts = set()      # chateaux attaques proteges par une porte deja ouverte
         self.alliance, self.alliance_lue = None, float("-inf")
         self.recus = []            # messages gam pas encore lus
         self.bloques_avant = set()
@@ -156,8 +160,8 @@ class ModuleDefense:
         self.sortie(texte)
 
     def _ecouter(self, msg):
-        if msg[0] == "gam" and msg[1] == 0:
-            self.recus.append(msg[2])
+        if msg[0] in ("gam", "mrm") and msg[1] == 0:
+            self.recus.append((msg[0], msg[2]))
 
     def _nom_chateau(self, cid):
         c = self.chateaux[cid]
@@ -174,13 +178,29 @@ class ModuleDefense:
         if not isinstance(getattr(self.jeu, "ecouteurs", None), list):     # pas d'ecouteur (tests) : on lit la boite
             reste = []
             for m in self.jeu.recus:
-                (self.recus.append(m[2]) if m[0] == "gam" and m[1] == 0 else reste.append(m))
+                (self.recus.append((m[0], m[2])) if m[0] in ("gam", "mrm") and m[1] == 0 else reste.append(m))
             self.jeu.recus[:] = reste
         t = self.horloge()
         while self.recus:
-            mouvements, noms = lire_mouvements(self.recus.pop(0))
+            cmd, payload = self.recus.pop(0)
+            if cmd == "mrm":
+                self._retiree(T.json_ou_none(payload), t)
+                continue
+            mouvements, noms = lire_mouvements(payload)
             for mv in mouvements:
                 self._mouvement(mv, noms, t)
+
+    def _retiree(self, d, t):
+        """mrm {"MID"} : le jeu retire un mouvement. Avant son arrivee = l'attaquant a rappele son attaque -> attaque finie
+        (rappel des soldats, reprise des modules) : quelques soldats envoyes puis retires ne bloquent pas le bot."""
+        mid = d.get("MID") if isinstance(d, dict) else None
+        a = self.attaques.get(mid)
+        if a is None or a["arrivee"] - t <= 5:
+            return                                          # mouvement inconnu, ou attaque arrivee (retiree normalement)
+        del self.attaques[mid]
+        if a["defendue"]:
+            self._noter("ATTAQUE ANNULEE par l'attaquant sur %s (elle arrivait dans %s)." % (self._nom_chateau(a["cid"]),
+                                                                                         duree(a["arrivee"] - t)))
 
     def _mouvement(self, mv, noms, t):
         cid = mv["ta"][3]
@@ -229,7 +249,7 @@ class ModuleDefense:
         return cid in self.envois and not any(a["cid"] == cid for a in self._actives(t))
 
     def _maj_pauses(self, t):
-        bloques = {a["kid"] for a in self._actives(t)}
+        bloques = {a["kid"] for a in self._actives(t) if a["cid"] not in self.couverts}
         bloques |= {self.chateaux[c]["kid"] for c in self.envois}
         bloques |= {self.chateaux[c]["kid"] for c, fin in self.retours.items() if fin > t}
         for kid in sorted(bloques - self.bloques_avant):
@@ -248,9 +268,13 @@ class ModuleDefense:
         for a in self._actives(t):
             if a["arrivee"] > t:
                 par_chateau.setdefault(a["cid"], []).append(a)
+        for cid, liste in par_chateau.items():           # porte deja ouverte jusqu'apres l'attaque : rien a faire, pas de pause
+            (self.couverts.add if await self._porte_couvre(cid, liste) else self.couverts.discard)(cid)
         self._maj_pauses(t)
         for cid, liste in par_chateau.items():
             premiere = min(a["arrivee"] for a in liste)
+            if cid in self.couverts:
+                continue
             if self._a_verifier(cid, self.horloge()):
                 await self._mettre_a_l_abri(cid, max(a["arrivee"] for a in liste), premiere)
             reste = premiere - self.horloge()
@@ -273,8 +297,46 @@ class ModuleDefense:
             self.abri_ok.discard(cid)
         for cid in [c for c in self.verif if c not in par_chateau]:
             del self.verif[cid]
+        self.porte_note &= set(par_chateau)
+        self.couverts &= {a["cid"] for a in self._actives(t)}
         self._maj_pauses(t)
         return PAUSE_ATTAQUE if (par_chateau or self.envois) else PAUSE_CALME
+
+    async def _lire_portes(self):
+        """dcl : OGT = secondes de porte ouverte restantes de chaque chateau (capture du 08/11 : OGT = fin de l'ouverture)."""
+        rep = await self._demander("dcl", {"CD": 1}, delai=15)
+        d = T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None
+        if not isinstance(d, dict):
+            return False
+        t = self.horloge()
+        for k in d.get("C") or []:
+            for a in (k.get("AI") or []) if isinstance(k, dict) else []:
+                if isinstance(a, dict) and a.get("AID") in self.chateaux:
+                    ogt = a.get("OGT")
+                    self.porte_lue[a["AID"]] = t
+                    if isinstance(ogt, (int, float)) and ogt > 0:
+                        self.porte_fin[a["AID"]] = max(self.porte_fin.get(a["AID"], 0), t + ogt)
+        return True
+
+    async def _porte_couvre(self, cid, liste):
+        """Vrai si la porte du chateau est deja ouverte jusqu'apres l'arrivee de TOUTES les attaques (marge 10 s) : inutile
+        d'envoyer les soldats. Une attaque qui arrive apres la fin de la porte -> faux (les soldats partent)."""
+        if self.porte_lue.get(cid, float("-inf")) + 60 <= self.horloge() and cid not in self.envois:
+            await self._lire_portes()
+        fin = self.porte_fin.get(cid, 0)
+        derniere = max(a["arrivee"] for a in liste)
+        if fin >= derniere + 10:
+            if cid not in self.porte_note:
+                self.porte_note.add(cid)
+                self._noter("   porte deja ouverte sur %s encore %s (l'attaque arrive avant la fin) : soldats gardes au chateau."
+                            % (self._nom_chateau(cid), duree(fin - self.horloge())))
+            self.abri_ok.add(cid)
+            return True
+        if fin > self.horloge() and cid not in self.porte_note:
+            self.porte_note.add(cid)
+            self._noter("   porte ouverte sur %s mais elle se ferme %s avant l'attaque : les soldats partent quand meme."
+                        % (self._nom_chateau(cid), duree(derniere - fin)))
+        return False
 
     # ------------------------------------------------------------------ alliance : membre en protection le plus proche
     async def _lire_alliance(self):
@@ -367,7 +429,7 @@ class ModuleDefense:
         # chaque commandant emmene les 10 types de soldats les plus nombreux (pas de limite de nombre) ; s'il reste des types,
         # le commandant suivant complete.
         reste = [list(wn) for wn in tous]
-        envoyes, raison, ptt = 0, "", 0
+        envoyes, raison, ptt = 0, "", 1                          # toujours avec plumes (trajet et retour bien plus courts)
         for pos, cmd in libres:
             essais = 0
             while reste and essais < 4:
@@ -399,8 +461,9 @@ class ModuleDefense:
                     reste = [wn for wn in reste if wn[0] not in interdits]
                     self._noter("   %d soldat(s) ne peuvent pas voyager sur ce monde : ils restent au chateau." % n_int)
                     interdits = []
-                elif ptt == 0:
-                    ptt = 1                                        # sans cheval refuse : avec plumes
+                elif ptt == 1:
+                    ptt = 0                                        # refuse avec plumes (plus de plumes ?) : sans, plutot que rien
+                    self._noter("   envoi avec plumes refuse (%s) : essai sans plumes." % raison)
                 else:
                     break                                          # ce commandant ne peut pas partir : le suivant
             if not reste:
@@ -438,7 +501,7 @@ class ModuleDefense:
         c = self.chateaux[cid]
         if self.simulation:
             self._noter("[SIMULATION] la porte de %s serait ouverte (rubis)." % self._nom_chateau(cid))
-            self.porte[cid] = self.horloge() + 6 * 3600
+            self.porte[cid] = self.porte_fin[cid] = self.horloge() + 6 * 3600
             return
         rep = await self._demander("mos", {"CID": cid, "KID": c["kid"], "CD": 0})
         d = T.json_ou_none(rep[2]) if rep else None
@@ -455,6 +518,7 @@ class ModuleDefense:
         if rep and rep[1] == 0 and isinstance(d, dict):
             rpt = d.get("RPT") if isinstance(d.get("RPT"), (int, float)) else 6 * 3600
             self.porte[cid] = self.horloge() + rpt
+            self.porte_fin[cid] = self.horloge() + rpt
             self._noter("PORTE OUVERTE sur %s (%s rubis) pendant %s : les soldats restes au chateau ne seront pas tues."
                         % (self._nom_chateau(cid), prix or "?", duree(rpt)))
         else:

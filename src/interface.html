@@ -168,6 +168,13 @@ input.faux{border-color:var(--err)}
 .etat .grand{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;background:var(--panel3)}
 .etat .grand.marche{background:var(--okbg);color:var(--ok)}.etat .grand.attente{background:var(--accentbg);color:var(--accent)}
 .etat h3{margin:0;font-size:20px}.etat p{margin:2px 0 0;color:var(--muted)}
+.sessions{display:flex;flex-direction:column;gap:8px}
+.session{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)) 30px;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 14px}
+.session.en-cours{border-color:var(--ok);background:var(--okbg)}
+.session small{color:var(--muted);display:block;font-size:12px}.session b{font-variant-numeric:tabular-nums;font-size:16px}
+.session .suppr{border:1px solid var(--line2);background:transparent;color:var(--muted);border-radius:8px;width:30px;height:30px;cursor:pointer;display:grid;place-items:center}
+.session .suppr:hover{color:var(--err);border-color:var(--err)}
+@media (max-width:640px){.session{grid-template-columns:1fr 1fr}.session .quand{grid-column:1/-1}}
 .chiffres{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:18px}
 .chiffre{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
 .chiffre small{color:var(--muted);display:block}.chiffre b{font-size:24px;font-variant-numeric:tabular-nums}
@@ -239,6 +246,11 @@ input.faux{border-color:var(--err)}
             <div><h3 id="etat-titre">Bot arrêté</h3><p id="etat-detail">Choisis les modules ci-dessous puis démarre.</p></div>
           </div>
           <div class="chiffres" id="chiffres"></div>
+        </div>
+        <div class="carte">
+          <h2>Sessions</h2>
+          <p class="aide">Durée, pièces et rubis gagnés à chaque session (les dépenses du bot ne sont pas retirées). Les 10 dernières sont gardées.</p>
+          <div class="sessions" id="sessions"></div>
         </div>
         <div class="carte">
           <h2>Lancer le bot</h2>
@@ -478,7 +490,7 @@ const NOMS = {0:"vert",1:"sables",2:"glacier",3:"feu"};
 const COULEURS = {0:"var(--k0)",1:"var(--k1)",2:"var(--k2)",3:"var(--k3)"};
 const COTES = [["F","Flanc gauche"],["FF","Deux flancs"],["A","Avant"],["AF","Avant + flanc"],["AFF","Avant + 2 flancs"]];
 const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
-const VERSION = "2026-11-08-transferts";     // doit etre egale a VERSION dans interface.py
+const VERSION = "2026-11-12-vagues";     // doit etre egale a VERSION dans interface.py
 let serveur = null;            // dernier /api/etat
 const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null};      // formulaires en cours
 const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false};
@@ -560,7 +572,9 @@ function lignesCommunes(mod, b, avecEchelles){
   if(b.mode === "auto"){
     lignes.push(el("div",{class:"ligne"}, el("span",{},"Côtés à remplir"), segment(COTES, b.cotes, v => { b.cotes = v; changer(mod); })));
   } else {
-    const ps = el("div",{class:"presets"}, [0,1,2,3].map(i => el("label",{class:"champ"}, i===3 ? "Vague 4 et +" : "Vague "+(i+1),
+    // seulement les vagues remplies (les autres partent vides : leur présélection ne sert pas)
+    const nb = b.vagues_remplies === undefined ? 4 : Math.min(4, Math.max(1, +b.vagues_remplies || 4));
+    const ps = el("div",{class:"presets"}, [0,1,2,3].slice(0, nb).map(i => el("label",{class:"champ"}, i===3 ? "Vague 4 et +" : "Vague "+(i+1),
       el("input",{type:"number", min:1, max:30, value:(b.presets||[])[i] ?? 1, oninput:e => { b.presets[i] = e.target.value === "" ? "" : +e.target.value; changer(mod,false); }}))));
     lignes.push(el("div",{class:"ligne"}, el("span",{},"Présélection par vague"), ps));
   }
@@ -729,8 +743,8 @@ function dessinerFort(){
   for(const k of s.royaumes){
     const b = s.reglages[k];
     const resume = (b.mode === "auto" ? "auto " + b.cotes : "présélections") + " · " + (b.vagues_remplies >= 4 ? "toutes les vagues" : b.vagues_remplies + " vague(s)") + " · " + b.distance_max + " cases";
-    const corps = el("div",{class:"corps"}, lignesCommunes("forteresses", b, false),
-      el("div",{class:"ligne haut"}, el("span",{},"Vagues a remplir"), choixVagues(b.vagues_remplies, v => { b.vagues_remplies = v; changer("forteresses"); })),
+    const vagues = el("div",{class:"ligne haut"}, el("span",{},"Vagues à remplir"), choixVagues(b.vagues_remplies, v => { b.vagues_remplies = v; changer("forteresses"); }));
+    const corps = el("div",{class:"corps"}, lignesCommunes("forteresses", b, false), vagues,
       el("div",{class:"ligne"}, el("span",{},"Distance maximale"), curseur(10, 500, 5, b.distance_max, "cases", (v, fin) => { b.distance_max = v; changer("forteresses", fin); })));
     blocs.append(el("details",{class:"bloc-royaume", style:"--c:"+COULEURS[k], "data-k":k, open: ouverts.size ? ouverts.has(String(k)) : true},
       el("summary",{}, drapeau(k), "Royaume " + NOMS[k], el("span",{class:"resume"}, resume)), corps));
@@ -1197,7 +1211,27 @@ $("#maj-verifier").addEventListener("click", () => verifierMaj(true));
 $("#maj-installer").addEventListener("click", installerMaj);
 
 async function majEtat(){
-  try{ const d = await api("/api/etat"); serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; dessinerEtat(); }catch(e){}
+  try{ const d = await api("/api/etat"); serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; serveur.sessions = d.sessions; dessinerEtat(); dessinerSessions(); }catch(e){}
+}
+function dureeTxt(s){ s = Math.max(0, Math.round(s)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60);
+  return h ? h + " h " + String(m).padStart(2,"0") + " min" : m ? m + " min" : s + " s"; }
+function dessinerSessions(){
+  const zone = $("#sessions"), liste = serveur.sessions || [];
+  if(!liste.length){ zone.replaceChildren(el("p",{class:"aide", style:"margin:0"}, "Aucune session pour l'instant : elle apparaîtra au prochain démarrage du bot.")); return; }
+  zone.replaceChildren(...liste.map(s => {
+    const vive = s.en_cours && (serveur.bot || {}).etat === "en_marche";
+    const d = new Date(s.debut * 1000);
+    const quand = d.toLocaleDateString("fr-FR", {weekday:"short", day:"numeric", month:"short"}) + " à " + d.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+    return el("div",{class:"session" + (vive ? " en-cours" : "")},
+      el("div",{class:"quand"}, el("small",{}, vive ? "En cours" : "Session"), el("b",{style:"font-size:14px"}, quand), s.pseudo ? el("small",{}, s.pseudo) : null),
+      el("div",{}, el("small",{}, "Durée"), el("b",{}, dureeTxt(vive ? Date.now()/1000 - s.debut : s.duree))),
+      el("div",{}, el("small",{}, "Pièces gagnées"), el("b",{}, "+" + fmtN(s.pieces))),
+      el("div",{}, el("small",{}, "Rubis gagnés"), el("b",{}, "+" + fmtN(s.rubis))),
+      vive ? el("span") : el("button",{class:"suppr", title:"Supprimer cette session", "aria-label":"Supprimer cette session", onclick: async () => {
+        if(!confirm("Supprimer la session du " + quand + " ?")) return;
+        try{ const r = await api("/api/sessions/supprimer", {id: s.id}); serveur.sessions = r.sessions; dessinerSessions(); }catch(e){}
+      }}, "✕"));
+  }));
 }
 async function debut(){
   serveur = await api("/api/etat");
@@ -1210,7 +1244,7 @@ async function debut(){
   const l = serveur.config.lanceur || {};
   (l.modules || serveur.modules.map(m => m.nom)).forEach(m => choixModules.add(m));
   $("#l-duree").value = l.duree || ""; $("#l-max").value = l.max_attaques || ""; $("#l-simu").checked = !!l.simulation; $("#l-ecran").checked = l.ecran_allume !== false;
-  chargerFormulaires(); dessinerModules(); dessinerEtat(); dessinerCompte();
+  chargerFormulaires(); dessinerModules(); dessinerEtat(); dessinerCompte(); dessinerSessions();
   let page = "accueil"; try{ page = localStorage.getItem("gge-page") || "accueil"; }catch(e){}
   aller(TITRES[page] ? page : "accueil");
   rafraichirJournal(true);
@@ -1218,6 +1252,7 @@ async function debut(){
   setInterval(() => verifierMaj(false), 30 * 60 * 1000);
   setInterval(() => rafraichirJournal(false), 1500);
   setInterval(majEtat, 4000);
+  setInterval(() => { if((serveur.sessions || []).some(s => s.en_cours)) dessinerSessions(); }, 1000);   // duree en direct
 }
 debut().catch(e => { document.body.innerHTML = '<p style="padding:40px;color:#ff8e7e">Interface injoignable : lance outils\\lancer_interface.bat</p>'; });
 </script>

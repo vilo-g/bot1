@@ -35,6 +35,7 @@ import coffre       # noqa: E402
 import zipfile      # noqa: E402
 import maj          # noqa: E402
 import achats       # noqa: E402
+import sessions     # noqa: E402
 import defense      # noqa: E402
 import transferts   # noqa: E402
 
@@ -44,7 +45,7 @@ PORT = 8770
 DOSSIER_IMAGES = os.path.join(ICI, "images")
 NOMS_UNITES = {215: "Vierge à bouclier niv. 10", 6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-08-transferts"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-12-vagues"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -450,7 +451,7 @@ def tout_etat():
                         "image": "images/engins/%d.png" % w if os.path.exists(os.path.join(DOSSIER_IMAGES, "engins", "%d.png" % w)) else None}
                        for w in achats.ENGINS],
             "seuil_min": achats.SEUIL_MIN, "pieces_max": achats.PIECES_MAX, "part_budget": achats.PART_BUDGET,
-            "pseudo": tout.get("pseudo"), "bot": etat_bot(),
+            "pseudo": tout.get("pseudo"), "bot": etat_bot(), "sessions": sessions.pour_interface(etat_perime=ETAT_PERIME),
             "modules": [{"nom": m.LANCEUR_NOM, "priorite": getattr(m, "LANCEUR_PRIORITE", bot.PRIORITE_DEFAUT)} for m in bot.MODULES],
             "royaumes": {str(k): v for k, v in tours.ROYAUMES.items()}, "soldat_tours": tours.ID_SOLDAT,
             "reserve_max_secondes": forteresses.RESERVE_MAX_SECONDES, "compte": coffre.etat(), "version": VERSION,
@@ -608,6 +609,10 @@ class Gestionnaire(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True, "compte": e})
             if chemin == "/api/compte/effacer":
                 return self._json(200, {"ok": True, "compte": coffre.effacer_mdp()})
+            if chemin == "/api/sessions/supprimer":
+                if not isinstance(data.get("id"), str) or not sessions.supprimer(data["id"]):
+                    raise ErreurSaisie(["Session introuvable."])
+                return self._json(200, {"ok": True, "sessions": sessions.pour_interface(etat_perime=ETAT_PERIME)})
             if chemin == "/api/copie-ami":
                 return self._json(200, creer_copie())
             if chemin == "/api/maj/installer":
