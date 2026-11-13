@@ -36,6 +36,8 @@ import zipfile      # noqa: E402
 import maj          # noqa: E402
 import achats       # noqa: E402
 import sessions     # noqa: E402
+import recrutement  # noqa: E402
+import materiaux    # noqa: E402
 import defense      # noqa: E402
 import transferts   # noqa: E402
 
@@ -45,7 +47,7 @@ PORT = 8770
 DOSSIER_IMAGES = os.path.join(ICI, "images")
 NOMS_UNITES = {215: "Vierge à bouclier niv. 10", 6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-12-vagues"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-13-avantpostes"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -395,11 +397,145 @@ def normaliser_defense(data, ancienne=None):
 def normaliser_transferts(data, ancienne=None):
     """Reglages du module transferts -> rubrique "transferts", ou ErreurSaisie."""
     erreurs = []
-    cfg = {k: v for k, v in (ancienne if isinstance(ancienne, dict) else {}).items() if k not in ("min_envoi", "accelerer")}
+    cfg = {k: v for k, v in (ancienne if isinstance(ancienne, dict) else {}).items() if k not in ("min_envoi", "accelerer", "passes")}
     m = _entier(data.get("min_envoi", transferts.MIN_ENVOI), "Quantité minimum par envoi", 1, 100000000, erreurs)
     if m is not None:
         cfg["min_envoi"] = m
     cfg["accelerer"] = bool(data.get("accelerer"))
+    passes = data.get("passes", transferts.PASSES_DEFAUT)
+    if not isinstance(passes, list) or not all(isinstance(x, str) and x in transferts.PASSES for x in passes):
+        erreurs.append("Passe-temps inconnus.")
+    else:
+        cfg["passes"] = sorted(set(passes), key=transferts.PASSES.get, reverse=True)
+        if cfg["accelerer"] and not cfg["passes"]:
+            erreurs.append("Choisis au moins un passe-temps pour accélérer les envois.")
+    cfg["commandants"] = []
+    if erreurs:
+        raise ErreurSaisie(erreurs)
+    return cfg
+
+
+NOMS_RECRUTEMENT = {"MeadRanger": "Valkyrie pisteuse", "MeadShieldMaiden": "Vierge au bouclier", "MeadBow": "Valkyrie franc-tireuse",
+                    "MeadMace": "Protecteur du nord", "SceatFameShield": "Tour de gloire", "SceatAttWallMelee": "Canon lance-grappin",
+                    "SceatAttMoatAttRange": "Hwacha", "SceatAttWallAttRange": "Mortier de siège",
+                    "SceatSuppAttWaves": "Chariot de guerre", "SceatSuppAttPowerYard": "Lance-flammes d'assaut"}
+_catalogue = []
+
+
+def catalogue_recrutement():
+    """Types proposes dans la page Recrutement : {"soldats": [{"type","nom","niveaux"}], "engins": [...]}."""
+    if not _catalogue:
+        try:
+            _catalogue.append(recrutement.charger_catalogue())
+        except (OSError, ValueError, KeyError):
+            return {"soldats": [], "engins": []}
+    cat = _catalogue[0]
+    res = {}
+    for cle, lieu in (("soldats", recrutement.CASERNE), ("engins", recrutement.ATELIER)):
+        res[cle] = [{"type": t, "nom": NOMS_RECRUTEMENT[t], "niveaux": sorted({n for n, _ in cat[lieu][t]}),
+                     "image": ("recrutement/%s.png" % t) if os.path.isfile(os.path.join(DOSSIER_IMAGES, "recrutement", t + ".png"))
+                     else None} for t in NOMS_RECRUTEMENT if t in cat[lieu]]
+    return res
+
+
+def avant_postes_connus():
+    """Avant-postes du compte vus par le bot (captures/chateaux.json, ecrit au lancement du module recrutement)."""
+    try:
+        with open(recrutement.FICHIER_CHATEAUX, encoding="utf-8") as f:
+            d = json.load(f)
+        return [a for a in d.get("avant_postes") or [] if isinstance(a, dict) and a.get("n") in recrutement.AVANT_POSTES]
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def normaliser_recrutement(data, ancienne=None):
+    """Reglages du module recrutement -> rubrique "recrutement" (types choisis royaume par royaume), ou ErreurSaisie."""
+    erreurs = []
+    cat = catalogue_recrutement()
+    cfg = {k: v for k, v in (ancienne if isinstance(ancienne, dict) else {}).items()
+           if k not in ("royaumes", "avant_postes", "reglages", "soldats", "engins", "quantite_soldats", "quantite_engins", "aide")}
+    roy = data.get("royaumes", [])
+    aps = data.get("avant_postes", [])
+    if (not isinstance(roy, list) or not all(isinstance(k, int) and k in tours.ROYAUMES for k in roy)
+            or not isinstance(aps, list) or not all(isinstance(n, int) and n in recrutement.AVANT_POSTES for n in aps)):
+        raise ErreurSaisie(["Royaumes ou avant-postes invalides."])
+    if not roy and not aps:
+        raise ErreurSaisie(["Choisis au moins un royaume ou un avant-poste."])
+    cfg["royaumes"] = sorted(set(roy))
+    cfg["avant_postes"] = sorted(set(aps))
+    cfg["reglages"] = {}
+    recus = data.get("reglages") if isinstance(data.get("reglages"), dict) else {}
+    for k in recrutement.cles_config(cfg):
+        nom_k = tours.ROYAUMES[k] if isinstance(k, int) else "avant-poste " + k[2:]
+        r = recus.get(str(k)) if isinstance(recus.get(str(k)), dict) else {}
+        bloc = {}
+        for cle, quoi in (("soldats", "soldat"), ("engins", "engin")):
+            connus = {e["type"]: e for e in cat[cle]}
+            liste = []
+            for e in r.get(cle) if isinstance(r.get(cle), list) else []:
+                if not isinstance(e, dict) or e.get("type") not in connus:
+                    erreurs.append("%s : type de %s inconnu." % (nom_k, quoi))
+                    continue
+                if e["type"] not in [x["type"] for x in liste]:
+                    liste.append({"type": e["type"], "niveau_max": None})   # toujours le plus haut niveau debloque
+            bloc[cle] = liste
+        if not bloc["soldats"] and not bloc["engins"]:
+            erreurs.append("%s : choisis au moins un type de soldat ou d'engin." % nom_k)
+        cfg["reglages"][str(k)] = bloc
+    cfg["commandants"] = []
+    if erreurs:
+        raise ErreurSaisie(erreurs)
+    return cfg
+
+
+NOMS_MATERIAUX = {1: "Bois raffiné", 2: "Pierre raffinée", 3: "Vis", 4: "Poudre noire", 5: "Scie", 6: "Perceuse",
+                  7: "Pied-de-biche", 8: "Lanières de cuir", 9: "Chaînes", 10: "Plaques de métal",
+                  11: "Tuiles d'écailles de dragon", 12: "Amulettes métamorphes"}
+_recettes = []
+
+
+def catalogue_materiaux():
+    """Materiaux proposes dans la page Materiaux : {partie: [{"groupe","nom","image","court","long"}]} + prix des emplacements."""
+    if not _recettes:
+        try:
+            _recettes.append(materiaux.charger_recettes())
+        except (OSError, ValueError, KeyError):
+            return {"parties": {p: [] for p in materiaux.PARTIES}, "prix": {}}
+    recettes, prix = _recettes[0]
+    res = {p: [] for p in materiaux.PARTIES}
+    for g, (p, cle, _) in sorted(materiaux.MATERIAUX.items()):
+        types = {r["type"] for r in recettes.values() if r["groupe"] == g}
+        res[p].append({"groupe": g, "nom": NOMS_MATERIAUX[g], "court": "Short" in types, "long": "Long" in types,
+                       "image": ("materiaux/%s.png" % cle) if os.path.isfile(os.path.join(DOSSIER_IMAGES, "materiaux", cle + ".png"))
+                       else None})
+    return {"parties": res, "prix": {p: prix.get(q) for p, q in materiaux.PARTIES.items()}}
+
+
+def normaliser_materiaux(data, ancienne=None):
+    """Reglages du module materiaux -> rubrique "materiaux", ou ErreurSaisie."""
+    erreurs = []
+    cfg = {k: v for k, v in (ancienne if isinstance(ancienne, dict) else {}).items() if k not in materiaux.PARTIES}
+    for p in materiaux.PARTIES:
+        bloc = data.get(p) if isinstance(data.get(p), dict) else {}
+        cases = bloc.get("cases") if isinstance(bloc.get("cases"), list) else []
+        if len(cases) > materiaux.CASES:
+            erreurs.append("Trop de cases (%s)." % materiaux.NOMS_PARTIES[p])
+            cases = cases[:materiaux.CASES]
+        propres = []
+        for c in cases:
+            if c is None:
+                propres.append(None)
+                continue
+            if (not isinstance(c, dict) or c.get("manuel") not in materiaux.MANUELS
+                    or materiaux.MATERIAUX.get(c.get("groupe"), (None,))[0] != p):
+                erreurs.append("Case invalide (%s)." % materiaux.NOMS_PARTIES[p])
+                propres.append(None)
+                continue
+            propres.append({"groupe": c["groupe"], "manuel": c["manuel"]})
+        propres += [None] * (materiaux.CASES - len(propres))
+        cfg[p] = {"cases": propres, "acheter": bool(bloc.get("acheter"))}
+    if not any(c for p in materiaux.PARTIES for c in cfg[p]["cases"]):
+        erreurs.append("Choisis au moins un matériau à fabriquer.")
     cfg["commandants"] = []
     if erreurs:
         raise ErreurSaisie(erreurs)
@@ -417,7 +553,9 @@ def demarrer_bot(lanceur, popen=subprocess.Popen):
                            "forteresses": (forteresses.RUBRIQUE, forteresses.config_valide),
                            "achats": (achats.RUBRIQUE, achats.config_valide),
                            "defense": (defense.RUBRIQUE, defense.config_valide),
-                           "transferts": (transferts.RUBRIQUE, transferts.config_valide)}[nom]
+                           "transferts": (transferts.RUBRIQUE, transferts.config_valide),
+                           "recrutement": (recrutement.RUBRIQUE, recrutement.config_valide),
+                           "materiaux": (materiaux.RUBRIQUE, materiaux.config_valide)}[nom]
             if not valide((tout or {}).get(rub)):
                 raise ErreurSaisie(["Module %s : réglages incomplets, enregistre-les d'abord." % m.LANCEUR_NOM])
         try:
@@ -445,7 +583,10 @@ def tout_etat():
     prix = achats.prix_engins() if os.path.exists(tours.FICHIER_ITEMS) else {w: p for w, (_, _, p) in achats.ENGINS.items()}
     return {"config": {"tours": tout.get("tours"), "forteresses": tout.get(forteresses.RUBRIQUE), "lanceur": tout.get(bot.RUBRIQUE),
                        "achats": tout.get(achats.RUBRIQUE), "defense": tout.get(defense.RUBRIQUE),
-                       "transferts": tout.get(transferts.RUBRIQUE)},
+                       "transferts": tout.get(transferts.RUBRIQUE), "recrutement": tout.get(recrutement.RUBRIQUE),
+                       "materiaux": tout.get(materiaux.RUBRIQUE)},
+            "materiaux": catalogue_materiaux(),
+            "recrutement": dict(catalogue_recrutement(), avant_postes=avant_postes_connus()),
             "prix_porte_max": defense.PRIX_PORTE_MAX,
             "engins": [{"id": w, "nom": achats.NOMS_ENGINS[w], "prix": prix[w],
                         "image": "images/engins/%d.png" % w if os.path.exists(os.path.join(DOSSIER_IMAGES, "engins", "%d.png" % w)) else None}
@@ -509,6 +650,10 @@ def enregistrer(rubrique, data):
             cfg = normaliser_defense(data, tout.get(defense.RUBRIQUE))
         elif rubrique == "transferts":
             cfg = normaliser_transferts(data, tout.get(transferts.RUBRIQUE))
+        elif rubrique == "recrutement":
+            cfg = normaliser_recrutement(data, tout.get(recrutement.RUBRIQUE))
+        elif rubrique == "materiaux":
+            cfg = normaliser_materiaux(data, tout.get(materiaux.RUBRIQUE))
         else:
             raise ErreurSaisie(["Rubrique inconnue."])
         tours.memoriser_config(cfg, rubrique={"forteresses": forteresses.RUBRIQUE, "lanceur": bot.RUBRIQUE}.get(rubrique, rubrique))

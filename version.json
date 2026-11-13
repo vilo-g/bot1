@@ -1,12 +1,10 @@
 {
-  "version": 9,
-  "date": "12/11/2026",
+  "version": 10,
+  "date": "13/11/2026",
   "nouveautes": [
-    "Interface : nouvel encadré « Sessions » (durée, pièces et rubis gagnés), avec les 10 dernières sessions et un bouton pour en supprimer une.",
-    "Forteresses : quand le jeu n'a pas encore libéré une forteresse (code 95), le bot réessaie toutes les 3 s pour partir dès que possible.",
-    "Forteresses : le message d'attente indique les forteresses attaquables mises de côté (plus de soldats, attaque en cours).",
-    "Interface forteresses : seules les vagues remplies affichent leur choix de présélection.",
-    "Défense : soutien toujours envoyé avec des plumes ; rien n'est envoyé si une porte ouverte couvre déjà l'attaque ; soldats rappelés aussitôt si l'attaquant retire son attaque.",
-    "Transferts : bois/pierre/nourriture et ressources des mondes partent dans des envois séparés (le jeu refuse de les mélanger)."
+    "Nouveau module Recrutement : remplit la caserne et l'atelier de siège des royaumes et des avant-postes choisis, au plus haut niveau débloqué et au maximum par emplacement, puis demande l'aide de l'alliance (soldats).",
+    "Nouveau module Matériaux : raffinerie, outilleur et butin du dragon (6 cases par bâtiment, manuel court ou long), avec vérification des ressources et achat automatique des emplacements payants en option.",
+    "Transferts : passe-temps 1 min à 1 h combinés pour gâcher le moins de temps ; le vert est servi en premier et garde ce dont le module Matériaux a besoin.",
+    "Interface : pages Recrutement et Matériaux, avec images."
   ]
 }

@@ -47,9 +47,11 @@ import forteresses  # noqa: E402
 import achats       # noqa: E402
 import defense      # noqa: E402
 import transferts   # noqa: E402
+import recrutement  # noqa: E402
+import materiaux    # noqa: E402
 from tours import ArretModule, demander, duree  # noqa: E402
 
-MODULES = [tours, forteresses, achats, defense, transferts]  # ordre = numero affiche (1 tours, 2 forteresses, 3 achats, 4 defense, 5 transferts)
+MODULES = [tours, forteresses, achats, defense, transferts, recrutement, materiaux]  # ordre = numero affiche (1 tours, 2 forteresses, 3 achats, 4 defense, 5 transferts)
 RUBRIQUE = "lanceur"
 VERIF_SESSION = 30                      # secondes max entre deux verifications que la connexion est vivante
 PRIORITE_DEFAUT = 50                    # module sans LANCEUR_PRIORITE (plus petit = plus prioritaire)
@@ -403,7 +405,10 @@ def battement_etat(modules, debut, horloge=time.time, fichier=None, tous_les=3, 
         ecrire_etat({"etat": "en_marche", "pid": os.getpid(), "modules": modules, "debut": debut, "maj": t, "pieces": pieces,
                      "achats": {e.nom: e.module.nb_achats for e in entrees if hasattr(e.module, "nb_achats")},
                      "attaques": {e.nom: e.module.nb_attaques for e in entrees if not hasattr(e.module, "nb_achats")
-                                  and not hasattr(e.module, "nb_abris") and not hasattr(e.module, "nb_transferts")},
+                                  and not hasattr(e.module, "nb_abris") and not hasattr(e.module, "nb_transferts")
+                                  and not hasattr(e.module, "nb_recrutements") and not hasattr(e.module, "nb_fabrications")},
+                     "fabrications": {e.nom: e.module.nb_fabrications for e in entrees if hasattr(e.module, "nb_fabrications")},
+                     "recrutements": {e.nom: e.module.nb_recrutements for e in entrees if hasattr(e.module, "nb_recrutements")},
                      "transferts": {e.nom: e.module.nb_transferts for e in entrees if hasattr(e.module, "nb_transferts")},
                      "defense": {e.nom: [e.module.nb_detectees, e.module.nb_abris] for e in entrees if hasattr(e.module, "nb_abris")},
                      "arretes": {e.nom: e.arrete for e in entrees if e.arrete}}, fichier)

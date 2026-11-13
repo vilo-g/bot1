@@ -11,8 +11,11 @@ Regles (demande du 08/11) :
   - pas de reserve gardee au depart (les tours et les fiefs remplissent au fur et a mesure) ;
   - 3 types de ressources (base : bois, pierre, nourriture ; mondes : fer, charbon, huile, verre ; miel/hydromel, pas
     geres) : un envoi ne contient qu'un seul type (plusieurs ressources du meme type ensemble), sinon le jeu refuse (code 2) ;
+  - le vert d'abord ; si le module materiaux tourne, ce qu'il lui faut au vert (de quoi remplir 2 fois ses 6 emplacements par
+    batiment) n'est jamais envoye ailleurs (demande du 13/11) ;
   - un seul envoi a la fois vers un meme royaume (le suivant attend la fin du premier) ;
-  - un envoi met 2 h a arriver ; option : l'accelerer avec des passe-temps 1 h (2 par envoi).
+  - un envoi met 1 h 36 a 2 h a arriver ; option : l'accelerer avec les passe-temps choisis (1 min a 1 h), combines pour
+    gacher le moins de temps possible (1 h 36 -> 1 h + 30 min + 10 min).
 Messages du jeu (capture du 08/11) : dcl (ressources et capacites de tous les chateaux, tous royaumes), kpi (royaumes
 debloques, envois en cours RT), kgt (envoi : chateau source, royaume source, royaume cible, liste [ressource, quantite]),
 msk (passe-temps MS5 = 1 h sur l'envoi en cours vers un royaume).
@@ -35,8 +38,31 @@ NOMS_RES = {"W": "bois", "S": "pierre", "I": "fer", "C": "charbon", "O": "huile"
 PLEIN = 0.98                                       # bois/pierre "pleins" a partir de 98 % de la capacite
 MIN_ENVOI = 10000
 PAUSE = 300                                        # verification toutes les 5 min
-PASSE_ENVOI = "MS5"                                # passe-temps 1 h
-MAX_PASSES_PAR_ENVOI = 3
+PASSES = {"MS1": 60, "MS2": 300, "MS3": 600, "MS4": 1800, "MS5": 3600}   # capture du 12/11 (msk MST)
+NOMS_PASSES = {"MS1": "1 min", "MS2": "5 min", "MS3": "10 min", "MS4": "30 min", "MS5": "1 h"}
+PASSES_DEFAUT = ["MS5"]
+MAX_PASSES_PAR_ENVOI = 20
+REMPLISSAGES_GARDES = 2         # module materiaux : de quoi remplir 2 fois les 6 emplacements de chaque batiment, garde au vert
+
+
+def reserve_materiaux(cfg_mat, recettes):
+    """Ressources du chateau (bois, pierre, charbon, huile, verre, fer) que le module materiaux consomme au vert :
+    {ressource: quantite} = pour chaque batiment, le plus gros cout des cases choisies x 6 emplacements x 2."""
+    import materiaux
+    total = {}
+    for partie in materiaux.PARTIES:
+        cases = [c for c in (cfg_mat.get(partie) or {}).get("cases") or [] if c]
+        pire = {}
+        for c in cases:
+            typ = materiaux.MANUELS.get(c.get("manuel"))
+            for r in recettes.values():
+                if r["groupe"] == c.get("groupe") and r["type"] == typ:
+                    for k, q in r["couts"].items():
+                        if k in materiaux.RESSOURCES_CHATEAU:
+                            pire[k] = max(pire.get(k, 0), q)
+        for k, q in pire.items():
+            total[k] = total.get(k, 0) + q * materiaux.CASES * REMPLISSAGES_GARDES
+    return total
 
 
 def nom_monde(kid):
@@ -50,7 +76,9 @@ def fmt(n):
 def config_valide(cfg):
     try:
         m = cfg.get("min_envoi", MIN_ENVOI)
-        return (isinstance(m, int) and not isinstance(m, bool) and 1 <= m <= 100000000 and isinstance(cfg.get("accelerer", False), bool))
+        p = cfg.get("passes", PASSES_DEFAUT)
+        return (isinstance(m, int) and not isinstance(m, bool) and 1 <= m <= 100000000 and isinstance(cfg.get("accelerer", False), bool)
+                and isinstance(p, list) and all(x in PASSES for x in p) and (p or not cfg.get("accelerer")))
     except AttributeError:
         return False
 
@@ -60,7 +88,9 @@ def resume_config(cfg):
             "qui en manquent, dans l'ordre vert, glacier, sables, feu",
             "bois et pierre : depuis les royaumes des tours quand ils y sont pleins, vers les royaumes sans tours",
             "envois de %s au moins par ressource ; %s" % (fmt(cfg.get("min_envoi", MIN_ENVOI)),
-            "envois acceleres avec des passe-temps 1 h" if cfg.get("accelerer") else "envois non acceleres (2 h de trajet)")]
+            "envois acceleres avec les passe-temps %s (le moins de temps gache)" % ", ".join(
+                NOMS_PASSES[x] for x in sorted(cfg.get("passes", PASSES_DEFAUT), key=PASSES.get, reverse=True))
+            if cfg.get("accelerer") else "envois non acceleres (1 h 36 a 2 h de trajet)")]
 
 
 def lire_stocks(payload):
@@ -96,14 +126,43 @@ def lire_kpi(d):
     return ouverts, en_route, restant
 
 
+def combinaison(restant, durees):
+    """Passe-temps qui couvrent `restant` secondes en gachant le moins de temps, puis avec le moins de passe-temps.
+    durees : {code: secondes}. -> liste de codes, du plus long au plus court ([] si rien a couvrir ou aucun passe-temps)."""
+    if restant <= 0 or not durees:
+        return []
+    m = {c: v // 60 for c, v in durees.items()}
+    cible = -(-int(restant) // 60)
+    haut = cible + max(m.values())
+    meilleur = [None] * (haut + 1)                     # meilleur[s] = liste la plus courte qui fait exactement s minutes
+    meilleur[0] = []
+    for total in range(1, haut + 1):
+        for c, v in m.items():
+            if v <= total and meilleur[total - v] is not None:
+                essai = meilleur[total - v] + [c]
+                if meilleur[total] is None or len(essai) < len(meilleur[total]):
+                    meilleur[total] = essai
+    for total in range(cible, haut + 1):
+        if meilleur[total] is not None:
+            return sorted(meilleur[total], key=lambda c: -durees[c])
+    return []
+
+
 def principal(chateaux):
     """Chateau d'un royaume qui recoit les envois et dont on compare le remplissage : celui qui a la plus grande capacite."""
     return max(chateaux, key=lambda c: (sum(c["max"].values()), c["id"]))
 
 
-def plan_transferts(stocks, ouverts, en_route, royaumes_tours, bloques=(), min_envoi=MIN_ENVOI):
-    """-> [(chateau source, royaume source, royaume cible, [[ressource, quantite], ...])], dans l'ordre d'envoi."""
+def plan_transferts(stocks, ouverts, en_route, royaumes_tours, bloques=(), min_envoi=MIN_ENVOI, reserves=None):
+    """-> [(chateau source, royaume source, royaume cible, [[ressource, quantite], ...])], dans l'ordre d'envoi.
+    reserves : {royaume: {ressource: quantite}} gardee dans le chateau principal du royaume (jamais envoyee)."""
     dispo = {k: {c["id"]: dict(c["res"]) for c in cs} for k, cs in stocks.items()}
+    for k, res in (reserves or {}).items():
+        if k in stocks:
+            p = principal(stocks[k])
+            for r, q in res.items():
+                if r in dispo[k][p["id"]]:
+                    dispo[k][p["id"]][r] = max(0, dispo[k][p["id"]][r] - q)
     manque = {}
     for k, cs in stocks.items():
         p = principal(cs)
@@ -130,7 +189,8 @@ def plan_transferts(stocks, ouverts, en_route, royaumes_tours, bloques=(), min_e
                 manque[dst][r] -= q
                 envois.setdefault((cid, src, dst, TYPE_RES[r]), []).append([r, q])
     # le jeu refuse un envoi qui melange les types (base / ressources des mondes) : un envoi par type
-    return [(cid, src, dst, g) for (cid, src, dst, _), g in envois.items()]
+    plan = [(cid, src, dst, g) for (cid, src, dst, _), g in envois.items()]
+    return sorted(plan, key=lambda e: e[2] != 0)        # le vert d'abord (stable : l'ordre des autres ne change pas)
 
 
 class ModuleTransferts:
@@ -143,7 +203,9 @@ class ModuleTransferts:
         self.nb_attaques = 0
         self.nb_transferts = 0
         self.plus_de_passes = False
+        self.passes_vides = set()   # passe-temps refuses (plus en stock) : plus utilises pendant la session
         self.occupes = set()
+        self.reserve_vert = None    # module materiaux : ressources gardees au vert (calcule au premier passage)
 
     def _tours(self):
         if self.royaumes_tours is not None:
@@ -151,6 +213,21 @@ class ModuleTransferts:
         if tours.ModuleTours.NOM_MODULE not in self.partage.commandants:
             return set()
         return set((tours.lire_config().get("tours") or {}).get("royaumes") or [])
+
+    def _reserve_vert(self):
+        if self.reserve_vert is None:
+            self.reserve_vert = {}
+            if "MATERIAUX" in self.partage.commandants:
+                try:
+                    import materiaux
+                    recettes, _ = materiaux.charger_recettes()
+                    self.reserve_vert = reserve_materiaux(tours.lire_config().get("materiaux") or {}, recettes)
+                except (OSError, ValueError, KeyError, ImportError):
+                    self.reserve_vert = {}
+                if self.reserve_vert:
+                    self.sortie("   module materiaux actif : gardes au vert (jamais envoyes) : %s."
+                                % ", ".join("%s %s" % (fmt(q), NOMS_RES.get(r, r)) for r, q in sorted(self.reserve_vert.items())))
+        return self.reserve_vert
 
     async def _demander(self, cmd, donnees, delai=10):
         await self.jeu.vider()
@@ -169,7 +246,7 @@ class ModuleTransferts:
         if not ouverts:
             ouverts = set(stocks)
         plan = plan_transferts(stocks, ouverts, en_route, self._tours(), getattr(self.partage, "royaumes_bloques", ()) or (),
-                               self.cfg.get("min_envoi", MIN_ENVOI))
+                               self.cfg.get("min_envoi", MIN_ENVOI), reserves={0: self._reserve_vert()})
         for cid, src, dst, g in plan:
             if self.partage.urgence_prioritaire(self.NOM_MODULE):
                 return 5                                   # attaque ou forteresse d'abord : la suite au passage suivant
@@ -191,7 +268,7 @@ class ModuleTransferts:
                 self.sortie("TRANSFERT %s -> %s : %s (arrivee dans %s)." % (nom_monde(src), nom_monde(dst), texte,
                                                                            duree(restant.get(dst, 7200))))
                 self.occupes.add(dst)
-                if self.cfg.get("accelerer") and await self._accelerer(dst):
+                if self.cfg.get("accelerer") and await self._accelerer(dst, restant.get(dst)):
                     self.occupes.discard(dst)              # arrive tout de suite : le royaume peut en recevoir un autre
                     await asyncio.sleep(2)
                 return
@@ -213,22 +290,43 @@ class ModuleTransferts:
         self.sortie("   transfert %s -> %s refuse par le jeu (%s : %s)." % (nom_monde(src), nom_monde(dst),
                                                                        "code %s" % rep[1] if rep else "pas de reponse", texte))
 
-    async def _accelerer(self, dst):
-        """-> True si l'envoi est arrive (le royaume cible est libre pour un autre envoi)."""
-        if self.plus_de_passes:
-            return False
-        for n in range(MAX_PASSES_PAR_ENVOI):
-            rep = await self._demander("msk", {"MST": PASSE_ENVOI, "KID": str(dst), "TT": "2"})
+    async def _accelerer(self, dst, restant=None):
+        """Passe-temps sur l'envoi en cours vers dst, combines pour gacher le moins de temps. -> True si l'envoi est arrive."""
+        dispo = {c: PASSES[c] for c in self.cfg.get("passes", PASSES_DEFAUT) if c in PASSES and c not in self.passes_vides}
+        utilises = []
+        if restant is None:
+            rep = await self._demander("kpi", {})
+            _, _, rs = lire_kpi(T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None)
+            restant = rs.get(dst, 0)
+        for _ in range(MAX_PASSES_PAR_ENVOI):
+            plan = combinaison(restant, dispo)
+            if not plan:
+                break
+            code = plan[0]
+            rep = await self._demander("msk", {"MST": code, "KID": str(dst), "TT": "2"})
             if not rep or rep[1] != 0:
+                self.passes_vides.add(code)                # plus de ce passe-temps : on complete avec les autres
+                dispo.pop(code, None)
+                self.sortie("   passe-temps %s refuse (%s) : plus en stock ? Il n'est plus utilise%s."
+                            % (NOMS_PASSES[code], "code %s" % rep[1] if rep else "pas de reponse",
+                               ", on complete avec les autres" if dispo else ""))
+                continue
+            utilises.append(code)
+            _, _, rs = lire_kpi(T.json_ou_none(rep[2]))
+            restant = rs.get(dst, 0)
+            if restant <= 0:
+                break
+        if utilises:
+            detail = ", ".join("%d x %s" % (utilises.count(c), NOMS_PASSES[c]) for c in sorted(set(utilises), key=lambda c: -PASSES[c]))
+            if restant <= 0:
+                self.sortie("   envoi accelere : arrive (%s)." % detail)
+            else:
+                self.sortie("   envoi accelere (%s) : encore %s de trajet." % (detail, duree(restant)))
+        elif not dispo:
+            if not self.plus_de_passes:
                 self.plus_de_passes = True
-                self.sortie("   acceleration impossible (%s) : plus de passe-temps 1 h ? Les envois suivants ne seront plus "
-                            "acceleres." % ("code %s" % rep[1] if rep else "pas de reponse"))
-                return False
-            _, _, restant = lire_kpi(T.json_ou_none(rep[2]))
-            if restant.get(dst, 0) <= 0:
-                self.sortie("   envoi accelere : arrive (%d passe-temps 1 h)." % (n + 1))
-                return True
-        return False
+                self.sortie("   plus aucun passe-temps choisi en stock : les envois ne sont plus acceleres.")
+        return restant <= 0
 
 
 # ============================================================================== branchement dans le lanceur commun (src/bot.py)
@@ -242,6 +340,7 @@ def lanceur_config(args, lire=None, sortie=print):
     cfg = dict(tours.lire_config().get(RUBRIQUE) or {})
     cfg.setdefault("min_envoi", MIN_ENVOI)
     cfg.setdefault("accelerer", False)
+    cfg.setdefault("passes", list(PASSES_DEFAUT))
     if not config_valide(cfg):
         raise ArretModule("Module transferts : reglages invalides. Regle-le dans l'interface (page Transferts), puis relance.")
     cfg["commandants"] = []

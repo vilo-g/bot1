@@ -168,6 +168,36 @@ input.faux{border-color:var(--err)}
 .etat .grand{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;background:var(--panel3)}
 .etat .grand.marche{background:var(--okbg);color:var(--ok)}.etat .grand.attente{background:var(--accentbg);color:var(--accent)}
 .etat h3{margin:0;font-size:20px}.etat p{margin:2px 0 0;color:var(--muted)}
+.cases-mat{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+@media (max-width:980px){.cases-mat{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:520px){.cases-mat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.case-mat{border:1px solid var(--line2);border-radius:12px;background:var(--panel2);padding:10px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.case-mat.on{border-color:var(--accent);background:var(--accentbg)}
+.case-mat .tete{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.case-mat .tete b{color:var(--text);font-size:13px}
+.case-mat .vignette{width:64px;height:64px;border-radius:10px;align-self:center;display:grid;place-items:center;background:var(--panel);border:1px dashed var(--line2);color:var(--muted);font-size:24px}
+.case-mat .vignette img{width:64px;height:64px;border-radius:10px}
+.case-mat select{width:100%;padding:6px 4px;font-size:12px !important;border-radius:8px;border:1px solid var(--line2);background:var(--panel);color:var(--text);font:inherit;font-size:13px}
+.case-mat .seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.case-mat .seg button{border:0;background:transparent;color:var(--muted);padding:6px 0;font:inherit;font-size:12px;cursor:pointer}
+.case-mat .seg button.on{background:var(--accent);color:#1b1408;font-weight:600}
+.case-mat .seg button:disabled{opacity:.35;cursor:not-allowed}
+.palette-mat{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+.palette-mat span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:3px 8px 3px 3px;border:1px solid var(--line);border-radius:999px}
+.palette-mat img{width:24px;height:24px;border-radius:6px}
+.sous-titre{font-size:14px;margin:18px 0 4px}
+.royaume.ap{--c:var(--k0)}
+.royaume.ap .drapeau{font-weight:700;color:var(--c);display:grid;place-items:center}
+.recrues{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.recrue{display:flex;align-items:center;gap:9px;padding:9px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--panel2);cursor:pointer;user-select:none}
+.recrue.on{border-color:var(--accent);background:var(--accentbg)}
+.recrue input[type=checkbox]{accent-color:var(--accent);margin:0}
+.recrue b{flex:1;font-weight:500}
+.recrue img{width:40px;height:40px;object-fit:contain;flex:none;background:#fff;border-radius:8px;padding:2px}
+.choix-passes{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.passe{display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line2);border-radius:9px;cursor:pointer;font-weight:500;user-select:none}
+.passe.on{border-color:var(--accent);background:var(--accentbg)}
+.passe input{accent-color:var(--accent);margin:0}
 .sessions{display:flex;flex-direction:column;gap:8px}
 .session{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)) 30px;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 14px}
 .session.en-cours{border-color:var(--ok);background:var(--okbg)}
@@ -222,6 +252,8 @@ input.faux{border-color:var(--err)}
       <button data-page="achats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4"/><path d="M3 10.5v4c0 1.4 2.7 2.5 6 2.5 1 0 2-.1 2.8-.3"/><circle cx="17" cy="16" r="4.5"/><path d="M17 14v4M15 16h4"/></svg>Achats<span class="pastille" id="p-achats">-</span></button>
       <button data-page="defense"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Défense<span class="pastille" id="p-defense">-</span></button>
       <button data-page="transferts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>Transferts<span class="pastille" id="p-transferts">-</span></button>
+      <button data-page="recrutement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.900 1.900 6.500 5.500"/><path d="M18.500 7v6M15.500 10h6"/></svg>Recrutement<span class="pastille" id="p-recrutement">-</span></button>
+      <button data-page="materiaux"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>Matériaux<span class="pastille" id="p-materiaux">-</span></button>
       <div class="titre">Suivi</div>
       <button data-page="journal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>Journal</button>
     </div>
@@ -458,13 +490,44 @@ input.faux{border-color:var(--err)}
             (module défense) sont laissés de côté pendant l'attaque.</p>
           <div class="grille g3">
             <label class="champ">Quantité minimum par envoi (par ressource)<input type="number" id="r-min" min="1"></label>
-            <div class="champ">Accélérer les envois<label class="interrupteur" style="margin-top:6px"><input type="checkbox" id="r-acc"><i></i>Passe-temps 1 h (2 par envoi)</label></div>
+            <div class="champ">Accélérer les envois<label class="interrupteur" style="margin-top:6px"><input type="checkbox" id="r-acc"><i></i>Avec des passe-temps</label></div>
+            <div class="champ" id="r-passes-zone">Passe-temps à utiliser<div class="choix-passes" id="r-passes"></div>
+              <p class="aide" style="margin:6px 0 0">Le bot les combine pour gâcher le moins de temps : un envoi de 1 h 36 → 1 h + 30 min + 10 min. S'il en manque un, il complète avec les autres cochés.</p></div>
           </div>
-          <p class="aide" style="margin:8px 0 0">Sans accélération, un envoi met 2 h à arriver.</p>
+          <p class="aide" style="margin:8px 0 0">Sans accélération, un envoi met 1 h 36 à 2 h à arriver.</p>
         </div>
         <div class="barre"><div class="msg" id="r-msg">Aucune modification.</div>
           <button class="bouton" id="r-annuler">Annuler</button><button class="bouton principal" id="r-enregistrer">Enregistrer</button></div>
         <ul class="erreurs" id="r-erreurs"></ul>
+      </section>
+
+      <!-- ===================== MATERIAUX -->
+      <section class="page" id="page-materiaux">
+        <div class="carte">
+          <h2>Matériaux des engins spéciaux</h2>
+          <p class="aide">Pour chaque bâtiment, remplis les 6 cases avec le matériau à fabriquer et le manuel (court = 1 h, long = 5 h). Toutes les 5 minutes, le bot lance ces fabrications à tour de rôle dans les emplacements libres, au plus haut niveau de manuel débloqué, et seulement si tu as assez de ressources. Une case vide est sautée.</p>
+        </div>
+        <div id="m-parties"></div>
+        <div class="barre"><div class="msg" id="m-msg">Aucune modification.</div>
+          <button class="bouton" id="m-annuler">Annuler</button><button class="bouton principal" id="m-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="m-erreurs"></ul>
+      </section>
+
+      <!-- ===================== RECRUTEMENT -->
+      <section class="page" id="page-recrutement">
+        <div class="carte">
+          <h2>Royaumes</h2>
+          <p class="aide">Toutes les 5 minutes, le bot remplit au maximum les emplacements libres de la caserne et de l'atelier de siège du château principal de chaque royaume coché et de chaque avant-poste coché, au plus haut niveau débloqué, puis demande l'aide de l'alliance. Les types se choisissent château par château.</p>
+          <div class="royaumes" id="rc-royaumes"></div>
+          <h3 class="sous-titre">Avant-postes du vert</h3>
+          <p class="aide" id="rc-ap-aide"></p>
+          <div class="royaumes" id="rc-aps"></div>
+          <p class="aide" style="margin:10px 0 0">Si un château coché n'existe pas, n'a pas de caserne ou d'atelier, ou si un type coché n'y est pas débloqué, le bot le signale au lancement et n'y recrute rien.</p>
+        </div>
+        <div id="rc-blocs"></div>
+        <div class="barre"><div class="msg" id="rc-msg">Aucune modification.</div>
+          <button class="bouton" id="rc-annuler">Annuler</button><button class="bouton principal" id="rc-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="rc-erreurs"></ul>
       </section>
 
       <!-- ===================== JOURNAL -->
@@ -490,10 +553,10 @@ const NOMS = {0:"vert",1:"sables",2:"glacier",3:"feu"};
 const COULEURS = {0:"var(--k0)",1:"var(--k1)",2:"var(--k2)",3:"var(--k3)"};
 const COTES = [["F","Flanc gauche"],["FF","Deux flancs"],["A","Avant"],["AF","Avant + flanc"],["AFF","Avant + 2 flancs"]];
 const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
-const VERSION = "2026-11-12-vagues";     // doit etre egale a VERSION dans interface.py
+const VERSION = "2026-11-13-avantpostes";     // doit etre egale a VERSION dans interface.py
 let serveur = null;            // dernier /api/etat
-const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null};      // formulaires en cours
-const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false};
+const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null, recrutement:null, materiaux:null};      // formulaires en cours
+const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false, recrutement:false, materiaux:false};
 
 async function api(chemin, corps){
   const opt = corps === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-GGE-Bot":"1"}, body:JSON.stringify(corps)};
@@ -522,7 +585,9 @@ const TITRES = {accueil:["Tableau de bord","Lancer le bot et suivre ce qu'il fai
   forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"],
   achats:["Module achats","Dépenser le surplus de pièces en engins (rubrique achats)"],
   defense:["Module défense","Mettre les soldats à l'abri quand un château est attaqué (rubrique defense)"],
-  transferts:["Module transferts","Répartir les ressources entre les royaumes (rubrique transferts)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
+  transferts:["Module transferts","Répartir les ressources entre les royaumes (rubrique transferts)"],
+  recrutement:["Module recrutement","Remplir la caserne et l'atelier de siège (rubrique recrutement)"],
+  materiaux:["Module matériaux","Fabriquer les matériaux des engins spéciaux (rubrique materiaux)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
 function aller(page){
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("visible", p.id === "page-"+page));
   document.querySelectorAll("#menu button").forEach(b => b.classList.toggle("actif", b.dataset.page === page));
@@ -546,17 +611,19 @@ function chargerFormulaires(){
   etat.achats = etatAchats(serveur.config.achats);
   etat.defense = etatDefense(serveur.config.defense);
   etat.transferts = etatTransferts(serveur.config.transferts);
-  sale.tours = sale.forteresses = sale.achats = sale.defense = sale.transferts = false;
-  dessinerTours(); dessinerFort(); dessinerAchats(); dessinerDefense(); dessinerTransferts();
-  marquer("tours"); marquer("forteresses"); marquer("achats"); marquer("defense"); marquer("transferts");
+  etat.recrutement = etatRecrutement(serveur.config.recrutement);
+  etat.materiaux = etatMateriaux(serveur.config.materiaux);
+  sale.tours = sale.forteresses = sale.achats = sale.defense = sale.transferts = sale.recrutement = sale.materiaux = false;
+  dessinerTours(); dessinerFort(); dessinerAchats(); dessinerDefense(); dessinerTransferts(); dessinerRecrutement(); dessinerMateriaux();
+  marquer("tours"); marquer("forteresses"); marquer("achats"); marquer("defense"); marquer("transferts"); marquer("recrutement"); marquer("materiaux");
   for(const id of ["t-cmd", "f-cmd"]) if($("#" + id).value) verifierCommandants(id);   // reglages enregistres faux : signales tout de suite
 }
 function marquer(mod, texte, classe){
-  const m = $("#" + {tours:"t", forteresses:"f", achats:"a", defense:"d", transferts:"r"}[mod] + "-msg");
+  const m = $("#" + {tours:"t", forteresses:"f", achats:"a", defense:"d", transferts:"r", recrutement:"rc", materiaux:"m"}[mod] + "-msg");
   m.className = "msg " + (classe || (sale[mod] ? "sale" : ""));
   m.textContent = texte || (sale[mod] ? "Modifications non enregistrées." : "Aucune modification.");
 }
-function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats, defense:dessinerDefense, transferts:dessinerTransferts})[mod](); } pastilles(); }
+function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats, defense:dessinerDefense, transferts:dessinerTransferts, recrutement:dessinerRecrutement, materiaux:dessinerMateriaux})[mod](); } pastilles(); }
 
 /* ------------------------------------------------------------------ blocs communs a un royaume */
 function curseur(min, max, pas, valeur, unite, poser){
@@ -982,12 +1049,20 @@ $("#d-enregistrer").addEventListener("click", async () => {
   }
 });
 /* ------------------------------------------------------------------ module transferts */
-function etatTransferts(c){ c = c || {}; return {min_envoi: String(c.min_envoi || 10000), accelerer: !!c.accelerer}; }
-function erreursTransferts(r){ return (/^\d+$/.test(String(r.min_envoi).trim()) && +r.min_envoi >= 1) ? [] : ["Indique la quantité minimum par envoi (1 ou plus)."]; }
+const PASSES = [["MS5","1 h"],["MS4","30 min"],["MS3","10 min"],["MS2","5 min"],["MS1","1 min"]];
+function etatTransferts(c){ c = c || {}; return {min_envoi: String(c.min_envoi || 10000), accelerer: !!c.accelerer, passes: Array.isArray(c.passes) ? [...c.passes] : ["MS5"]}; }
+function erreursTransferts(r){
+  const e = (/^\d+$/.test(String(r.min_envoi).trim()) && +r.min_envoi >= 1) ? [] : ["Indique la quantité minimum par envoi (1 ou plus)."];
+  if(r.accelerer && !r.passes.length) e.push("Choisis au moins un passe-temps pour accélérer les envois.");
+  return e;
+}
 function dessinerTransferts(){
   const r = etat.transferts; if(!r) return;
   if(document.activeElement !== $("#r-min")) $("#r-min").value = r.min_envoi;
   $("#r-acc").checked = r.accelerer;
+  $("#r-passes-zone").hidden = !r.accelerer;
+  $("#r-passes").replaceChildren(...PASSES.map(([c, t]) => el("label",{class:"passe" + (r.passes.includes(c) ? " on" : "")},
+    el("input",{type:"checkbox", checked:r.passes.includes(c), onchange:e => { r.passes = e.target.checked ? [...r.passes, c] : r.passes.filter(x => x !== c); changer("transferts"); }}), t)));
 }
 $("#r-min").addEventListener("input", e => { etat.transferts.min_envoi = e.target.value.trim(); changer("transferts", false); });
 $("#r-acc").addEventListener("change", e => { etat.transferts.accelerer = e.target.checked; changer("transferts"); });
@@ -997,22 +1072,136 @@ $("#r-enregistrer").addEventListener("click", async () => {
   const r = etat.transferts, err = erreursTransferts(r);
   if(err.length){ marquer("transferts", "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x))); return; }
   try{
-    const rep = await api("/api/config/transferts", {min_envoi: +r.min_envoi, accelerer: r.accelerer});
+    const rep = await api("/api/config/transferts", {min_envoi: +r.min_envoi, accelerer: r.accelerer, passes: r.passes});
     serveur.config.transferts = rep.config; sale.transferts = false; marquer("transferts", "Enregistré dans config.json.", "ok"); pastilles(); dessinerModules();
   }catch(ex){
     marquer("transferts", "Pas enregistré : corrige les points ci-dessous.", "err");
     liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
   }
 });
+/* ------------------------------------------------------------------ module recrutement */
+const CLES_RC = [0,1,2,3,"ap1","ap2","ap3"];
+function etatRecrutement(c){ c = c || {};
+  const reg = {};
+  for(const k of CLES_RC){ const r = (c.reglages || {})[k] || {}; reg[k] = {soldats:(r.soldats || []).map(e => ({...e})), engins:(r.engins || []).map(e => ({...e}))}; }
+  return {royaumes:[...(c.royaumes || [])], avant_postes:[...(c.avant_postes || [])], reglages:reg}; }
+function clesChoisies(r){ return [...r.royaumes, ...r.avant_postes.map(n => "ap" + n)]; }
+function nomRc(k){
+  if(typeof k === "number") return "Royaume " + NOMS[k];
+  const a = ((serveur.recrutement || {}).avant_postes || []).find(x => "ap" + x.n === k);
+  return "Avant-poste " + k.slice(2) + (a ? " (" + a.x + "," + a.y + ")" : "");
+}
+function erreursRecrutement(r){
+  const e = [];
+  if(!r.royaumes.length && !r.avant_postes.length) e.push("Choisis au moins un royaume ou un avant-poste.");
+  for(const k of clesChoisies(r)) if(!r.reglages[k].soldats.length && !r.reglages[k].engins.length)
+    e.push(nomRc(k) + " : choisis au moins un type de soldat ou d'engin.");
+  return e;
+}
+function dessinerRecrutement(){
+  const r = etat.recrutement; if(!r) return;
+  $("#rc-royaumes").replaceChildren(...[0,1,2,3].map(k => { const on = r.royaumes.includes(k);
+    return tuileRoyaume(k, on, 0, () => { r.royaumes = on ? r.royaumes.filter(x => x !== k) : [...r.royaumes, k].sort(); changer("recrutement"); }); }));
+  const connus = (serveur.recrutement || {}).avant_postes;
+  $("#rc-ap-aide").textContent = connus == null
+    ? "Ils se recrutent comme les royaumes. Numérotés du plus ancien au plus récent ; le bot vérifie au lancement qu'ils existent (leurs coordonnées s'afficheront ici après un premier lancement du module)."
+    : connus.length ? "Ils se recrutent comme les royaumes. Ton compte en a " + connus.length + " (vus au dernier lancement du module)."
+    : "Le bot n'a vu aucun avant-poste au vert sur ton compte au dernier lancement du module.";
+  $("#rc-aps").replaceChildren(...[1,2,3].map(n => { const on = r.avant_postes.includes(n);
+    const a = (connus || []).find(x => x.n === n), absent = connus != null && !a;
+    return el("div",{class:"royaume ap" + (on ? " on" : ""), style: absent && !on ? "opacity:.45" : "",
+        onclick:() => { r.avant_postes = on ? r.avant_postes.filter(x => x !== n) : [...r.avant_postes, n].sort(); changer("recrutement"); }},
+      el("div",{class:"drapeau"}, "AP" + n), el("div",{}, el("b",{}, "Avant-poste " + n), el("small",{}, a ? "(" + a.x + "," + a.y + ")" : absent ? "pas sur le compte" : "vert")), el("span",{class:"coche"}));
+  }));
+  const grille = (k, cle, niveau) => {
+    const dispo = (serveur.recrutement || {})[cle] || [], liste = r.reglages[k][cle];
+    return el("div",{class:"recrues"}, ...(dispo.length ? dispo.map(u => {
+      const e = liste.find(x => x.type === u.type);
+      const cb = el("input",{type:"checkbox", checked:!!e, onchange:ev => { r.reglages[k][cle] = ev.target.checked ? [...liste, {type:u.type, niveau_max:null}] : liste.filter(x => x.type !== u.type); changer("recrutement"); }});
+      return el("label",{class:"recrue" + (e ? " on" : "")}, cb, u.image ? el("img",{src:"/images/" + u.image, alt:"", loading:"lazy"}) : null, el("b",{}, u.nom));
+    }) : [el("p",{class:"aide"}, "Liste des unités introuvable (captures/items.json).")]));
+  };
+  $("#rc-blocs").replaceChildren(...clesChoisies(r).map(k => el("div",{class:"carte", style:"border-left:3px solid " + (typeof k === "number" ? COULEURS[k] : COULEURS[0])},
+    el("h2",{}, nomRc(k)),
+    el("p",{class:"aide", style:"margin-bottom:6px"}, "Caserne : soldats recrutés à tour de rôle, toujours au plus haut niveau débloqué sur le compte."),
+    grille(k, "soldats", true),
+    el("p",{class:"aide", style:"margin:14px 0 6px"}, "Atelier de siège : engins fabriqués à tour de rôle."),
+    grille(k, "engins", false))));
+}
+$("#rc-annuler").addEventListener("click", () => { etat.recrutement = etatRecrutement(serveur.config.recrutement); sale.recrutement = false; dessinerRecrutement(); marquer("recrutement"); pastilles(); $("#rc-erreurs").replaceChildren(); });
+$("#rc-enregistrer").addEventListener("click", async () => {
+  const liste = $("#rc-erreurs"); liste.replaceChildren();
+  const r = etat.recrutement, err = erreursRecrutement(r);
+  if(err.length){ marquer("recrutement", "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x))); return; }
+  try{
+    const reg = {}; for(const k of clesChoisies(r)) reg[k] = r.reglages[k];
+    const rep = await api("/api/config/recrutement", {royaumes:r.royaumes, avant_postes:r.avant_postes, reglages:reg});
+    serveur.config.recrutement = rep.config; sale.recrutement = false; marquer("recrutement", "Enregistré dans config.json.", "ok"); pastilles(); dessinerModules();
+  }catch(ex){
+    marquer("recrutement", "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
+  }
+});
+/* ------------------------------------------------------------------ module materiaux */
+const PARTIES_MAT = [["raffinerie","Raffinerie","Bois et pierre raffinés, à partir du bois et de la pierre du château."],
+  ["outilleur","Outilleur","Les 8 composants des engins, à partir du bois/de la pierre raffinés et des ressources des royaumes."],
+  ["dragon","Butin du dragon","Tuiles d'écailles de dragon et amulettes métamorphes."]];
+function etatMateriaux(c){ c = c || {}; const r = {};
+  for(const [p] of PARTIES_MAT){ const b = c[p] || {}; const cases = (b.cases || []).map(x => x ? {...x} : null);
+    while(cases.length < 6) cases.push(null); r[p] = {cases, acheter: !!b.acheter}; }
+  return r; }
+function erreursMateriaux(r){ return PARTIES_MAT.some(([p]) => r[p].cases.some(x => x)) ? [] : ["Choisis au moins un matériau à fabriquer."]; }
+function prixTxt(n){ return n >= 1e6 ? (n/1e6).toLocaleString("fr-FR") + " M" : fmtN(n); }
+function dessinerMateriaux(){
+  const r = etat.materiaux; if(!r) return;
+  const cat = (serveur.materiaux || {}).parties || {}, prix = (serveur.materiaux || {}).prix || {};
+  $("#m-parties").replaceChildren(...PARTIES_MAT.map(([p, titre, aide]) => {
+    const mats = cat[p] || [], b = r[p];
+    const pr = prix[p];
+    const cases = b.cases.map((c, i) => {
+      const m = c && mats.find(x => x.groupe === c.groupe);
+      const sel = el("select",{onchange:ev => { const g = +ev.target.value;
+          if(!g){ b.cases[i] = null; } else { const mm = mats.find(x => x.groupe === g); b.cases[i] = {groupe:g, manuel: (c && mm[c.manuel]) ? c.manuel : (mm.court ? "court" : "long")}; }
+          changer("materiaux"); }},
+        el("option",{value:"0"}, "— vide —"), ...mats.map(x => el("option",{value:String(x.groupe), selected: c && c.groupe === x.groupe}, x.nom)));
+      const seg = el("div",{class:"seg"}, ...[["court","Court"],["long","Long"]].map(([k, t]) =>
+        el("button",{type:"button", class: c && c.manuel === k ? "on" : "", disabled: !m || !m[k], onclick:() => { c.manuel = k; changer("materiaux"); }}, t)));
+      return el("div",{class:"case-mat" + (c ? " on" : "")},
+        el("div",{class:"tete"}, el("b",{}, "Case " + (i + 1))),
+        el("div",{class:"vignette", title: m ? m.nom : ""}, m && m.image ? el("img",{src:"/images/" + m.image, alt:m.nom}) : (m ? m.nom.slice(0,1) : "+")),
+        sel, seg);
+    });
+    const achat = el("div",{class:"champ", style:"margin-top:14px"}, "Emplacements payants",
+      el("label",{class:"interrupteur", style:"margin-top:6px"}, el("input",{type:"checkbox", checked:b.acheter, onchange:ev => { b.acheter = ev.target.checked; changer("materiaux"); }}), el("i"),
+        "Acheter automatiquement les 4 emplacements payants s'ils ne sont pas achetés ou ont expiré" + (pr ? " (" + prixTxt(pr.production) + " + " + pr.attente.map(prixTxt).join(" + ") + " pièces, 7 jours)" : "")));
+    return el("div",{class:"carte"}, el("h2",{}, titre), el("p",{class:"aide"}, aide),
+      el("div",{class:"cases-mat"}, ...cases), achat);
+  }));
+}
+$("#m-annuler").addEventListener("click", () => { etat.materiaux = etatMateriaux(serveur.config.materiaux); sale.materiaux = false; dessinerMateriaux(); marquer("materiaux"); pastilles(); $("#m-erreurs").replaceChildren(); });
+$("#m-enregistrer").addEventListener("click", async () => {
+  const liste = $("#m-erreurs"); liste.replaceChildren();
+  const r = etat.materiaux, err = erreursMateriaux(r);
+  if(err.length){ marquer("materiaux", "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x))); return; }
+  try{
+    const rep = await api("/api/config/materiaux", r);
+    serveur.config.materiaux = rep.config; sale.materiaux = false; marquer("materiaux", "Enregistré dans config.json.", "ok"); pastilles(); dessinerModules();
+  }catch(ex){
+    marquer("materiaux", "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
+  }
+});
 function configOk(nom){
   const c = serveur && serveur.config[nom];
+  if(nom === "materiaux") return !!(c && !erreursMateriaux(etatMateriaux(c)).length);
+  if(nom === "recrutement") return !!(c && !erreursRecrutement(etatRecrutement(c)).length);
   if(nom === "transferts") return !!(c && !erreursTransferts(etatTransferts(c)).length);
   if(nom === "defense") return !!(c && c.seuil && !erreursDefense(etatDefense(c)).length);
   if(nom === "achats") return !!(c && c.seuil && c.royaumes && c.royaumes.length && !erreursAchats(etatAchats(c)).length);
   return !!(c && c.commandants && c.commandants.length && c.royaumes && c.royaumes.length);
 }
 function pastilles(){
-  for(const nom of ["tours","forteresses","achats","defense","transferts"]){
+  for(const nom of ["tours","forteresses","achats","defense","transferts","recrutement","materiaux"]){
     const p = $("#p-"+nom); if(!p || !serveur) continue;
     const ok = configOk(nom); p.textContent = sale[nom] ? "modifié" : ok ? "prêt" : "à régler"; p.className = "pastille" + (ok && !sale[nom] ? " ok" : "");
   }
@@ -1023,7 +1212,9 @@ function dessinerModules(){
   const desc = {tours:"Tours les plus proches, couronne par couronne.", forteresses:"Forteresses lues sur la carte, minuteur personnel.",
     achats:"Surplus de pièces dépensé en engins, après les attaques.",
     defense:"Château attaqué : soldats à l'abri chez un membre protégé de l'alliance, puis rappelés.",
-    transferts:"Ressources réparties entre les royaumes (spéciale de chaque royaume, bois et pierre en trop)."};
+    transferts:"Ressources réparties entre les royaumes (spéciale de chaque royaume, bois et pierre en trop).",
+    recrutement:"Caserne et atelier de siège remplis en continu, aide de l'alliance demandée.",
+    materiaux:"Raffinerie, outilleur et butin du dragon : fabrications lancées en continu."};
   for(const m of serveur.modules){
     const ok = configOk(m.nom), on = choixModules.has(m.nom);
     const cb = el("input",{type:"checkbox", checked:on, onchange:e => { e.target.checked ? choixModules.add(m.nom) : choixModules.delete(m.nom); dessinerModules(); }});
@@ -1050,6 +1241,8 @@ function dessinerEtat(){
     if(b.pieces != null) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Pièces du compte"), el("b",{}, fmtN(b.pieces))));
     for(const [nom, n] of Object.entries(b.achats || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Achats d'engins"), el("b",{}, String(n)),
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
+    for(const [nom, n] of Object.entries(b.fabrications || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Fabrications"), el("b",{}, fmtN(n))));
+    for(const [nom, n] of Object.entries(b.recrutements || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Recrutements"), el("b",{}, fmtN(n))));
     for(const [nom, n] of Object.entries(b.transferts || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Transferts"),
         el("b",{}, String(n)), el("small",{}, "envoi(s) de ressources")));
     for(const [nom, v] of Object.entries(b.defense || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Défense"),
@@ -1063,7 +1256,7 @@ function dessinerEtat(){
 }
 $("#b-demarrer").addEventListener("click", async () => {
   $("#l-erreurs").replaceChildren(); $("#l-msg").textContent = "";
-  if(sale.tours || sale.forteresses || sale.achats || sale.defense || sale.transferts){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
+  if(sale.tours || sale.forteresses || sale.achats || sale.defense || sale.transferts || sale.recrutement || sale.materiaux){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
   const corps = {modules:[...choixModules], duree:$("#l-duree").value.trim(), max_attaques: $("#l-max").value ? +$("#l-max").value : null, simulation:$("#l-simu").checked, ecran_allume:$("#l-ecran").checked};
   try{ await api("/api/demarrer", corps); $("#l-msg").textContent = "Démarré : regarde la fenêtre du bot."; }
   catch(e){ $("#l-erreurs").replaceChildren(...(e.erreurs||["Erreur"]).map(x => el("li",{},x))); }
