@@ -94,6 +94,10 @@ CIBLE_REFUSEE = (1800, 10800)   # cible ignoree par le serveur : laissee de cote
 ESSAIS_PAR_PASSAGE = 8          # cibles essayees au plus par passage (une cible refusee ne bloque pas le commandant)
 CODE_PAS_PRETE = 95             # abi/adi refuse alors que la carte la dit libre : le jeu la libere ~1 min plus tard (11/11)
 ESSAI_RAPIDE = 3                # code 95 : nouvel essai toutes les 3 s ...
+ESSAI_TRES_RAPIDE = 1           # ... et toutes les secondes pendant les 15 premieres secondes
+DUREE_TRES_RAPIDE = 15
+RETARDS_GARDES = 9             # retards du jeu retenus (mediane)
+CARTE_APRES = 15                # la carte n'est relue (prise par un autre joueur ?) qu'apres 15 s de refus, puis toutes les 30 s
 ESSAIS_RAPIDES_MAX = 240        # ... pendant 4 min au plus, puis 1 min, 5, 15, 30 min comme les autres refus
 PAUSE_SANS_STOCK = 300          # secondes pendant lesquelles un royaume sans soldat 216 est laisse de cote
 TYPES_CHATEAU = {1: "chateau", 12: "avant-poste"}   # types vus dans la liste des chateaux du compte (autres : "type N")
@@ -1011,6 +1015,7 @@ class Partage:
         self.priorites = {}
         self.urgences = {}
         self.royaumes_bloques = set()      # module defense : royaumes attaques (les autres modules y sont en pause)
+        self.cibles_gardees = set()        # (royaume, x, y) : tour en montee (sous-module montee), le module tours n'y touche pas
         self.rubis = None                  # rubis du compte (gcu C2)
         self.compte = ""                   # pseudo du compte (achats une fois par jour notes par compte)
         self.pieces = None                 # pieces du compte (message gcu du jeu), None tant qu'on ne les a pas vues
@@ -1068,6 +1073,7 @@ class ModuleTours:
         self.refus_cibles = {}     # (royaume, x, y) -> nombre de fois ou le serveur a ignore une attaque sur cette cible
         self.sans_info = {}        # (royaume, x, y) -> demandes d'infos (adi/abi) restees sans reponse de suite
         self.pas_prete = {}        # (royaume, x, y) -> 1er refus code 95 (essais toutes les 3 s)
+        self.retards = []          # retards du jeu sur le minuteur de la carte (secondes)
         self.pas_prete_carte = {}  # (royaume, x, y) -> derniere relecture de sa zone pendant ces essais
         self.nb_attaques = 0
         self.echecs = 0
@@ -1305,7 +1311,8 @@ class ModuleTours:
         for kid, (lu, e) in self._tours_connues().items():
             src = self.sources[kid[0]]
             if (e[3] == -1 and combat.niveau_reel(kid[0], 2, e[4]) >= self.cfg.get("niveau_min", 0)
-                    and lu + max(0, e[5]) <= t + 1 and kid not in self.engagees):
+                    and lu + max(0, e[5]) <= t + 1 and kid not in self.engagees
+                    and kid not in (getattr(self.partage, "cibles_gardees", None) or ())):
                 res.append((math.hypot(e[1] - src["x"], e[2] - src["y"]), kid[0], e))
         res.sort(key=lambda c: c[0])          # la plus proche d'abord, peu importe le royaume
         return res
@@ -1387,6 +1394,25 @@ class ModuleTours:
             vus |= {m[0] for m in self.jeu.recus}
         return rep
 
+    def _noter_retard(self, cle, exact):
+        """Retard du jeu sur la carte (liberation reelle - fin du minuteur), pour demander les infos juste au bon moment.
+        exact : liberee apres des refus (retard mesure) ; sinon accepte du premier coup (le retard est au plus ce qu'on a attendu)."""
+        f = getattr(self, "fort", {}).get(cle)
+        if not f:
+            return
+        r = self.horloge() - f["dispo"]
+        if not 0 <= r <= 60:
+            return
+        if exact or r < self.retard_jeu():
+            self.retards = (self.retards + [r])[-RETARDS_GARDES:]
+
+    def retard_jeu(self):
+        """Secondes a attendre apres la fin du minuteur de la carte : mediane des retards observes (0 si rien appris ; dans ce cas
+        les modules demandent 1 s avant la fin, comme avant). Si c'est un peu tot, le jeu refuse et le bot reessaie 1 s plus tard."""
+        if not self.retards:
+            return 0
+        return max(0, min(30, sorted(self.retards)[len(self.retards) // 2]))
+
     async def attaquer(self, pos, tour, kid):
         cx, cy = self.sources[kid]["x"], self.sources[kid]["y"]
         tx, ty = tour[1], tour[2]
@@ -1401,7 +1427,7 @@ class ModuleTours:
             debut = self.pas_prete.setdefault(cle, t)
             if t - debut < ESSAIS_RAPIDES_MAX:
                 verdict = None
-                if t == debut or t - self.pas_prete_carte.get(cle, 0) >= 30:
+                if t - debut >= CARTE_APRES and t - self.pas_prete_carte.get(cle, debut - 15) >= 30:
                     self.pas_prete_carte[cle] = t
                     verdict = await self._apres_sans_info(cle)
                 if verdict:
@@ -1409,10 +1435,10 @@ class ModuleTours:
                     self._noter("   %s : le jeu refuse ses infos (code %d) ; %s." % (nom, rep[1], verdict))
                     self._sauver_etat()
                     return False
-                self.engagees[cle] = t + ESSAI_RAPIDE
+                self.engagees[cle] = t + (ESSAI_TRES_RAPIDE if t - debut < DUREE_TRES_RAPIDE else ESSAI_RAPIDE)
                 if t == debut:
                     self._noter("   %s : pas encore libre pour le jeu (code %d) alors que la carte la dit libre ; nouvel essai toutes "
-                                "les %d s pour partir des que possible." % (nom, rep[1], ESSAI_RAPIDE))
+                                "les secondes (puis toutes les %d s) pour partir des que possible." % (nom, rep[1], ESSAI_RAPIDE))
                 return False
             self.pas_prete.pop(cle, None)
             self.pas_prete_carte.pop(cle, None)
@@ -1446,6 +1472,9 @@ class ModuleTours:
         if cle in self.pas_prete:
             self._noter("   %s : liberee par le jeu apres %s d'attente." % (nom, duree(self.horloge() - self.pas_prete.pop(cle))))
             self.pas_prete_carte.pop(cle, None)
+            self._noter_retard(cle, exact=True)
+        else:
+            self._noter_retard(cle, exact=False)
         adi = T.json_ou_none(rep[2]) or {}
         if isinstance((adi.get("gui") or {}).get("I"), list):
             self.echelles[kid] = combat.inventaire_depuis_adi(adi["gui"]["I"]).get(ID_ECHELLE, 0)
@@ -1865,8 +1894,8 @@ class ModuleTours:
             if self.max_attaques and self.nb_attaques >= self.max_attaques:
                 return 0
         if cede:
-            self._attente_msg("pause-prioritaire", "   pause : un module prioritaire (forteresses ou defense) a quelque chose a faire "
-                              "tout de suite, il passe d'abord ; reprise juste apres.")
+            self._attente_msg("pause-prioritaire", "   pause : un module prioritaire (forteresses, defense ou combat de Tours lev max) a "
+                              "quelque chose a faire tout de suite, il passe d'abord ; reprise juste apres.")
             return 1
         self._verifier_stock()
         return 5

@@ -1,10 +1,9 @@
 {
-  "version": 10,
-  "date": "13/11/2026",
+  "version": 11,
+  "date": "14/11/2026",
   "nouveautes": [
-    "Nouveau module Recrutement : remplit la caserne et l'atelier de siège des royaumes et des avant-postes choisis, au plus haut niveau débloqué et au maximum par emplacement, puis demande l'aide de l'alliance (soldats).",
-    "Nouveau module Matériaux : raffinerie, outilleur et butin du dragon (6 cases par bâtiment, manuel court ou long), avec vérification des ressources et achat automatique des emplacements payants en option.",
-    "Transferts : passe-temps 1 min à 1 h combinés pour gâcher le moins de temps ; le vert est servi en premier et garde ce dont le module Matériaux a besoin.",
-    "Interface : pages Recrutement et Matériaux, avec images."
+    "Nouveau module Tours lev max : monte une tour au niveau voulu (71 par défaut) en salves d'attaques, en sautant son blocage avec les passe-temps choisis juste après chaque combat. Seul ou avec les autres modules (page Tours lev max, case du tableau de bord).",
+    "Défense : les armées du bot qui rentrent avant une attaque sont attendues, puis leurs soldats repartent à l'abri avec les autres (rattrapage jusqu'à 30 s avant l'attaque, puis une armée à la fois).",
+    "Forteresses : le bot apprend le petit retard du jeu à la fin du minuteur et réessaie toutes les secondes au début, pour partir plus vite."
   ]
 }

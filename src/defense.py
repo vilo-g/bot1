@@ -15,9 +15,18 @@ Fonctionnement :
     quand l'attaque est passee et les soldats rentres ;
   - les soldats sont rappeles des que la derniere attaque sur le chateau est arrivee. Securite : la duree de stationnement
     demandee au jeu ne depasse pas l'heure d'arrivee de l'attaque + 10 min (arrondi a l'heure), ils rentrent seuls sinon.
+  - armees du bot (tours, forteresses) qui rentrent dans le chateau attaque avant l'attaque (14/11) :
+      * envoi principal : le bot attend le retour de la derniere armee qui rentre au moins 2 min avant l'attaque, puis
+        envoie tous les soldats d'un coup (au plus tard 2 min avant l'attaque) ;
+      * rattrapage : les armees qui rentrent ensuite, jusqu'a 30 s avant l'attaque, repartent ensemble apres le retour de
+        la derniere d'entre elles (avec un commandant libre, d'abord celui d'une armee qui vient de rentrer) ;
+      * dans les 30 dernieres secondes : chaque armee qui rentre repart aussitot, une par une, avec son commandant.
+    Porte (option) : seulement si un envoi echoue (commandant, refus du jeu), jamais pendant l'attente d'un retour.
 Messages du jeu (capture du 08/11) : gam (attaque annoncee), gdi/ain (joueurs, alliance, temps de protection RPT),
 sdi (infos de soutien : soldats du chateau, commandants), cds (envoi du soutien), mcm (rappel), mos (porte, 2 temps : prix
-annonce puis confirmation).
+annonce puis confirmation). Armees du bot : cra (armee partie : AAM.M, SA = chateau de depart, TT = trajet aller,
+AAM.UM.L.ID = commandant), cat (armee sur la cible, retour : A.M avec D = 1, TA = chateau ou elle rentre, TT = duree du
+retour), mrm (mouvement termine : l'armee est rentree).
 """
 import json
 import math
@@ -43,6 +52,12 @@ PAUSE_ATTAQUE = 1
 TYPE_ATTAQUE = 0                    # champ T d'un mouvement : 0 = attaque
 TYPES_PAR_COMMANDANT = 10           # un envoi de soutien prend au plus 10 types de soldats (pas de limite de nombre)
 MIN_PAR_TYPE = 100                  # defaut : un type de soldat a moins de 100 n'est pas envoye
+ATTENTE_RETOURS = 120               # envoi principal : on attend les armees qui rentrent au moins 2 min avant l'attaque
+FENETRE_FINALE = 30                 # ensuite : retours groupes jusqu'a 30 s avant l'attaque, puis une armee a la fois
+DELAI_ARRIVEE = 2                   # secondes apres le retour d'une armee avant de relire le chateau (soldats bien rentres)
+RETOUR_ESTIME = 0.5                 # armee partie (cra) : retour estime = arrivee sur la cible + 50 % du trajet aller
+                                    # (le retour reel, souvent 3 fois plus court, est donne par le message cat)
+REESSAI_PROCHE = 3                  # a moins d'1 min de l'attaque : envoi rate reessaye toutes les 3 s (20 s sinon)
 
 
 def nom_monde(kid):
@@ -73,7 +88,9 @@ def commandant_prioritaire(cfg, kid):
 def resume_config(cfg):
     lignes = ["reaction a partir de %d soldat(s) dans l'attaque (estimation du jeu a son apparition) : tous les soldats du "
               "chateau attaque partent en soutien chez le membre de l'alliance en protection le plus proche" % cfg["seuil"],
-              "les modules du monde attaque sont en pause jusqu'au retour des soldats"]
+              "les modules du monde attaque sont en pause jusqu'au retour des soldats",
+              "armees du bot qui rentrent avant l'attaque : envoi apres le retour de la derniere (au plus tard 2 min avant), "
+              "puis celles qui rentrent ensuite repartent ensemble (jusqu'a 30 s avant), puis une par une avec leur commandant"]
     lignes.append("types de soldats a moins de %d : laisses au chateau ; 10 types au plus par commandant, les plus nombreux "
                   "d'abord" % cfg.get("min_par_type", MIN_PAR_TYPE))
     cr = cfg.get("commandants_royaumes") or {}
@@ -104,8 +121,14 @@ def charger_soldats(chemin_items=None):
     return res
 
 
+def _commandant(um):
+    """Bloc UM d'un mouvement -> ID du commandant (UM.L.ID) ou None."""
+    l = um.get("L") if isinstance(um, dict) else None
+    return l.get("ID") if isinstance(l, dict) and isinstance(l.get("ID"), int) and not isinstance(l.get("ID"), bool) else None
+
+
 def lire_mouvements(payload):
-    """Message gam -> (mouvements [{mid, t, d, ta, sa, pt, tt, gs, kid}], noms {joueur: nom})."""
+    """Message gam -> (mouvements [{mid, t, d, ta, sa, pt, tt, gs, kid, oid, lid}], noms {joueur: nom})."""
     d = T.json_ou_none(payload)
     if not isinstance(d, dict):
         return [], {}
@@ -119,8 +142,24 @@ def lire_mouvements(payload):
         if not (isinstance(ta, list) and len(ta) >= 5):
             continue
         res.append({"mid": m["MID"], "t": m.get("T"), "d": m.get("D"), "ta": ta, "sa": sa if isinstance(sa, list) else [],
-                    "pt": m.get("PT") or 0, "tt": m.get("TT") or 0, "gs": e.get("GS"), "kid": m.get("KID")})
+                    "pt": m.get("PT") or 0, "tt": m.get("TT") or 0, "gs": e.get("GS"), "kid": m.get("KID"),
+                    "oid": m.get("OID"), "lid": _commandant(e.get("UM"))})
     return res, noms
+
+
+def lire_armee(cmd, payload):
+    """cra (armee qui part) / cat (armee qui rentre) -> {mid, lid, sa, ta, d, tt, pt} ou None."""
+    d = T.json_ou_none(payload)
+    bloc = (d.get("AAM") if cmd == "cra" else d.get("A")) if isinstance(d, dict) else None
+    m = bloc.get("M") if isinstance(bloc, dict) else None
+    if not isinstance(m, dict) or not isinstance(m.get("MID"), int):
+        return None
+    tt, pt = m.get("TT"), m.get("PT") or 0
+    if not isinstance(tt, (int, float)) or not isinstance(pt, (int, float)):
+        return None
+    ta, sa = m.get("TA"), m.get("SA")
+    return {"mid": m["MID"], "lid": _commandant(bloc.get("UM")), "d": m.get("D"), "tt": tt, "pt": pt,
+            "ta": ta if isinstance(ta, list) else [], "sa": sa if isinstance(sa, list) else []}
 
 
 class ModuleDefense:
@@ -143,14 +182,18 @@ class ModuleDefense:
         self.retours = {}          # cid -> instant ou les soldats rappeles sont rentres
         self.echecs = {}           # cid -> raison du dernier envoi rate (pendant l'attaque en cours)
         self.verif = {}            # cid -> instant de la derniere verification des soldats
-        self.abri_ok = set()       # chateaux vides avec succes pendant l'attaque en cours : plus de verification, pas de porte
+        self.abri_ok = set()       # chateaux vides avec succes pendant l'attaque en cours (et pas d'echec depuis) : pas de porte
+        self.vide_a = {}           # cid -> instant de la derniere lecture du chateau suivie d'un envoi reussi (soldats partis)
+        self.rentrees = {}         # cle -> {cid, arrivee, lid, sure, mid} : armees du bot qui rentrent dans un de nos chateaux
+        self.attente_note = {}     # cid -> (texte deja affiche) : message d'attente des retours
         self.porte = {}            # cid -> pas de nouvel essai d'ouverture de la porte avant
         self.porte_fin = {}        # cid -> porte ouverte (protection) jusqu'a : lu dans dcl (OGT) ou apres notre ouverture
         self.porte_lue = {}        # cid -> instant de la derniere lecture de la porte
         self.porte_note = set()
         self.couverts = set()      # chateaux attaques proteges par une porte deja ouverte
         self.alliance, self.alliance_lue = None, float("-inf")
-        self.recus = []            # messages gam pas encore lus
+        self.recus = []            # messages gam, mrm, cra, cat pas encore lus
+        self._copies = set()       # sans ecouteur (tests) : cra/cat deja lus dans la boite du jeu (laisses aux autres modules)
         self.bloques_avant = set()
         if isinstance(getattr(jeu, "ecouteurs", None), list):
             jeu.ecouteurs.append(self._ecouter)   # voit les attaques meme pendant le passage d'un autre module
@@ -160,7 +203,7 @@ class ModuleDefense:
         self.sortie(texte)
 
     def _ecouter(self, msg):
-        if msg[0] in ("gam", "mrm") and msg[1] == 0:
+        if msg[0] in ("gam", "mrm", "cra", "cat") and msg[1] == 0:
             self.recus.append((msg[0], msg[2]))
 
     def _nom_chateau(self, cid):
@@ -178,22 +221,60 @@ class ModuleDefense:
         if not isinstance(getattr(self.jeu, "ecouteurs", None), list):     # pas d'ecouteur (tests) : on lit la boite
             reste = []
             for m in self.jeu.recus:
-                (self.recus.append((m[0], m[2])) if m[0] in ("gam", "mrm") and m[1] == 0 else reste.append(m))
+                if m[0] in ("cra", "cat") and m[1] == 0:
+                    if (m[0], m[2]) not in self._copies:         # copie (une fois) : les modules d'attaque les lisent aussi
+                        self._copies.add((m[0], m[2]))
+                        self.recus.append((m[0], m[2]))
+                    reste.append(m)
+                else:
+                    (self.recus.append((m[0], m[2])) if m[0] in ("gam", "mrm") and m[1] == 0 else reste.append(m))
             self.jeu.recus[:] = reste
+            if len(self._copies) > 500:
+                self._copies = {(m[0], m[2]) for m in reste if m[0] in ("cra", "cat")}
         t = self.horloge()
         while self.recus:
             cmd, payload = self.recus.pop(0)
             if cmd == "mrm":
                 self._retiree(T.json_ou_none(payload), t)
                 continue
+            if cmd in ("cra", "cat"):
+                self._armee(cmd, lire_armee(cmd, payload), t)
+                continue
             mouvements, noms = lire_mouvements(payload)
             for mv in mouvements:
                 self._mouvement(mv, noms, t)
+        for cle in [k for k, r in self.rentrees.items() if r["arrivee"] < t - 600]:
+            del self.rentrees[cle]
+
+    # ------------------------------------------------------------------ armees du bot qui rentrent dans nos chateaux
+    def _noter_retour(self, cid, arrivee, lid, mid, sure):
+        if sure and lid is not None:
+            self.rentrees.pop(("lid", lid), None)           # le retour reel remplace l'estimation faite au depart
+        cle = ("mid", mid) if sure or lid is None else ("lid", lid)
+        self.rentrees[cle] = {"cid": cid, "arrivee": arrivee, "lid": lid, "sure": sure, "mid": mid}
+
+    def _armee(self, cmd, a, t):
+        """cra : armee qui part d'un de nos chateaux (retour estime) ; cat : armee qui rentre (retour exact)."""
+        if a is None:
+            return
+        if cmd == "cra":
+            sa = a["sa"]
+            if len(sa) > 3 and sa[3] in self.chateaux:
+                aller = max(0, a["tt"] - a["pt"])
+                self._noter_retour(sa[3], t + aller * (1 + RETOUR_ESTIME), a["lid"], a["mid"], False)
+        else:
+            ta = a["ta"]
+            if a["d"] == 1 and len(ta) > 3 and ta[3] in self.chateaux:
+                self._noter_retour(ta[3], t + max(0, a["tt"] - a["pt"]), a["lid"], a["mid"], True)
 
     def _retiree(self, d, t):
         """mrm {"MID"} : le jeu retire un mouvement. Avant son arrivee = l'attaquant a rappele son attaque -> attaque finie
-        (rappel des soldats, reprise des modules) : quelques soldats envoyes puis retires ne bloquent pas le bot."""
+        (rappel des soldats, reprise des modules) : quelques soldats envoyes puis retires ne bloquent pas le bot.
+        Retour d'une de nos armees retire = elle est rentree au chateau."""
         mid = d.get("MID") if isinstance(d, dict) else None
+        r = self.rentrees.get(("mid", mid))
+        if r is not None and r["sure"] and r["arrivee"] > t:
+            r["arrivee"] = t
         a = self.attaques.get(mid)
         if a is None or a["arrivee"] - t <= 5:
             return                                          # mouvement inconnu, ou attaque arrivee (retiree normalement)
@@ -204,6 +285,15 @@ class ModuleDefense:
 
     def _mouvement(self, mv, noms, t):
         cid = mv["ta"][3]
+        if mv["d"] == 1 and cid in self.chateaux and (mv["oid"] is None or mv["oid"] == self.moi.get("OID")):
+            self._noter_retour(cid, t + max(0, mv["tt"] - mv["pt"]), mv["lid"], mv["mid"], True)    # une de nos armees rentre
+            return
+        sa = mv["sa"]
+        if (mv["t"] == TYPE_ATTAQUE and mv["d"] != 1 and len(sa) > 3 and sa[3] in self.chateaux and cid not in self.chateaux
+                and mv["oid"] == self.moi.get("OID") and mv["lid"] is not None):
+            if ("lid", mv["lid"]) not in self.rentrees:                     # une de nos armees partie (vue au demarrage)
+                self._noter_retour(sa[3], t + max(0, mv["tt"] - mv["pt"]) * (1 + RETOUR_ESTIME), mv["lid"], mv["mid"], False)
+            return
         if mv["t"] != TYPE_ATTAQUE or cid not in self.chateaux:
             return
         arrivee = t + max(0, mv["tt"] - mv["pt"])
@@ -230,20 +320,53 @@ class ModuleDefense:
     def _actives(self, t):
         return [a for a in self.attaques.values() if a["defendue"] and a["arrivee"] + MARGE_RAPPEL > t]
 
+    def _par_chateau(self, t):
+        res = {}
+        for a in self._actives(t):
+            if a["arrivee"] > t:
+                res.setdefault(a["cid"], []).append(a)
+        return res
+
     def urgence(self):
-        """Une attaque a traiter tout de suite (envoi, porte ou rappel) : les autres modules s'interrompent."""
+        """Une attaque a traiter tout de suite (envoi, porte ou rappel) : les autres modules s'interrompent.
+        Pendant l'attente du retour d'une armee : pas d'urgence (les autres royaumes continuent) jusqu'a 2 s de l'envoi."""
         self._absorber()
         t = self.horloge()
-        for a in self._actives(t):
-            if a["arrivee"] > t and self._a_verifier(a["cid"], t):
+        for cid, liste in self._par_chateau(t).items():
+            if cid not in self.couverts and self._decision(cid, liste, t + 2)[0]:
                 return True
         return any(self._rappel_du(cid, t) for cid in self.envois)
 
-    def _a_verifier(self, cid, t):
-        """Envoi a (re)tenter : jamais une fois le chateau vide avec succes ; sinon au premier passage puis toutes les 20 s."""
-        if cid in self.abri_ok:
-            return False
-        return cid not in self.verif or self.verif[cid] + VERIF_SOLDATS <= t
+    def _decision(self, cid, liste, t):
+        """Envoyer les soldats de ce chateau maintenant ? -> (oui/non, commandant a prendre d'abord, attente) ;
+        attente = (nombre d'armees attendues, arrivee de la derniere, envoi principal ?) quand le bot attend un retour.
+          - envoi principal (chateau pas encore vide) : apres le retour de la derniere armee qui rentre au moins 2 min avant
+            l'attaque (au plus tard 2 min avant) ;
+          - ensuite, seulement si des armees sont rentrees depuis : retours groupes jusqu'a 30 s avant l'attaque, puis
+            chaque armee aussitot rentree, avec son commandant ;
+          - envoi rate : nouvel essai 20 s plus tard (3 s a moins d'1 min de l'attaque)."""
+        arrivees = sorted(a["arrivee"] for a in liste)
+        prochaine = next((x for x in arrivees if x > t), None)
+        if prochaine is None:
+            return False, None, None
+        if cid in self.echecs and cid in self.verif:
+            if self.verif[cid] + (REESSAI_PROCHE if prochaine - t <= 60 else VERIF_SOLDATS) > t:
+                return False, None, None
+            return True, None, None
+        principal = cid not in self.vide_a
+        retours = [r for r in self.rentrees.values() if r["cid"] == cid and r["arrivee"] < arrivees[-1]]
+        sp = self.cfg.get("secondes_porte", SECONDES_PORTE)
+        limite = prochaine - (max(ATTENTE_RETOURS, sp + 10) if principal else FENETRE_FINALE)
+        en_route = [r for r in retours if r["arrivee"] + DELAI_ARRIVEE > t and r["arrivee"] <= limite]
+        attente = (len(en_route), max(r["arrivee"] for r in en_route), principal) if en_route and t < limite else None
+        if principal:
+            return attente is None, None, attente
+        rentres = [r for r in retours if self.vide_a[cid] < r["arrivee"] + DELAI_ARRIVEE <= t]
+        if not rentres:
+            return False, None, None
+        if attente is not None:
+            return False, None, attente
+        return True, max(rentres, key=lambda r: r["arrivee"])["lid"], None
 
     def _rappel_du(self, cid, t):
         return cid in self.envois and not any(a["cid"] == cid for a in self._actives(t))
@@ -262,12 +385,13 @@ class ModuleDefense:
 
     # ------------------------------------------------------------------ passage
     async def cycle(self):
+        if self.attaques or self.envois:
+            rel = getattr(self.jeu, "relever", None)
+            if rel is not None:
+                await rel()                              # retours d'armees (cat, mrm) vus a temps, meme si rien d'autre ne lit
         self._absorber()
         t = self.horloge()
-        par_chateau = {}
-        for a in self._actives(t):
-            if a["arrivee"] > t:
-                par_chateau.setdefault(a["cid"], []).append(a)
+        par_chateau = self._par_chateau(t)
         for cid, liste in par_chateau.items():           # porte deja ouverte jusqu'apres l'attaque : rien a faire, pas de pause
             (self.couverts.add if await self._porte_couvre(cid, liste) else self.couverts.discard)(cid)
         self._maj_pauses(t)
@@ -275,8 +399,10 @@ class ModuleDefense:
             premiere = min(a["arrivee"] for a in liste)
             if cid in self.couverts:
                 continue
-            if self._a_verifier(cid, self.horloge()):
-                await self._mettre_a_l_abri(cid, max(a["arrivee"] for a in liste), premiere)
+            envoyer, prefere, attente = self._decision(cid, liste, self.horloge())
+            self._noter_attente(cid, attente)
+            if envoyer:
+                await self._mettre_a_l_abri(cid, max(a["arrivee"] for a in liste), premiere, prefere=prefere)
             reste = premiere - self.horloge()
             # porte seulement si le module n'a PAS reussi a vider le chateau (aucun protege, infos ou envoi refuses, plus de
             # commandant, attaque vue trop tard pour finir l'envoi) ; jamais quand tous les soldats sont partis.
@@ -297,10 +423,33 @@ class ModuleDefense:
             self.abri_ok.discard(cid)
         for cid in [c for c in self.verif if c not in par_chateau]:
             del self.verif[cid]
+        for cid in [c for c in self.vide_a if c not in par_chateau]:
+            del self.vide_a[cid]
+        for cid in [c for c in self.attente_note if c not in par_chateau]:
+            del self.attente_note[cid]
         self.porte_note &= set(par_chateau)
         self.couverts &= {a["cid"] for a in self._actives(t)}
         self._maj_pauses(t)
         return PAUSE_ATTAQUE if (par_chateau or self.envois) else PAUSE_CALME
+
+    def _noter_attente(self, cid, attente):
+        """Message (une fois, et quand l'heure prevue change) : le bot attend le retour d'armees avant d'envoyer."""
+        if attente is None:
+            if self.attente_note.get(cid) is not None:
+                self.attente_note[cid] = None
+            return
+        nb, derniere, principal = attente
+        cle = (nb, int(derniere) // 5, principal)
+        if self.attente_note.get(cid) == cle:
+            return
+        self.attente_note[cid] = cle
+        dans = duree(max(0, derniere - self.horloge()))
+        if principal:
+            self._noter("   %s : %d armee(s) du bot rentrent avant l'attaque (la derniere dans %s) : tous les soldats partiront "
+                        "ensemble a son retour." % (self._nom_chateau(cid), nb, dans))
+        else:
+            self._noter("   %s : armee(s) rentree(s) depuis l'envoi ; %d encore en route (la derniere dans %s) : leurs soldats "
+                        "partiront ensemble a son retour." % (self._nom_chateau(cid), nb, dans))
 
     async def _lire_portes(self):
         """dcl : OGT = secondes de porte ouverte restantes de chaque chateau (capture du 08/11 : OGT = fin de l'ouverture)."""
@@ -363,36 +512,46 @@ class ModuleDefense:
         return meilleur
 
     # ------------------------------------------------------------------ envoi des soldats
-    def _commandants_libres(self, rep_sdi, kid):
-        """Commandants libres, dans l'ordre d'utilisation : celui choisi pour ce royaume, puis ceux qu'aucun module n'utilise,
-        puis les autres. Numeros = ordre d'affichage du jeu (comme dans les autres modules)."""
+    def _commandants_libres(self, rep_sdi, kid, prefere=None):
+        """Commandants libres, dans l'ordre d'utilisation : celui de l'armee qui vient de rentrer (prefere), celui choisi pour
+        ce royaume, puis ceux qu'aucun module n'utilise, puis les autres. Numeros = ordre d'affichage du jeu."""
         t = self.horloge()
         cmds = tours.positions_commandants(rep_sdi)
         pris = {e["pos"] for liste in self.envois.values() for e in liste}
         modules = {p for liste in self.partage.commandants.values() for p in liste}
         prioritaire = commandant_prioritaire(self.cfg, kid)
         libres = [(pos, c) for pos, c in enumerate(cmds, 1)
-                  if isinstance(c.get("ID"), int) and pos not in pris and self.partage.libre_a.get(pos, 0) <= t]
-        libres.sort(key=lambda pc: (pc[0] != prioritaire, pc[0] in modules, pc[0]))
+                  if isinstance(c.get("ID"), int) and pos not in pris
+                  and (self.partage.libre_a.get(pos, 0) <= t or (prefere is not None and c["ID"] == prefere))]
+        libres.sort(key=lambda pc: (prefere is not None and pc[1]["ID"] != prefere, pc[0] != prioritaire, pc[0] in modules, pc[0]))
         return libres
 
-    async def _mettre_a_l_abri(self, cid, fin_attaque, premiere=None):
+    def _echec(self, cid, raison):
+        """Envoi rate. Apres un envoi reussi, un nouvel envoi rate (commandant, refus du jeu) autorise la porte ; le jeu muet sur
+        les infos de soutien, non (cas du 11/11 : envoi reussi puis infos refusees -> pas de porte pour rien)."""
+        self.echecs[cid] = raison
+        if raison != "infos":
+            self.abri_ok.discard(cid)
+
+    async def _mettre_a_l_abri(self, cid, fin_attaque, premiere=None, prefere=None):
         c = self.chateaux[cid]
-        self.verif[cid] = self.horloge()
+        debut = self.verif[cid] = self.horloge()
+        rattrapage = cid in self.vide_a                 # le chateau avait deja ete vide : soldats d'armees rentrees depuis
         cible = await self.protege_le_plus_proche(c["kid"], c["x"], c["y"])
         if cible is None:
             if self.echecs.get(cid) != "aucun protege":
                 self._noter("   IMPOSSIBLE : aucun membre de l'alliance en protection au %s." % nom_monde(c["kid"]))
-            self.echecs[cid] = "aucun protege"
+            self._echec(cid, "aucun protege")
             return False
         dist, p = cible
         # la reponse sdi est grosse (~86 Ko) et lente quand le jeu est charge : 20 s d'attente, moins si l'attaque est proche
-        marge = (premiere if premiere is not None else fin_attaque) - self.horloge() - self.cfg.get("secondes_porte", SECONDES_PORTE)
-        rep = await self._demander("sdi", {"TX": p["x"], "TY": p["y"], "SX": c["x"], "SY": c["y"]},
-                                   delai=max(6, min(20, marge)))
+        sp = self.cfg.get("secondes_porte", SECONDES_PORTE)
+        reste = (premiere if premiere is not None else fin_attaque) - self.horloge()
+        delai = max(6, min(20, reste - sp)) if reste - sp > 6 else max(3, min(6, reste - 8))
+        rep = await self._demander("sdi", {"TX": p["x"], "TY": p["y"], "SX": c["x"], "SY": c["y"]}, delai=delai)
         d = T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None
         if not isinstance(d, dict):
-            self.echecs[cid] = "infos"
+            self._echec(cid, "infos")
             self._noter("   le jeu n'a pas donne les infos de soutien (%s) : nouvel essai dans quelques secondes."
                         % ("code %s" % rep[1] if rep else "pas de reponse"))
             self.verif[cid] = self.horloge() - VERIF_SOLDATS + 3
@@ -407,24 +566,22 @@ class ModuleDefense:
         if not tous:
             if cid not in self.envois:
                 self._noter("   aucun soldat dans %s : rien a envoyer." % self._nom_chateau(cid))
-            self.echecs.pop(cid, None)
-            self.abri_ok.add(cid)
+            self._reussi(cid, debut)
             return True
         tous.sort(key=lambda wn: (-wn[1], wn[0]))                 # les soldats les plus nombreux d'abord
         interdits = [w for w, _ in tous if self.soldats[w] is not None and c["kid"] not in self.soldats[w]]
         n_total = sum(n for _, n in tous)
         heures = max(1, min(12, math.ceil((fin_attaque - self.horloge() + 600) / 3600)))
-        libres = self._commandants_libres(d, c["kid"])
+        libres = self._commandants_libres(d, c["kid"], prefere)
         if not libres:
-            self.echecs[cid] = "commandant"
+            self._echec(cid, "commandant")
             self._noter("   IMPOSSIBLE : aucun commandant libre pour emmener les soldats de %s." % self._nom_chateau(cid))
             return False
         if self.simulation:
             self._noter("[SIMULATION] %d soldat(s) de %s partiraient chez %s (%d,%d), a %.1f cases, commandant %d d'abord."
                         % (n_total, self._nom_chateau(cid), p["nom"], p["x"], p["y"], dist, libres[0][0]))
             self.envois.setdefault(cid, [])
-            self.echecs.pop(cid, None)
-            self.abri_ok.add(cid)
+            self._reussi(cid, debut)
             return True
         # chaque commandant emmene les 10 types de soldats les plus nombreux (pas de limite de nombre) ; s'il reste des types,
         # le commandant suivant complete.
@@ -451,8 +608,10 @@ class ModuleDefense:
                                 wn[1] -= q
                     reste = [wn for wn in reste if wn[1] > 0]
                     self.nb_abris += 1
-                    self._noter("SOLDATS A L'ABRI : %d soldat(s) de %s partis avec le commandant %d chez %s (%d,%d), a %.1f cases "
-                                "(trajet %s)." % (n, self._nom_chateau(cid), pos, p["nom"], p["x"], p["y"], dist, duree(tt)))
+                    self._noter("SOLDATS A L'ABRI%s : %d soldat(s) de %s partis avec le commandant %d chez %s (%d,%d), a %.1f "
+                                "cases (trajet %s, attaque dans %s)." % (" (armee rentree)" if rattrapage else "", n,
+                                self._nom_chateau(cid), pos, p["nom"], p["x"], p["y"], dist, duree(tt),
+                                duree(max(0, (premiere if premiere is not None else fin_attaque) - t))))
                     break                                          # ce commandant est parti : le suivant complete
                 raison = "code %s" % rep[1] if rep else "pas de reponse"
                 essais += 1
@@ -470,17 +629,28 @@ class ModuleDefense:
                 break
         if envoyes:
             if reste:
-                self.echecs[cid] = "incomplet"
+                self._echec(cid, "incomplet")
                 self._noter("   %d soldat(s) restent dans %s (plus de commandant libre ou envoi refuse) : nouvel essai dans %d s."
-                            % (sum(n for _, n in reste), self._nom_chateau(cid), VERIF_SOLDATS))
+                            % (sum(n for _, n in reste), self._nom_chateau(cid), self._reessai(premiere, fin_attaque)))
             else:
-                self.echecs.pop(cid, None)
-                self.abri_ok.add(cid)
-                self._noter("   %s est vide : plus rien a envoyer, rappel apres l'attaque." % self._nom_chateau(cid))
+                self._reussi(cid, debut)
+                if not rattrapage:
+                    self._noter("   %s est vide : plus rien a envoyer, rappel apres l'attaque." % self._nom_chateau(cid))
             return True
-        self.echecs[cid] = raison or "refuse"
-        self._noter("   ECHEC de l'envoi des soldats de %s (%s) : nouvel essai dans %d s." % (self._nom_chateau(cid), raison, VERIF_SOLDATS))
+        self._echec(cid, raison or "refuse")
+        self._noter("   ECHEC de l'envoi des soldats de %s (%s) : nouvel essai dans %d s." % (self._nom_chateau(cid), raison,
+                                                                                       self._reessai(premiere, fin_attaque)))
         return False
+
+    def _reussi(self, cid, debut):
+        """Chateau vide (soldats partis ou rien a envoyer) : les armees rentrees apres `debut` seront renvoyees."""
+        self.echecs.pop(cid, None)
+        self.abri_ok.add(cid)
+        self.vide_a[cid] = debut
+
+    def _reessai(self, premiere, fin_attaque):
+        reste = (premiere if premiere is not None else fin_attaque) - self.horloge()
+        return REESSAI_PROCHE if reste <= 60 else VERIF_SOLDATS
 
     async def _rappeler(self, cid):
         t = self.horloge()

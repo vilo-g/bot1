@@ -917,7 +917,8 @@ class ModuleForteresses(tours.ModuleTours):
         actifs = set(self._royaumes_actifs())
         res = []
         for (kid, x, y), f in self.fort.items():
-            if kid not in actifs or f["dispo"] > t + 1 or (kid, x, y) in self.engagees:
+            r = self.retard_jeu()
+            if kid not in actifs or f["dispo"] + r > t + (0 if r else 1) or (kid, x, y) in self.engagees:
                 continue
             src = self.sources[kid]
             res.append((math.hypot(x - src["x"], y - src["y"]), kid, [11, x, y, -1, f["niveau"], 0, 0, kid]))
@@ -933,13 +934,15 @@ class ModuleForteresses(tours.ModuleTours):
             return False
         t = self.horloge()
         actifs = set(self._royaumes_actifs())
-        return any(k[0] in actifs and self.engagees.get(k, 0) <= t and f["dispo"] <= t + 1 for k, f in self.fort.items())
+        r = self.retard_jeu()
+        return any(k[0] in actifs and self.engagees.get(k, 0) <= t and f["dispo"] + r <= t + (0 if r else 1) for k, f in self.fort.items())
 
     def _prochaine(self):
         """Secondes avant la prochaine forteresse attaquable (d'apres les minuteurs lus), ou None."""
         t = self.horloge()
         actifs = set(self._royaumes_actifs())
-        d = [max(f["dispo"], self.engagees.get(k, 0)) - t for k, f in self.fort.items() if k[0] in actifs]
+        r = self.retard_jeu()
+        d = [max(f["dispo"] + r, self.engagees.get(k, 0)) - t for k, f in self.fort.items() if k[0] in actifs]
         return min(d) if d else None
 
     async def preparer_carte(self):

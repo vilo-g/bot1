@@ -40,6 +40,7 @@ import recrutement  # noqa: E402
 import materiaux    # noqa: E402
 import defense      # noqa: E402
 import transferts   # noqa: E402
+import montee       # noqa: E402
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(ICI, "interface.html")
@@ -47,7 +48,7 @@ PORT = 8770
 DOSSIER_IMAGES = os.path.join(ICI, "images")
 NOMS_UNITES = {215: "Vierge à bouclier niv. 10", 6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-13-avantpostes"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-14-levmax"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -279,9 +280,43 @@ def normaliser_achats(data, ancienne=None):
     return cfg
 
 
+_MAX_MONTEE = {}
+
+
+def niveaux_max_montee():
+    """Dernier niveau d'une tour de chaque royaume (donnees du jeu, lues une seule fois) : {"3": 71, ...}."""
+    if not _MAX_MONTEE:
+        mv = montee.max_victoires_par_royaume()
+        _MAX_MONTEE.update({str(k): montee.niveau(k, v) for k, v in mv.items()} or {"vide": None})
+    return {k: v for k, v in _MAX_MONTEE.items() if k != "vide"}
+
+
+def normaliser_montee(data, ancienne=None):
+    """Page Tours lev max -> rubrique "montee", ou ErreurSaisie."""
+    erreurs = []
+    cfg = {k: v for k, v in ancienne.items() if k != "active"} if isinstance(ancienne, dict) else {}
+    kid = data.get("kid")
+    if not (isinstance(kid, int) and not isinstance(kid, bool) and kid in tours.ROYAUMES):
+        erreurs.append("Monde : choisis le monde de la tour.")
+    x = _entier(data.get("x"), "Coordonnée X de la tour", 0, 2000, erreurs)
+    y = _entier(data.get("y"), "Coordonnée Y de la tour", 0, 2000, erreurs)
+    cmds = _commandants(data.get("commandants", ""), erreurs)
+    p = data.get("passes")
+    if not isinstance(p, list) or not p or not all(c in montee.PASSES for c in p):
+        erreurs.append("Passe-temps : coche au moins un passe-temps (1 h, 30 min ou 10 min).")
+    nv = _entier(data.get("niveau_vise", montee.NIVEAU_VISE), "Niveau visé", 1, montee.NIVEAU_MAX_SAISIE, erreurs)
+    if erreurs:
+        raise ErreurSaisie(erreurs)
+    cfg.update({"kid": kid, "x": x, "y": y, "commandants": cmds,
+                "passes": [c for c in montee.PASSES if c in p], "niveau_vise": nv})
+    if not montee.config_valide(cfg):
+        raise ErreurSaisie(["Réglages incomplets."])
+    return cfg
+
+
 def normaliser_lanceur(data, ancienne=None):
     erreurs = []
-    noms = [m.LANCEUR_NOM for m in bot.MODULES]
+    noms = [m.LANCEUR_NOM for m in bot.a_choisir()]
     mods = data.get("modules")
     if not isinstance(mods, list) or not mods or not all(m in noms for m in mods):
         erreurs.append("Modules : coche au moins un module.")
@@ -555,9 +590,16 @@ def demarrer_bot(lanceur, popen=subprocess.Popen):
                            "defense": (defense.RUBRIQUE, defense.config_valide),
                            "transferts": (transferts.RUBRIQUE, transferts.config_valide),
                            "recrutement": (recrutement.RUBRIQUE, recrutement.config_valide),
-                           "materiaux": (materiaux.RUBRIQUE, materiaux.config_valide)}[nom]
+                           "materiaux": (materiaux.RUBRIQUE, materiaux.config_valide),
+                           "montee": (montee.RUBRIQUE, montee.config_valide)}[nom]
             if not valide((tout or {}).get(rub)):
-                raise ErreurSaisie(["Module %s : réglages incomplets, enregistre-les d'abord." % m.LANCEUR_NOM])
+                raise ErreurSaisie(["Module %s : réglages incomplets, enregistre-les d'abord."
+                                    % ("Tours lev max" if nom == "montee" else m.LANCEUR_NOM)])
+            if nom == "montee":
+                kid = tout[rub]["kid"]
+                if not tours.reglages_valides(((tout.get("tours") or {}).get("reglages") or {}).get(str(kid))):
+                    raise ErreurSaisie(["Module Tours lev max : l'armée %s n'est pas réglée dans la page Tours (coche ce royaume, "
+                                        "règle-le, enregistre ; tu peux le décocher ensuite)." % montee.DU_MONDE[kid]])
         try:
             os.remove(bot.FICHIER_ARRET)
         except OSError:
@@ -584,7 +626,9 @@ def tout_etat():
     return {"config": {"tours": tout.get("tours"), "forteresses": tout.get(forteresses.RUBRIQUE), "lanceur": tout.get(bot.RUBRIQUE),
                        "achats": tout.get(achats.RUBRIQUE), "defense": tout.get(defense.RUBRIQUE),
                        "transferts": tout.get(transferts.RUBRIQUE), "recrutement": tout.get(recrutement.RUBRIQUE),
-                       "materiaux": tout.get(materiaux.RUBRIQUE)},
+                       "materiaux": tout.get(materiaux.RUBRIQUE), "montee": tout.get(montee.RUBRIQUE)},
+            "montee": {"niveaux_max": niveaux_max_montee(), "niveau_vise": montee.NIVEAU_VISE,
+                       "passes": [[c, montee.NOMS_PASSES[c]] for c in montee.PASSES]},
             "materiaux": catalogue_materiaux(),
             "recrutement": dict(catalogue_recrutement(), avant_postes=avant_postes_connus()),
             "prix_porte_max": defense.PRIX_PORTE_MAX,
@@ -593,7 +637,7 @@ def tout_etat():
                        for w in achats.ENGINS],
             "seuil_min": achats.SEUIL_MIN, "pieces_max": achats.PIECES_MAX, "part_budget": achats.PART_BUDGET,
             "pseudo": tout.get("pseudo"), "bot": etat_bot(), "sessions": sessions.pour_interface(etat_perime=ETAT_PERIME),
-            "modules": [{"nom": m.LANCEUR_NOM, "priorite": getattr(m, "LANCEUR_PRIORITE", bot.PRIORITE_DEFAUT)} for m in bot.MODULES],
+            "modules": [{"nom": m.LANCEUR_NOM, "priorite": getattr(m, "LANCEUR_PRIORITE", bot.PRIORITE_DEFAUT)} for m in bot.a_choisir()],
             "royaumes": {str(k): v for k, v in tours.ROYAUMES.items()}, "soldat_tours": tours.ID_SOLDAT,
             "reserve_max_secondes": forteresses.RESERVE_MAX_SECONDES, "compte": coffre.etat(), "version": VERSION,
             "unites_tours": [{"id": u[0], "nom": NOMS_UNITES.get(u[0], u[1]), "type": u[2].replace("corps a corps", "corps à corps"),
@@ -654,6 +698,8 @@ def enregistrer(rubrique, data):
             cfg = normaliser_recrutement(data, tout.get(recrutement.RUBRIQUE))
         elif rubrique == "materiaux":
             cfg = normaliser_materiaux(data, tout.get(materiaux.RUBRIQUE))
+        elif rubrique == "montee":
+            cfg = normaliser_montee(data, tout.get(montee.RUBRIQUE))
         else:
             raise ErreurSaisie(["Rubrique inconnue."])
         tours.memoriser_config(cfg, rubrique={"forteresses": forteresses.RUBRIQUE, "lanceur": bot.RUBRIQUE}.get(rubrique, rubrique))

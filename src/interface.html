@@ -248,6 +248,7 @@ input.faux{border-color:var(--err)}
       <button data-page="compte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Compte<span class="pastille" id="p-compte">-</span></button>
       <div class="titre">Modules</div>
       <button data-page="tours"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21V10L6 8V4h3v2h2V4h2v2h2V4h3v4l-2 2v11"/><path d="M5 21h14M11 21v-4a1 1 0 0 1 2 0v4"/></svg>Tours<span class="pastille" id="p-tours">-</span></button>
+      <button data-page="montee"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21V11L4 9V5h3v2h2V5h2v2h2V5h0"/><path d="M4 21h11M9 21v-3a1 1 0 0 1 2 0v3"/><path d="M18 21V8M15 11l3-3 3 3"/></svg>Tours lev max<span class="pastille" id="p-montee">-</span></button>
       <button data-page="forteresses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V11h3V8h3v3h6V8h3v3h3v10"/><path d="M3 21h18M10 21v-4h4v4M12 3v5M12 3l4 1.5L12 6"/></svg>Forteresses<span class="pastille" id="p-forteresses">-</span></button>
       <button data-page="achats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4"/><path d="M3 10.5v4c0 1.4 2.7 2.5 6 2.5 1 0 2-.1 2.8-.3"/><circle cx="17" cy="16" r="4.5"/><path d="M17 14v4M15 16h4"/></svg>Achats<span class="pastille" id="p-achats">-</span></button>
       <button data-page="defense"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Défense<span class="pastille" id="p-defense">-</span></button>
@@ -378,6 +379,34 @@ input.faux{border-color:var(--err)}
         <div class="barre"><div class="msg" id="t-msg">Aucune modification.</div>
           <button class="bouton" data-annuler="tours">Annuler</button><button class="bouton principal" data-enregistrer="tours">Enregistrer</button></div>
         <ul class="erreurs" id="t-erreurs"></ul>
+      </section>
+
+      <!-- ===================== TOURS LEV MAX -->
+      <section class="page" id="page-montee">
+        <div class="carte">
+          <h2>Monter une tour au niveau max</h2>
+          <p class="aide">Une seule tour à la fois. Le bot l'attaque en salves avec les commandants choisis ici (4,2 s d'écart entre deux départs),
+            saute le blocage de la tour avec les passe-temps cochés juste après chaque combat, puis relance une salve dès que la dernière
+            attaque est arrivée, jusqu'au niveau visé. L'armée est celle réglée dans la page Tours pour ce monde (même si le module tours ne tourne pas), calculée sur le vrai niveau de la tour.</p>
+          <p class="aide">Coche <b>Tours lev max</b> dans le tableau de bord : seul (rien d'autre n'attaque), ou avec les autres modules.
+            Le module tours, s'il tourne aussi, ne prend jamais ces commandants ni cette tour ; le module forteresses peut en garder un
+            (réservation) quand une forteresse devient attaquable bientôt, il revient ensuite à la montée. Jamais de rubis.</p>
+          <div class="grille g3" style="margin-top:12px">
+            <label class="champ">Monde de la tour<select id="mt-kid"></select></label>
+            <label class="champ">Coordonnée X<input type="number" id="mt-x" min="0" max="2000"></label>
+            <label class="champ">Coordonnée Y<input type="number" id="mt-y" min="0" max="2000"></label>
+          </div>
+          <div class="grille g3" style="margin-top:12px">
+            <label class="champ">Commandants dédiés<input type="text" id="mt-cmd" placeholder="ex. 20;21;22;23"></label>
+            <label class="champ">Niveau visé<input type="number" id="mt-niveau" min="1" max="90"></label>
+            <div class="champ">Passe-temps à utiliser<div class="choix-passes" id="mt-passes"></div></div>
+          </div>
+          <p class="aide" id="mt-info" style="margin:10px 0 0"></p>
+          <div id="mt-progres"></div>
+        </div>
+        <div class="barre"><div class="msg" id="mt-msg">Aucune modification.</div>
+          <button class="bouton" id="mt-annuler">Annuler</button><button class="bouton principal" id="mt-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="mt-erreurs"></ul>
       </section>
 
       <!-- ===================== FORTERESSES -->
@@ -553,10 +582,10 @@ const NOMS = {0:"vert",1:"sables",2:"glacier",3:"feu"};
 const COULEURS = {0:"var(--k0)",1:"var(--k1)",2:"var(--k2)",3:"var(--k3)"};
 const COTES = [["F","Flanc gauche"],["FF","Deux flancs"],["A","Avant"],["AF","Avant + flanc"],["AFF","Avant + 2 flancs"]];
 const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
-const VERSION = "2026-11-13-avantpostes";     // doit etre egale a VERSION dans interface.py
+const VERSION = "2026-11-14-levmax";     // doit etre egale a VERSION dans interface.py
 let serveur = null;            // dernier /api/etat
-const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null, recrutement:null, materiaux:null};      // formulaires en cours
-const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false, recrutement:false, materiaux:false};
+const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null, recrutement:null, materiaux:null, montee:null};      // formulaires en cours
+const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false, recrutement:false, materiaux:false, montee:false};
 
 async function api(chemin, corps){
   const opt = corps === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-GGE-Bot":"1"}, body:JSON.stringify(corps)};
@@ -582,6 +611,7 @@ function cmdListe(t){ return String(t||"").split(";").map(x=>x.trim()).filter(x=
 
 /* ------------------------------------------------------------------ navigation */
 const TITRES = {accueil:["Tableau de bord","Lancer le bot et suivre ce qu'il fait"], compte:["Compte","Nom du compte et mot de passe, gardés sur ce PC"], tours:["Module tours","Réglages enregistrés dans config.json (rubrique tours)"],
+  montee:["Module Tours lev max","Monter une tour au niveau max (rubrique montee)"],
   forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"],
   achats:["Module achats","Dépenser le surplus de pièces en engins (rubrique achats)"],
   defense:["Module défense","Mettre les soldats à l'abri quand un château est attaqué (rubrique defense)"],
@@ -613,17 +643,18 @@ function chargerFormulaires(){
   etat.transferts = etatTransferts(serveur.config.transferts);
   etat.recrutement = etatRecrutement(serveur.config.recrutement);
   etat.materiaux = etatMateriaux(serveur.config.materiaux);
-  sale.tours = sale.forteresses = sale.achats = sale.defense = sale.transferts = sale.recrutement = sale.materiaux = false;
-  dessinerTours(); dessinerFort(); dessinerAchats(); dessinerDefense(); dessinerTransferts(); dessinerRecrutement(); dessinerMateriaux();
-  marquer("tours"); marquer("forteresses"); marquer("achats"); marquer("defense"); marquer("transferts"); marquer("recrutement"); marquer("materiaux");
+  etat.montee = etatMontee(serveur.config.montee);
+  sale.tours = sale.forteresses = sale.achats = sale.defense = sale.transferts = sale.recrutement = sale.materiaux = sale.montee = false;
+  dessinerTours(); dessinerFort(); dessinerAchats(); dessinerDefense(); dessinerTransferts(); dessinerRecrutement(); dessinerMateriaux(); dessinerMontee();
+  marquer("tours"); marquer("forteresses"); marquer("achats"); marquer("defense"); marquer("transferts"); marquer("recrutement"); marquer("materiaux"); marquer("montee");
   for(const id of ["t-cmd", "f-cmd"]) if($("#" + id).value) verifierCommandants(id);   // reglages enregistres faux : signales tout de suite
 }
 function marquer(mod, texte, classe){
-  const m = $("#" + {tours:"t", forteresses:"f", achats:"a", defense:"d", transferts:"r", recrutement:"rc", materiaux:"m"}[mod] + "-msg");
+  const m = $("#" + {tours:"t", forteresses:"f", achats:"a", defense:"d", transferts:"r", recrutement:"rc", materiaux:"m", montee:"mt"}[mod] + "-msg");
   m.className = "msg " + (classe || (sale[mod] ? "sale" : ""));
   m.textContent = texte || (sale[mod] ? "Modifications non enregistrées." : "Aucune modification.");
 }
-function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats, defense:dessinerDefense, transferts:dessinerTransferts, recrutement:dessinerRecrutement, materiaux:dessinerMateriaux})[mod](); } pastilles(); }
+function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats, defense:dessinerDefense, transferts:dessinerTransferts, recrutement:dessinerRecrutement, materiaux:dessinerMateriaux, montee:dessinerMontee})[mod](); } pastilles(); }
 
 /* ------------------------------------------------------------------ blocs communs a un royaume */
 function curseur(min, max, pas, valeur, unite, poser){
@@ -1191,9 +1222,65 @@ $("#m-enregistrer").addEventListener("click", async () => {
     liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
   }
 });
+/* ------------------------------------------------------------------ montee d'une tour (page Tours) */
+const DU = {0:"du vert",1:"des sables",2:"du glacier",3:"du feu"};
+function armeeMontee(kid){ const r = ((((serveur || {}).config || {}).tours || {}).reglages || {})[String(kid)]; return !!(r && r.mode); }
+function nomPasse(c){ const p = ((serveur && serveur.montee && serveur.montee.passes) || []).find(x => x[0] === c); return p ? p[1] : c; }
+function etatMontee(c){ c = c || {};
+  return {kid: Number.isInteger(c.kid) ? c.kid : 3, x: c.x != null ? String(c.x) : "", y: c.y != null ? String(c.y) : "",
+          commandants: cmdTexte(c.commandants), niveau_vise: String(c.niveau_vise || ((serveur && serveur.montee) || {}).niveau_vise || 71),
+          passes: Array.isArray(c.passes) ? [...c.passes] : ["MS5","MS4","MS3"]}; }
+function erreursMontee(m){
+  const e = [];
+  for(const [k, n] of [["x","X"],["y","Y"]]) if(!/^\d+$/.test(String(m[k]).trim()) || +m[k] > 2000) e.push("Coordonnée " + n + " de la tour : un nombre entre 0 et 2000.");
+  const cm = cmdListe(m.commandants);
+  if(!cm.length || cm.some(x => x < 1 || x > 35) || new Set(cm).size !== cm.length || String(m.commandants).split(";").some(x => !/^\s*\d+\s*$/.test(x)))
+    e.push("Commandants dédiés : numéros de 1 à 35 séparés par des ; (ex. 20;21;22).");
+  if(!/^\d+$/.test(String(m.niveau_vise).trim()) || +m.niveau_vise < 1 || +m.niveau_vise > 90) e.push("Niveau visé : entre 1 et 90.");
+  if(!m.passes.length) e.push("Coche au moins un passe-temps.");
+  return e;
+}
+function dessinerMontee(){
+  const m = etat.montee; if(!m || !serveur) return;
+  const info = serveur.montee || {}, maxi = info.niveaux_max || {};
+  if(!$("#mt-kid").options.length) $("#mt-kid").replaceChildren(...[3,1,2,0].map(k => el("option",{value:String(k)}, NOMS[k][0].toUpperCase() + NOMS[k].slice(1))));
+  $("#mt-kid").value = String(m.kid);
+  for(const [id, k] of [["mt-x","x"],["mt-y","y"],["mt-cmd","commandants"],["mt-niveau","niveau_vise"]]) if(document.activeElement !== $("#" + id)) $("#" + id).value = m[k];
+  $("#mt-passes").replaceChildren(...(info.passes || []).map(([c, t]) => el("label",{class:"passe" + (m.passes.includes(c) ? " on" : "")},
+    el("input",{type:"checkbox", checked:m.passes.includes(c), onchange:e => { m.passes = e.target.checked ? [...m.passes, c] : m.passes.filter(x => x !== c); changer("montee"); }}), t)));
+  const mx = maxi[String(m.kid)], nv = +m.niveau_vise || 0;
+  const ct = ((serveur.config || {}).tours || {}).commandants, tc = Array.isArray(ct) ? ct : cmdListe(ct), communs = cmdListe(m.commandants).filter(x => tc.includes(x));
+  $("#mt-info").textContent = (mx != null ? "Dernier niveau d'une tour " + DU[m.kid] + " dans les données du jeu : " + mx
+      + (nv > mx ? " (le bot s'arrêtera à " + mx + ")." : ".") : "")
+    + " Les passe-temps sont combinés pour gâcher le moins de temps (blocage de 3 h → 3 × 1 h ; 2 h 33 → 2 × 1 h + 30 min + 10 min)."
+    + (communs.length ? " Commandant(s) " + communs.join(";") + " aussi dans la liste du module tours : si les deux tournent, il(s) ne servira(ont) qu'à la montée." : "")
+    + (armeeMontee(m.kid) ? "" : " ATTENTION : l'armée " + DU[m.kid] + " n'est pas réglée dans la page Tours (coche ce royaume, règle-le, enregistre ; tu peux le décocher ensuite).");
+  const p = Object.values(((serveur.bot || {}).etat === "en_marche" && serveur.bot.montee) || {})[0];
+  $("#mt-progres").replaceChildren(...(p ? [el("p",{class:"aide", style:"margin:8px 0 0;color:var(--text)"},
+    "En cours : tour " + NOMS[p.royaume] + " (" + p.x + "," + p.y + ") au niveau " + (p.niveau != null ? p.niveau : "?") + " / " + p.niveau_vise
+    + (p.victoires != null ? " (" + p.victoires + " / " + p.victoires_visees + " victoires)" : "") + ", " + p.attaques + " attaque(s)"
+    + (Object.keys(p.passes || {}).length ? ", passe-temps : " + Object.entries(p.passes).map(([c, n]) => n + " × " + nomPasse(c)).join(", ") : "") + ".")] : []));
+}
+$("#mt-kid").addEventListener("change", e => { etat.montee.kid = +e.target.value; changer("montee"); });
+for(const [id, k] of [["mt-x","x"],["mt-y","y"],["mt-cmd","commandants"],["mt-niveau","niveau_vise"]])
+  $("#" + id).addEventListener("input", e => { etat.montee[k] = e.target.value.trim(); changer("montee", k === "commandants" || k === "niveau_vise"); });
+$("#mt-annuler").addEventListener("click", () => { etat.montee = etatMontee(serveur.config.montee); sale.montee = false; dessinerMontee(); marquer("montee"); $("#mt-erreurs").replaceChildren(); });
+$("#mt-enregistrer").addEventListener("click", async () => {
+  const liste = $("#mt-erreurs"); liste.replaceChildren();
+  const m = etat.montee, err = erreursMontee(m);
+  if(err.length){ marquer("montee", "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x))); return; }
+  try{
+    const rep = await api("/api/config/montee", {kid: m.kid, x: +m.x, y: +m.y, commandants: m.commandants, niveau_vise: +m.niveau_vise, passes: m.passes});
+    serveur.config.montee = rep.config; etat.montee = etatMontee(rep.config); sale.montee = false; marquer("montee", "Enregistré dans config.json.", "ok"); dessinerMontee(); pastilles(); dessinerModules();
+  }catch(ex){
+    marquer("montee", "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
+  }
+});
 function configOk(nom){
   const c = serveur && serveur.config[nom];
   if(nom === "materiaux") return !!(c && !erreursMateriaux(etatMateriaux(c)).length);
+  if(nom === "montee") return !!(c && !erreursMontee(etatMontee(c)).length && armeeMontee(c.kid));
   if(nom === "recrutement") return !!(c && !erreursRecrutement(etatRecrutement(c)).length);
   if(nom === "transferts") return !!(c && !erreursTransferts(etatTransferts(c)).length);
   if(nom === "defense") return !!(c && c.seuil && !erreursDefense(etatDefense(c)).length);
@@ -1201,12 +1288,13 @@ function configOk(nom){
   return !!(c && c.commandants && c.commandants.length && c.royaumes && c.royaumes.length);
 }
 function pastilles(){
-  for(const nom of ["tours","forteresses","achats","defense","transferts","recrutement","materiaux"]){
+  for(const nom of ["tours","montee","forteresses","achats","defense","transferts","recrutement","materiaux"]){
     const p = $("#p-"+nom); if(!p || !serveur) continue;
     const ok = configOk(nom); p.textContent = sale[nom] ? "modifié" : ok ? "prêt" : "à régler"; p.className = "pastille" + (ok && !sale[nom] ? " ok" : "");
   }
 }
 const choixModules = new Set();
+const NOMS_MODULES = {defense:"Défense", montee:"Tours lev max", materiaux:"Matériaux"};
 function dessinerModules(){
   const zone = $("#choix-modules"); zone.replaceChildren();
   const desc = {tours:"Tours les plus proches, couronne par couronne.", forteresses:"Forteresses lues sur la carte, minuteur personnel.",
@@ -1214,11 +1302,12 @@ function dessinerModules(){
     defense:"Château attaqué : soldats à l'abri chez un membre protégé de l'alliance, puis rappelés.",
     transferts:"Ressources réparties entre les royaumes (spéciale de chaque royaume, bois et pierre en trop).",
     recrutement:"Caserne et atelier de siège remplis en continu, aide de l'alliance demandée.",
-    materiaux:"Raffinerie, outilleur et butin du dragon : fabrications lancées en continu."};
+    materiaux:"Raffinerie, outilleur et butin du dragon : fabrications lancées en continu.",
+    montee:"Une tour montée au niveau max : salves d'attaques, blocage sauté avec des passe-temps (réglages : page Tours lev max)."};
   for(const m of serveur.modules){
     const ok = configOk(m.nom), on = choixModules.has(m.nom);
     const cb = el("input",{type:"checkbox", checked:on, onchange:e => { e.target.checked ? choixModules.add(m.nom) : choixModules.delete(m.nom); dessinerModules(); }});
-    zone.append(el("label",{class: on ? "on" : ""}, cb, el("div",{}, el("b",{}, ({defense:"Défense"})[m.nom] || (m.nom[0].toUpperCase() + m.nom.slice(1)) + "  "),
+    zone.append(el("label",{class: on ? "on" : ""}, cb, el("div",{}, el("b",{}, (NOMS_MODULES[m.nom] || (m.nom[0].toUpperCase() + m.nom.slice(1))) + "  "),
       m.priorite === Math.min(...serveur.modules.map(x=>x.priorite)) ? el("span",{class:"puce or"},"prioritaire") : null, " ",
       el("span",{class:"puce " + (ok ? "ok" : "err")}, ok ? "réglages OK" : "à régler"), el("small",{style:"display:block;margin-top:4px"}, desc[m.nom] || ""))));
   }
@@ -1229,7 +1318,7 @@ function dessinerEtat(){
   const marche = b.etat === "en_marche", attente = b.etat === "connexion" || b.etat === "demarrage";
   const libelle = marche ? "Le bot travaille" : attente ? (b.etat === "connexion" ? "Connexion au compte…" : "Démarrage…") : "Bot arrêté";
   $("#etat-titre").textContent = b.arret_demande && (marche || attente) ? "Arrêt en cours…" : libelle;
-  $("#etat-detail").textContent = marche ? "Depuis " + depuis(b.debut) + " · modules : " + (b.modules||[]).join(", ")
+  $("#etat-detail").textContent = marche ? "Depuis " + depuis(b.debut) + " · modules : " + (b.modules||[]).map(n => NOMS_MODULES[n] || n).join(", ")
     : attente ? "Connexion en cours (mot de passe dans la fenêtre du bot seulement si la session a expiré)."
     : (b.remarque ? "(" + b.remarque + ") " : "") + "Choisis les modules ci-dessous puis démarre.";
   $("#etat-icone").className = "grand" + (marche ? " marche" : attente ? " attente" : "");
@@ -1248,6 +1337,13 @@ function dessinerEtat(){
     for(const [nom, v] of Object.entries(b.defense || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Défense"),
         el("b",{}, String(v[1])), el("small",{}, v[0] + " attaque(s) vue(s), " + v[1] + " mise(s) à l'abri"),
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
+    for(const [nom, p] of Object.entries(b.montee || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Tours lev max : tour " + NOMS[p.royaume] + " (" + p.x + "," + p.y + "), niveau"),
+        el("b",{}, p.niveau != null ? p.niveau + " / " + p.niveau_vise : "…"),
+        el("small",{}, (p.victoires != null ? p.victoires + " / " + p.victoires_visees + " victoires · " : "") + p.attaques + " attaque(s), " + p.en_route + " en route"
+          + (Object.keys(p.passes || {}).length ? " · passe-temps : " + Object.entries(p.passes).map(([c, n]) => n + " × " + nomPasse(c)).join(", ") : "")),
+        p.pause ? el("small",{style:"color:#ffc46b"}, "pause : " + p.pause) : null,
+        (b.arretes||{})[nom] ? el("small",{style:(p.fini && /NIVEAU VISE/.test(b.arretes[nom]) ? "color:#7fe0a8" : "color:#ff8e7e")},
+          (p.fini && /NIVEAU VISE/.test(b.arretes[nom]) ? "terminé : " : "arrêté : ") + b.arretes[nom]) : null));
     for(const [nom, n] of Object.entries(b.attaques || {}))
       ch.append(el("div",{class:"chiffre"}, el("small",{}, "Attaques " + nom), el("b",{}, String(n)),
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
@@ -1256,7 +1352,7 @@ function dessinerEtat(){
 }
 $("#b-demarrer").addEventListener("click", async () => {
   $("#l-erreurs").replaceChildren(); $("#l-msg").textContent = "";
-  if(sale.tours || sale.forteresses || sale.achats || sale.defense || sale.transferts || sale.recrutement || sale.materiaux){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
+  if(sale.tours || sale.forteresses || sale.achats || sale.defense || sale.transferts || sale.recrutement || sale.materiaux || sale.montee){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
   const corps = {modules:[...choixModules], duree:$("#l-duree").value.trim(), max_attaques: $("#l-max").value ? +$("#l-max").value : null, simulation:$("#l-simu").checked, ecran_allume:$("#l-ecran").checked};
   try{ await api("/api/demarrer", corps); $("#l-msg").textContent = "Démarré : regarde la fenêtre du bot."; }
   catch(e){ $("#l-erreurs").replaceChildren(...(e.erreurs||["Erreur"]).map(x => el("li",{},x))); }
@@ -1404,7 +1500,9 @@ $("#maj-verifier").addEventListener("click", () => verifierMaj(true));
 $("#maj-installer").addEventListener("click", installerMaj);
 
 async function majEtat(){
-  try{ const d = await api("/api/etat"); serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; serveur.sessions = d.sessions; dessinerEtat(); dessinerSessions(); }catch(e){}
+  try{ const d = await api("/api/etat"); serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; serveur.sessions = d.sessions;
+    if(!sale.montee && JSON.stringify(d.config.montee) !== JSON.stringify(serveur.config.montee)){ serveur.config.montee = d.config.montee; etat.montee = etatMontee(d.config.montee); }
+    dessinerEtat(); dessinerSessions(); dessinerMontee(); }catch(e){}
 }
 function dureeTxt(s){ s = Math.max(0, Math.round(s)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60);
   return h ? h + " h " + String(m).padStart(2,"0") + " min" : m ? m + " min" : s + " s"; }

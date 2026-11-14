@@ -49,9 +49,12 @@ import defense      # noqa: E402
 import transferts   # noqa: E402
 import recrutement  # noqa: E402
 import materiaux    # noqa: E402
+import montee       # noqa: E402
 from tours import ArretModule, demander, duree  # noqa: E402
 
-MODULES = [tours, forteresses, achats, defense, transferts, recrutement, materiaux]  # ordre = numero affiche (1 tours, 2 forteresses, 3 achats, 4 defense, 5 transferts)
+MODULES = [tours, forteresses, achats, defense, transferts, recrutement, materiaux, montee]  # ordre = numero affiche (1 tours, 2 forteresses, 3 achats, 4 defense, 5 transferts)
+# montee = "Tours lev max" (monter une tour au niveau max) : module a part, seul ou avec les autres.
+# Un module avec LANCEUR_PARENT (aucun pour l'instant) ne serait pas propose au choix : il demarrerait avec son parent.
 RUBRIQUE = "lanceur"
 VERIF_SESSION = 30                      # secondes max entre deux verifications que la connexion est vivante
 PRIORITE_DEFAUT = 50                    # module sans LANCEUR_PRIORITE (plus petit = plus prioritaire)
@@ -67,9 +70,28 @@ def par_nom(modules=None):
     return {m.LANCEUR_NOM: m for m in (modules or MODULES)}
 
 
+def a_choisir(modules=None):
+    """Modules proposes au choix (sans les sous-modules, lances avec leur parent)."""
+    return [m for m in (modules or MODULES) if not getattr(m, "LANCEUR_PARENT", None)]
+
+
+def sous_modules(choix, modules=None):
+    """Sous-modules a lancer avec les modules choisis : parent choisi et sous-module active dans ses reglages."""
+    res = []
+    for m in modules or MODULES:
+        parent = getattr(m, "LANCEUR_PARENT", None)
+        if parent and parent in choix and m.LANCEUR_NOM not in choix:
+            try:
+                if m.lanceur_actif():
+                    res.append(m.LANCEUR_NOM)
+            except Exception:
+                pass
+    return res
+
+
 def analyseur_modules(modules=None):
     """'1;2' ou 'tours;forteresses' (melange possible) -> liste de noms, sans doublon, ordre conserve. ';' seulement."""
-    modules = modules or MODULES
+    modules = a_choisir(modules)
     noms = [m.LANCEUR_NOM for m in modules]
 
     def analyser(texte):
@@ -92,7 +114,7 @@ def analyseur_modules(modules=None):
 
 def choisir_modules(args, lire=None, sortie=print, modules=None):
     """Modules a lancer : --modules, sinon question (Entree = dernier choix). Le choix est garde dans config.json."""
-    modules = modules or MODULES
+    modules = a_choisir(modules)
     analyser = analyseur_modules(modules)
     if getattr(args, "modules", None):
         try:
@@ -302,6 +324,7 @@ def lire_args(argv=None):
 async def preparer(args, lire_sync=None, sortie=print, modules=None):
     """AVANT la connexion : modules choisis, configuration et fichiers de chacun -> [(module python, cfg, ressources)]."""
     choix = choisir_modules(args, lire_sync, sortie, modules)
+    choix = choix + sous_modules(choix, modules)
     table = par_nom(modules)
     prets = []
     for nom in choix:
@@ -404,7 +427,9 @@ def battement_etat(modules, debut, horloge=time.time, fichier=None, tous_les=3, 
         pieces = next((getattr(e.module.partage, "pieces", None) for e in entrees if getattr(e.module, "partage", None)), None)
         ecrire_etat({"etat": "en_marche", "pid": os.getpid(), "modules": modules, "debut": debut, "maj": t, "pieces": pieces,
                      "achats": {e.nom: e.module.nb_achats for e in entrees if hasattr(e.module, "nb_achats")},
+                     "montee": {e.nom: e.module.progres() for e in entrees if hasattr(e.module, "progres")},
                      "attaques": {e.nom: e.module.nb_attaques for e in entrees if not hasattr(e.module, "nb_achats")
+                                  and not hasattr(e.module, "progres")
                                   and not hasattr(e.module, "nb_abris") and not hasattr(e.module, "nb_transferts")
                                   and not hasattr(e.module, "nb_recrutements") and not hasattr(e.module, "nb_fabrications")},
                      "fabrications": {e.nom: e.module.nb_fabrications for e in entrees if hasattr(e.module, "nb_fabrications")},

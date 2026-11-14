@@ -21,7 +21,7 @@ Tourne en local sur le PC de chaque joueur. Les identifiants ne quittent jamais 
 | `docs/`     | Le protocole (`protocole.md`), les questions ouvertes (`a-decouvrir.md`), la conception (`conception.md`) et les captures du bot d'exemple (`exemple-bot/`) |
 | `outils/`   | `observer.py` (observe), `test_envoi.py` (fonctions de base du jeu, utilisées par le bot), `connexion_auto.py` (connexion), `telecharger_items.py` (données du jeu), et les lanceurs `.bat` |
 | `captures/` | Journaux enregistrés par `observer.py` (PRIVÉ, voir plus bas) |
-| `src/`      | Le code du bot : `session.py` (connexion/déconnexion), `combat.py` (formules du jeu), `tours.py` (module tours), `forteresses.py` (module forteresses), `achats.py` (module achats : surplus de pièces dépensé en engins), `defense.py` (module défense : soldats à l'abri quand un château est attaqué), `transferts.py` (module transferts : ressources réparties entre les royaumes), `bot.py` (lanceur commun), `interface.py` + `interface.html` (interface graphique) |
+| `src/`      | Le code du bot : `session.py` (connexion/déconnexion), `combat.py` (formules du jeu), `tours.py` (module tours), `forteresses.py` (module forteresses), `achats.py` (module achats : surplus de pièces dépensé en engins), `defense.py` (module défense : soldats à l'abri quand un château est attaqué), `transferts.py` (module transferts : ressources réparties entre les royaumes), `montee.py` (module Tours lev max : monter une tour au niveau max), `bot.py` (lanceur commun), `interface.py` + `interface.html` (interface graphique) |
 
 ## Lancer le bot
 
