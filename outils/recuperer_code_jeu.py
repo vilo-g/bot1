@@ -68,9 +68,21 @@ async def telecharger():
                 continue
             print("Code du jeu :", jeu.split("/")[-1])
             code = await lire_texte(nav, s, cid, jeu, "__code")
+            # les formules de combat (places par vague, cour...) sont dans un 2e fichier public du jeu : ggs.dll.js (15/11)
+            for u in urls:
+                nom = u.split("/")[-1].split("?")[0]
+                if re.search(r"\.dll\.[0-9a-f.]*js$", nom) and nom not in AUTRES:
+                    try:
+                        AUTRES[nom] = await lire_texte(nav, s, cid, u, "__autre")
+                        print("Autre fichier du jeu :", nom)
+                    except Exception as e:
+                        print("Fichier %s pas recupere : %s" % (nom, e))
             donnees = await lire_texte(nav, s, cid, items, "__items") if items else None
             return code, donnees
     raise RuntimeError("page du jeu introuvable dans ce Chrome (ouvre empire.goodgamestudios.com dedans).")
+
+
+AUTRES = {}      # nom -> contenu des autres fichiers de code du jeu (ggs.dll.js...)
 
 
 def extraire(code, sortie):
@@ -105,6 +117,12 @@ def principal():
     with open(chemin, "w", encoding="utf-8") as f:
         f.write(code)
     print("Code du jeu enregistre : %s (%.1f Mo)" % (chemin, len(code) / 1e6))
+    for nom, contenu in AUTRES.items():
+        if contenu:
+            propre = re.sub(r"[^A-Za-z0-9_.-]", "_", nom)
+            with open(os.path.join(RACINE, "captures", "jeu", propre), "w", encoding="utf-8") as f:
+                f.write(contenu)
+            print("Enregistre : captures\\jeu\\%s (%.1f Mo)" % (propre, len(contenu) / 1e6))
     if donnees:
         with open(os.path.join(RACINE, "captures", "items.json"), "w", encoding="utf-8") as f:
             f.write(donnees)

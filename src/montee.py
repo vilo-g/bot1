@@ -39,18 +39,18 @@ import transferts       # noqa: E402
 from tours import ArretModule, PlusDeSoldats, ROYAUMES, T, duree   # noqa: E402
 
 RUBRIQUE = "montee"
-PASSES = {"MS5": 3600, "MS4": 1800, "MS3": 600}        # seulement 1 h, 30 min, 10 min (choix du joueur)
-NOMS_PASSES = {c: transferts.NOMS_PASSES[c] for c in PASSES}
+PASSES = {"MS7": 86400, "MS6": 18000, "MS5": 3600, "MS4": 1800, "MS3": 600}   # 24 h, 5 h (16/11 : gros delais du Khan), 1 h, 30 min, 10 min
+NOMS_PASSES = {"MS7": "24 h", "MS6": "5 h", "MS5": "1 h", "MS4": "30 min", "MS3": "10 min"}
 PASSES_DEFAUT = ["MS5", "MS4", "MS3"]
 NIVEAU_VISE = 71
-NIVEAU_MAX_SAISIE = 90
+NIVEAU_MAX_SAISIE = 71     # niveau maximum d'une tour (comme le module tours) : impossible de viser plus haut (14/11)
 ESPACEMENT = 4.2           # s minimum entre deux arrivees (= entre deux departs)
 ESPACEMENT_MAX = 10        # attaque arrivee pendant le blocage : l'ecart grandit de 2 s, jusqu'a 10 s
 TOLERANCE = 30             # blocage restant accepte sans passe-temps (attendre 30 s plutot que gacher 10 min)
 MARGE_ARRIVEE = 1.5        # le blocage doit etre fini 1,5 s avant l'arrivee de la prochaine attaque
 ATTENTE_COMBAT = 15        # s apres l'arrivee prevue : sans nouvelles du combat, la tour est relue
-SAUTS_MAX = 24             # passe-temps au plus d'un coup (4 h en 10 min)
-BLOCAGE_MAX = 4 * 3600     # blocage plus long : temps anormal, pas de passe-temps
+SAUTS_MAX = 40             # passe-temps au plus d'un coup (le reste au passage suivant)
+BLOCAGE_MAX = 30 * 3600    # blocage plus long : temps anormal, pas de passe-temps (le Khan monte jusqu'a 24 h, 16/11)
 PERTES_MAX = 3             # defaites de suite -> pause (armee trop faible ?)
 SANS_HAUSSE_MAX = 5        # combats de suite sans victoire comptee alors que la tour s'est bloquee -> arret (niveau max ?)
 REFUS_MAX = 5              # attaques refusees de suite -> pause
@@ -108,6 +108,7 @@ def max_victoires_par_royaume(chemin=None):
 
 def objectif(kid, niveau_vise, max_v=None):
     """-> (niveau vise effectif, victoires a atteindre) : le niveau demande, sans depasser le dernier niveau du royaume."""
+    niveau_vise = min(niveau_vise, NIVEAU_MAX_SAISIE)
     if max_v is not None:
         niveau_vise = min(niveau_vise, niveau(kid, max_v))
     v = victoires_pour(kid, niveau_vise)
@@ -138,6 +139,9 @@ def resume_config(cfg, max_v=None):
 class ModuleMontee(tours.ModuleTours):
     NOM_MODULE = "MONTEE"
     NOM_CIBLE = "tour"
+    TYPE_CIBLE = 2               # type d'objet de la carte de la cible ([2,x,y,...] = tour) ; le module nomades le change (15/11)
+    LA_CIBLE = "la tour"
+    NOM_PAUSE = "la montee"
 
     def __init__(self, jeu, cfg, sources, effets=None, max_v=None, **kw):
         kw.setdefault("journal", os.path.join(tours.DOSSIER_CAPTURES, "journal_montee.txt"))
@@ -184,7 +188,7 @@ class ModuleMontee(tours.ModuleTours):
                     if e[1] > 0:
                         self.passes_vides.discard(e[0])
             return
-        marque = "[2,%d,%d," % (self.x, self.y)
+        marque = "[%d,%d,%d," % (self.TYPE_CIBLE, self.x, self.y)
         if marque not in payload.replace(" ", ""):
             return
         d = T.json_ou_none(payload)
@@ -199,7 +203,11 @@ class ModuleMontee(tours.ModuleTours):
             entrees = [ai] if isinstance(ai, list) and ai and not isinstance(ai[0], list) else ai if isinstance(ai, list) else []
             for e in entrees:
                 if self._est_la_tour(e):
-                    self._noter_etat(e[4], e[5])
+                    self._noter_entree(e)
+
+    def _noter_entree(self, e):
+        """Entree de carte de la cible ([type,x,y,-1,victoires,blocage,...]) -> son etat."""
+        self._noter_etat(e[4], e[5])
 
     def _est_la_tour(self, e):
         return (isinstance(e, list) and len(e) >= 6 and e[0] == 2 and e[1] == self.x and e[2] == self.y
@@ -219,7 +227,7 @@ class ModuleMontee(tours.ModuleTours):
             return
         self.cats_vus.add(mid)
         t = self.horloge()
-        self._noter_etat(sa[4], sa[5])
+        self._noter_entree(sa)
         lid = ((((d.get("A") or {}).get("UM") or {}).get("L")) or {}).get("ID")
         if lid is not None:
             a = next((a for a in self.vol if a["lid"] == lid), None)   # None : armee envoyee a la main (pas par la montee)
@@ -248,6 +256,15 @@ class ModuleMontee(tours.ModuleTours):
 
     def _victoires(self):
         return self.etat_tour[0] if self.etat_tour is not None else None
+
+    def _attaques_utiles(self):
+        """Departs encore utiles : victoires qui manquent pour le niveau vise, moins les attaques deja en route ou dont le combat
+        n'est pas encore traite (chacune donne au plus 1 victoire). None si l'etat de la tour n'est pas connu. Jamais d'attaque
+        en trop : sinon une salve de 17 lancee a 3 victoires du but faisait depasser le niveau vise (14/11)."""
+        vs = [v for v in (self.v_combat, self._victoires()) if isinstance(v, int)]
+        if not vs:
+            return None
+        return self.cible_v - max(vs) - len(self.vol) - len(self.combats)
 
     def texte_niveau(self, v):
         n = niveau(self.kid, v)
@@ -320,7 +337,7 @@ class ModuleMontee(tours.ModuleTours):
                 for e in d["AI"]:
                     if isinstance(e, list) and len(e) >= 3 and e[1] == self.x and e[2] == self.y:
                         if self._est_la_tour(e):
-                            self._noter_etat(e[4], e[5])
+                            self._noter_entree(e)
                         return e
                 return None
         return False
@@ -359,7 +376,7 @@ class ModuleMontee(tours.ModuleTours):
     def _pause(self, secondes, raison):
         self.pause_jusqua = self.horloge() + secondes
         self.raison_pause = raison
-        self._noter("   PAUSE de la montee pendant %s : %s" % (duree(secondes), raison))
+        self._noter("   PAUSE de %s pendant %s : %s" % (self.NOM_PAUSE, duree(secondes), raison))
 
     # ------------------------------------------------------------------ un passage
     async def cycle(self):
@@ -422,8 +439,8 @@ class ModuleMontee(tours.ModuleTours):
         for a in [a for a in self.vol if a["arrivee"] + ATTENTE_COMBAT < t]:
             self.vol.remove(a)
             self.etat_tour = None
-            self._noter("   commandant %d : pas de nouvelles du combat %s apres son arrivee prevue ; la tour sera relue."
-                        % (a["pos"], duree(ATTENTE_COMBAT)))
+            self._noter("   commandant %d : pas de nouvelles du combat %s apres son arrivee prevue ; %s sera relu%s."
+                        % (a["pos"], duree(ATTENTE_COMBAT), self.LA_CIBLE, "e" if self.LA_CIBLE.startswith("la ") else ""))
 
     # ------------------------------------------------------------------ sauter le blocage
     async def _demander_msd(self, code):
@@ -443,7 +460,7 @@ class ModuleMontee(tours.ModuleTours):
             if b is None or b <= tol:
                 break
             if b > BLOCAGE_MAX:
-                self._pause(300, "blocage de la tour anormal (%s) : pas de passe-temps." % duree(b))
+                self._pause(300, "blocage anormal de %s (%s) : pas de passe-temps." % (self.LA_CIBLE, duree(b)))
                 break
             if self.simulation:
                 self._noter("[SIMULATION] blocage de %s : les passe-temps %s seraient utilises."
@@ -453,8 +470,8 @@ class ModuleMontee(tours.ModuleTours):
             dispo = {c: v for c, v in dispo.items() if self.stock.get(c, 1) > 0}     # stock vu a 0 (message sce) : pas d'essai
             plan = transferts.combinaison(b - tol, dispo)
             if not plan:
-                self._pause(PAUSE_PROBLEME, "plus aucun des passe-temps choisis (%s) en stock : la tour reste bloquee %s."
-                            % (texte_passes(self.cfg["passes"]), duree(b)))
+                self._pause(PAUSE_PROBLEME, "plus aucun des passe-temps choisis (%s) en stock : encore %s de blocage sur %s."
+                            % (texte_passes(self.cfg["passes"]), duree(b), self.LA_CIBLE))
                 break
             code = plan[0]
             rep = await self._demander_msd(code)
@@ -466,7 +483,7 @@ class ModuleMontee(tours.ModuleTours):
                 self._noter("   passe-temps %s refuse par le jeu (%s) : plus en stock ? Il n'est plus utilise%s."
                             % (NOMS_PASSES[code], "code %s" % rep[1] if rep else "pas de reponse", ", on complete avec les autres" if dispo else ""))
                 continue
-            self._noter_etat(ai[4], ai[5])
+            self._noter_entree(ai)
             utilises.append(code)
             self.utilises[code] += 1
         if utilises:
@@ -474,7 +491,7 @@ class ModuleMontee(tours.ModuleTours):
             stock = ", ".join("%s : %d" % (NOMS_PASSES[c], self.stock[c]) for c in sorted(set(utilises), key=lambda c: -PASSES[c]) if c in self.stock)
             self._noter("   blocage de %s saute : %s en %.1f s -> %s%s." % (
                 duree(b0 or 0), texte_utilises({c: utilises.count(c) for c in set(utilises)}), self.horloge() - debut,
-                "tour attaquable" if b is not None and b <= 0 else "encore %s (avant la prochaine arrivee)" % duree(b),
+                "%s attaquable" % self.NOM_CIBLE if b is not None and b <= 0 else "encore %s (avant la prochaine arrivee)" % duree(b),
                 " (stock : %s)" % stock if stock else ""))
 
     # ------------------------------------------------------------------ salves
@@ -486,6 +503,14 @@ class ModuleMontee(tours.ModuleTours):
         if self.kid in (getattr(self.partage, "royaumes_bloques", None) or ()):
             self._attente_msg("defense", "En attente : chateau %s attaque (module defense), pas de nouvelle attaque." % DU_MONDE[self.kid])
             return 5
+        utiles = self._attaques_utiles()
+        if utiles is not None and utiles <= 0:
+            if not self.vol and not self.combats:   # rien en route et plus rien a gagner : la tour est au niveau vise
+                self._terminer(self._raison_fin(utiles))
+            if self.salve is not None and not self.salve.get("fermee"):
+                self.salve["fermee"] = True       # assez d'attaques en route pour le niveau vise : plus aucun depart
+                self._noter("   salve envoyee (%d attaque(s)) : %s, plus aucun depart." % (self.salve["lances"], self._texte_assez()))
+            return None
         if self.salve is not None and not self.salve.get("fermee") and not self._candidats():
             interdits = self._reserves()
             retours = [self.libre_a.get(p, 0) for p in self.cfg["commandants"]
@@ -517,8 +542,10 @@ class ModuleMontee(tours.ModuleTours):
                 await self._acheter_echelles([self.kid])   # entre deux salves seulement (jamais pendant les combats)
                 t = self.horloge()
             self.salve = {"lances": 0, "debut": t, "fermee": False}
-            self._noter("SALVE : %d commandant(s) pret(s) (%s) vers la tour %s (%d,%d)%s." % (
-                len(libres), ";".join(map(str, libres)), ROYAUMES[self.kid], self.x, self.y,
+            utiles = self._attaques_utiles()
+            self._noter("SALVE : %d commandant(s) pret(s) (%s) vers %s%s." % (
+                len(libres), ";".join(map(str, libres)), self._nom_cible(article=True),
+                self._texte_reste(utiles) if utiles is not None and utiles < len(libres) else
                 ", les autres la rejoignent a leur retour" if len(libres) < len(self.cfg["commandants"]) else ""))
         cands = self._candidats()
         if not cands:
@@ -543,9 +570,33 @@ class ModuleMontee(tours.ModuleTours):
             return b + 0.3                        # presque fini : on attend plutot que gacher un passe-temps
         return await self._attaquer(pos)
 
+    # ---- textes et regles propres a la cible (le module nomades les remplace)
+    def _nom_cible(self, article=False):
+        return "%stour %s (%d,%d)" % ("la " if article else "", ROYAUMES[self.kid], self.x, self.y)
+
+    def _raison_fin(self, utiles):
+        return "la tour est au %s" % self.texte_niveau(self.cible_v - utiles).split(" (")[0]
+
+    def _texte_assez(self):
+        return "assez d'attaques en route pour atteindre le niveau %d" % self.niveau_vise
+
+    def _texte_reste(self, utiles):
+        return " ; plus que %d victoire(s) pour le niveau %d : %d depart(s) seulement" % (utiles, self.niveau_vise, utiles)
+
+    def _verifier_objectif(self, ai):
+        """Juste avant un depart, avec l'etat relu de la cible : None = on peut partir, sinon secondes d'attente (ou arret)."""
+        if isinstance(ai[4], int) and ai[4] >= self.cible_v and not self.vol:
+            self._terminer("la tour est au %s" % self.texte_niveau(ai[4]).split(" (")[0])
+        if isinstance(ai[4], int) and ai[4] + len(self.vol) >= self.cible_v:
+            return 0.1                            # assez d'attaques en route pour le niveau vise : pas de depart en trop
+        return None
+
+    def _entree_cible(self, ai):
+        return [2, self.x, self.y, -1, ai[4], ai[5], self.kid]
+
     async def _attaquer(self, pos):
         kid, cx, cy = self.kid, self.sources[self.kid]["x"], self.sources[self.kid]["y"]
-        nom = "tour %s (%d,%d)" % (ROYAUMES[kid], self.x, self.y)
+        nom = self._nom_cible()
         rep = await self._demander_infos(cx, cy, self.x, self.y, kid, set())
         if rep and rep[1] == CODE_PAS_PRETE:
             return 1                              # pas encore liberee par le jeu (juste apres un saut) : nouvel essai dans 1 s
@@ -554,20 +605,23 @@ class ModuleMontee(tours.ModuleTours):
             self._noter("   %s : le jeu ne donne pas ses infos d'attaque (%s)." % (nom, "code %s" % rep[1] if rep else "pas de reponse"))
             if self.refus_de_suite >= REFUS_MAX:
                 self.refus_de_suite = 0
-                self._pause(PAUSE_PROBLEME, "le jeu refuse les attaques sur la tour %d fois de suite." % REFUS_MAX)
+                self._pause(PAUSE_PROBLEME, "le jeu refuse les attaques sur %s %d fois de suite." % (self.LA_CIBLE, REFUS_MAX))
             return 5
         adi = T.json_ou_none(rep[2]) or {}
         ai = (adi.get("gaa") or {}).get("AI")
         if not self._est_la_tour(ai):
-            raise ArretModule("ERREUR DE REGLAGE : %s n'est plus une tour attaquable (%s)." % (nom, str(ai)[:60]))
+            raise ArretModule("ERREUR DE REGLAGE : %s n'est plus attaquable (%s)." % (nom, str(ai)[:60]))
         if not self._ecouteur:
-            self._noter_etat(ai[4], ai[5])
+            self._noter_entree(ai)
         # l'etat de la tour vu par l'ecouteur est le plus recent : un combat peut avoir eu lieu juste apres la reponse adi (14/11)
         if self.combats or (self._blocage() or 0) > 0 or ai[5] > 0:
             return 0.1                            # combat juste arrive / tour bloquee : le saut passe d'abord, le depart ensuite
+        attente = self._verifier_objectif(ai)
+        if attente is not None:
+            return attente
         if isinstance((adi.get("gui") or {}).get("I"), list):
             self.echelles[kid] = combat.inventaire_depuis_adi(adi["gui"]["I"]).get(tours.ID_ECHELLE, 0)
-        tour = [2, self.x, self.y, -1, ai[4], ai[5], kid]
+        tour = self._entree_cible(ai)
         try:
             cra, info = self._construire(adi, pos, tour, kid, (cx, cy))
         except PlusDeSoldats as e:
@@ -612,8 +666,15 @@ class ModuleMontee(tours.ModuleTours):
             self._sauver_etat()
             return 0
         if self.combats or (self._blocage() or 0) > 0:
-            self._noter("   commandant %d : depart refuse, la tour venait d'etre bloquee par un combat ; il repart apres le saut." % pos)
+            self._noter("   commandant %d : depart refuse, %s venait d'etre bloque%s par un combat ; il repart apres le saut."
+                        % (pos, self.LA_CIBLE, "e" if self.LA_CIBLE.startswith("la ") else ""))
             return 0.1
+        if rep and rep[1] == tours.CODE_COMMANDANT_PRIS:     # commandant deja utilise (parti en dehors du bot) : pas une erreur
+            self.libre_a[pos] = self.horloge() + tours.COMMANDANT_PRIS
+            self._noter("   commandant %d : le jeu dit qu'il est deja utilise (parti en dehors du bot ?) ; mis de cote %s."
+                        % (pos, duree(tours.COMMANDANT_PRIS)))
+            self._sauver_etat()
+            return 1
         self.refus_de_suite += 1
         self.libre_a[pos] = self.horloge() + COMMANDANT_REFUSE
         self._noter("   REFUS : commandant %d -> %s : %s ; commandant mis de cote %s." % (

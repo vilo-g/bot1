@@ -49,7 +49,10 @@ VERIF_SOLDATS = 20                  # pendant une attaque : soldats du chateau r
 ALLIANCE_VALIDE = 600               # liste de l'alliance relue toutes les 10 min au plus
 PAUSE_CALME = 3                     # secondes entre deux passages sans attaque
 PAUSE_ATTAQUE = 1
-TYPE_ATTAQUE = 0                    # champ T d'un mouvement : 0 = attaque
+TYPE_ATTAQUE = 0                    # champ T d'un mouvement : 0 = attaque (une attaque du Khan a le type 20 : jamais traitee ici)
+ATTAQUANT_KHAN = -801               # attaquant d'une attaque du Khan (camp du Khan, zone 35) : ignoree aussi par securite
+ZONE_KHAN = 35
+KHAN_AVANT = 3                      # module Khan : on attend l'arrivee d'une attaque du Khan qui precede l'attaque du joueur
 TYPES_PAR_COMMANDANT = 10           # un envoi de soutien prend au plus 10 types de soldats (pas de limite de nombre)
 MIN_PAR_TYPE = 100                  # defaut : un type de soldat a moins de 100 n'est pas envoye
 ATTENTE_RETOURS = 120               # envoi principal : on attend les armees qui rentrent au moins 2 min avant l'attaque
@@ -296,6 +299,8 @@ class ModuleDefense:
             return
         if mv["t"] != TYPE_ATTAQUE or cid not in self.chateaux:
             return
+        if mv["oid"] == ATTAQUANT_KHAN or sa[:1] == [ZONE_KHAN]:
+            return                                       # attaque du Khan : defendue par le module Khan, pas une attaque de joueur
         arrivee = t + max(0, mv["tt"] - mv["pt"])
         a = self.attaques.get(mv["mid"])
         if a is not None:                      # mise a jour (le bailli precise l'attaque en approchant)
@@ -354,6 +359,14 @@ class ModuleDefense:
                 return False, None, None
             return True, None, None
         principal = cid not in self.vide_a
+        if principal:
+            # module Khan (16/11) : les attaques du Khan qui arrivent AVANT l'attaque du joueur sont defendues d'abord ; les
+            # soldats partent juste apres la derniere d'entre elles, s'il reste le temps de les envoyer avant le joueur.
+            sp = self.cfg.get("secondes_porte", SECONDES_PORTE)
+            khan = [k for k in (getattr(self.partage, "khan_arrivees", None) or {}).get(cid, [])
+                    if t < k + KHAN_AVANT and k + KHAN_AVANT <= prochaine - (sp + 15)]
+            if khan:
+                return False, None, None
         retours = [r for r in self.rentrees.values() if r["cid"] == cid and r["arrivee"] < arrivees[-1]]
         sp = self.cfg.get("secondes_porte", SECONDES_PORTE)
         limite = prochaine - (max(ATTENTE_RETOURS, sp + 10) if principal else FENETRE_FINALE)
@@ -382,6 +395,7 @@ class ModuleDefense:
         self.bloques_avant = bloques
         self.partage.royaumes_bloques.clear()
         self.partage.royaumes_bloques.update(bloques)
+        self.partage.chateaux_vides = set(self.envois)       # soldats partis a l'abri (module Khan : attaque du Khan perdue)
 
     # ------------------------------------------------------------------ passage
     async def cycle(self):

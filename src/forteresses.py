@@ -161,11 +161,8 @@ def questions_royaume(lire, sortie, kid, ancien=None):
                         for i in range(tours.NB_PRESELECTIONS_DEMANDEES)]
     else:
         sortie("[2] COTES A REMPLIR - royaume %s" % nom)
-        sortie("    F   = un flanc (toujours le GAUCHE)")
-        sortie("    FF  = les deux flancs (gauche + droit)")
-        sortie("    A   = l'avant (front) seulement")
-        sortie("    AF  = l'avant + un flanc (gauche)")
-        sortie("    AFF = l'avant + les deux flancs")
+        for ligne in tours.QUESTION_COTES:
+            sortie(ligne)
         b["cotes"] = demander(lire, sortie, "    > ", analyser_cotes)
     sortie("")
     sortie("[3] CHEVAL - royaume %s" % nom)
@@ -292,8 +289,7 @@ def lignes_reglages(b):
         l.append("mode : PRESELECTIONS  (vague 1 : %d, vague 2 : %d, vague 3 : %d, vague 4 et suivantes : %d)" % tuple(p[:4]))
         l.append("si une preselection n'a aucun soldat disponible : vague remplie avec le soldat le plus rapide, memes cotes")
     else:
-        l.append("mode : REMPLISSAGE AUTOMATIQUE, cotes %s (%s), soldat le plus rapide, sans echelles"
-                 % (b["cotes"], " + ".join(combat.NOMS_COTES[c] for c in combat.COTES[b["cotes"]])))
+        l.append("mode : REMPLISSAGE AUTOMATIQUE, cotes : %s, soldat le plus rapide, sans echelles" % combat.texte_cotes(b["cotes"]))
     if b["cheval"] == "CF":
         l.append("cheval : pieces puis plumes a partir de %s cases" % b["distance_plumes"])
     else:

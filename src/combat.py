@@ -288,8 +288,29 @@ def vers_paquet(vague):
 
 # ----------------------------------------------------------------------------- remplissage multi-cotes (module tours)
 # Lettres de l'utilisateur -> cotes de l'attaque. Le flanc unique est TOUJOURS le gauche.
-COTES = {"F": ("L",), "FF": ("L", "R"), "A": ("M",), "AF": ("M", "L"), "AFF": ("M", "L", "R")}
-NOMS_COTES = {"L": "flanc gauche", "R": "flanc droit", "M": "front"}
+# Cotes a remplir : n'importe quelle combinaison de L (flanc gauche), M (centre), R (flanc droit), ecrite dans cet ordre :
+# "L", "R", "LR", "LMR"... (15/11 : trois cases dans l'interface). Les anciens codes (F, FF, A, AF, AFF) restent lus.
+ANCIENS_COTES = {"F": "L", "FF": "LR", "A": "M", "AF": "LM", "AFF": "LMR"}
+COTES = {code: tuple(code) for code in ("L", "M", "R", "LM", "LR", "MR", "LMR")}
+COTES.update({ancien: COTES[code] for ancien, code in ANCIENS_COTES.items()})
+NOMS_COTES = {"L": "flanc gauche", "R": "flanc droit", "M": "centre"}
+
+
+def normaliser_cotes(valeur):
+    """Code de cotes -> forme rangee ("L", "MR", "LMR"...), ancien code converti ; None si illisible ou vide."""
+    if not isinstance(valeur, str):
+        return None
+    t = valeur.strip().upper()
+    t = ANCIENS_COTES.get(t, t)
+    if not t or len(set(t)) != len(t) or not set(t) <= set("LMR"):
+        return None
+    return "".join(c for c in "LMR" if c in t)
+
+
+def texte_cotes(valeur):
+    """'flanc gauche + flanc droit'..."""
+    code = normaliser_cotes(valeur) or ""
+    return " + ".join(NOMS_COTES[c] for c in code) or "?"
 
 
 def plafond_cote(cote, niveau_cible, bonus_flanc=0, bonus_front=0):
@@ -332,11 +353,48 @@ def remplir_cotes(stock, unite, cotes, niveau_cible, nb_vagues, nb_echelles=0, i
     return vagues, stock, manques
 
 
+def repartir(stock, ordre, voulu, cases, deja=()):
+    """Choisit les piles d'un cote : jusqu'a `voulu` soldats pris dans les unites de `ordre` (priorite dans cet ordre), avec au
+    plus `cases` NOUVELLES cases ; une unite de `deja` (deja sur ce cote) est augmentee sans prendre de case.
+    Regle : d'abord remplir le cote le plus possible avec les cases qu'il a, puis, a remplissage egal, prendre les unites dans
+    l'ordre de priorite (17/11 : soldats a niveaux, le plus haut niveau d'abord). Ex. 2 cases, 300 soldats voulus, en stock
+    5 niv. 10 + 20 niv. 9 + 900 niv. 8 : 5 niv. 10 puis 295 niv. 8 (et pas 5 + 20 = 25 soldats seulement).
+    Retourne [(unite, quantite)] dans l'ordre de prise ; le stock n'est pas modifie."""
+    deja = set(deja)
+    cands = []
+    for w in ordre:
+        if w not in cands and stock.get(w, 0) > 0:
+            cands.append(w)
+
+    def capacite(pool, k):          # maximum de soldats pris dans `pool` avec k nouvelles cases
+        libres = sum(stock[w] for w in pool if w in deja)
+        autres = sorted((stock[w] for w in pool if w not in deja), reverse=True)
+        return libres + sum(autres[:max(k, 0)])
+    but = min(voulu, capacite(cands, cases))
+    pris, total = [], 0
+    while total < but and cands:
+        for w in cands:
+            k = cases - (0 if w in deja else 1)
+            if k < 0:
+                continue
+            q = min(but - total, stock[w])
+            if total + q + capacite([x for x in cands if x != w], k) >= but:
+                break
+        else:
+            break
+        pris.append((w, q))
+        total += q
+        cands.remove(w)
+        cases = k
+    return pris
+
+
 def remplir_cotes_complets(stock, ordre, cotes, niveau_cible, nb_vagues, bonus_flanc=0, bonus_front=0, nb_echelles=0,
                            id_echelle=614):
     """Comme remplir_cotes, mais avec PLUSIEURS unites : chaque cote recoit le plafond de la cible, avec la 1re unite de
     `ordre` (la plus rapide), completee par la suivante si elle manque, etc. Au plus 2 unites differentes par flanc et 6 au
-    front (cases du jeu). Retourne (vagues, stock_restant, manques, unites_utilisees)."""
+    front (cases du jeu) : si les cases ne suffisent pas avec cet ordre, les piles sont choisies pour remplir le cote au mieux
+    (voir repartir). Retourne (vagues, stock_restant, manques, unites_utilisees)."""
     stock = dict(stock)
     manques, vagues, utilisees = [], [], []
     for n in range(nb_vagues):
@@ -345,17 +403,13 @@ def remplir_cotes_complets(stock, ordre, cotes, niveau_cible, nb_vagues, bonus_f
             if c not in cotes:
                 continue
             voulu = plafond_cote(c, niveau_cible, bonus_flanc, bonus_front)
-            reste, cases = voulu, NB_CASES[(c, "U")]
-            for wid in ordre:
-                if reste <= 0 or len(vague[c]["U"]) >= cases:
-                    break
-                q = min(reste, stock.get(wid, 0))
-                if q > 0:
-                    stock[wid] -= q
-                    reste -= q
-                    vague[c]["U"].append([wid, q])
-                    if wid not in utilisees:
-                        utilisees.append(wid)
+            reste = voulu
+            for wid, q in repartir(stock, ordre, voulu, NB_CASES[(c, "U")]):
+                stock[wid] -= q
+                reste -= q
+                vague[c]["U"].append([wid, q])
+                if wid not in utilisees:
+                    utilisees.append(wid)
             if reste > 0:
                 manques.append("vague %d, %s : %d soldats au lieu de %d (plus assez de soldats offensifs en stock)"
                                % (n + 1, NOMS_COTES[c], voulu - reste, voulu))
@@ -464,10 +518,15 @@ def appliquer_preselection(groupes, stock, niveau, outil_ok=None):
 
 
 def ordre_complement(stock, unites, kid=None, secours=None):
-    """Unites pour completer une presélection : l'unite de remplacement choisie d'abord, puis les unites offensives A DISTANCE
-    du chateau (la plus forte attaque d'abord), puis celles de CORPS A CORPS (la plus forte d'abord). Seulement celles en stock
-    et autorisees a voyager dans ce royaume. Sans fichier des unites : seulement l'unite de remplacement."""
-    ordre = [secours] if secours is not None and stock.get(secours, 0) > 0 else []
+    """Unites pour completer une presélection : l'unite de remplacement choisie d'abord (un numero, ou la liste de ses niveaux du
+    plus haut au plus bas), puis les unites offensives A DISTANCE du chateau (la plus forte attaque d'abord), puis celles de
+    CORPS A CORPS (la plus forte d'abord). Seulement celles en stock et autorisees a voyager dans ce royaume. Sans fichier des
+    unites : seulement l'unite de remplacement."""
+    secours = [] if secours is None else [secours] if isinstance(secours, int) else list(secours)
+    ordre = []
+    for w in secours:
+        if stock.get(w, 0) > 0 and w not in ordre:
+            ordre.append(w)
     if not unites:
         return ordre
 
@@ -496,14 +555,9 @@ def completer_preselection(vague, groupes, stock, niveau, ordre, nb_echelles=0, 
         manque = voulu - place
         if manque <= 0:
             continue
-        for wid in ordre:
-            if manque <= 0:
-                break
-            dispo = stock.get(wid, 0)
+        presents = [pl[0] for pl in vague[cote]["U"]]
+        for wid, q in repartir(stock, ordre, manque, NB_CASES[(cote, "U")] - len(presents), deja=presents):
             pile = next((pl for pl in vague[cote]["U"] if pl[0] == wid), None)
-            if dispo <= 0 or (pile is None and len(vague[cote]["U"]) >= NB_CASES[(cote, "U")]):
-                continue
-            q = min(manque, dispo)
             stock[wid] -= q
             manque -= q
             if pile is not None:

@@ -93,6 +93,10 @@ input.faux{border-color:var(--err)}
 .segment button{all:unset;cursor:pointer;padding:6px 12px;border-radius:7px;color:#c2c9d6;font-size:13px;white-space:nowrap}
 .segment button:hover{background:var(--panel3)}
 .segment button.on{background:var(--accent);color:#1b1206;font-weight:600}
+.segment.cotes button{display:inline-flex;align-items:center;gap:7px}
+.segment.cotes .coche{width:12px;height:12px;border-radius:3px;border:1.5px solid #8b95a7;box-sizing:border-box;flex:none}
+.segment.cotes button.on .coche{border-color:#1b1206;background:#1b1206 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.2 2.2 4.8-5' fill='none' stroke='%23e3a94e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px no-repeat}
+.aide-cotes{color:var(--muted);font-size:12px}.aide-cotes.alerte{color:#ff8e7e}
 .interrupteur{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;color:var(--text);font-size:13px}
 .interrupteur input{display:none}
 .interrupteur i{width:38px;height:22px;border-radius:20px;background:var(--panel3);border:1px solid var(--line2);position:relative;transition:.15s}
@@ -127,6 +131,7 @@ input.faux{border-color:var(--err)}
 .soldat img,.soldat .sans-image{width:46px;height:52px;object-fit:contain;flex:none;border-radius:8px;background:radial-gradient(circle at 50% 35%,#2b3445,#1a202b)}
 .sans-image{display:grid;place-items:center;color:var(--dim);font-size:12px}
 .soldat .infos{display:flex;flex-direction:column;min-width:0;flex:1}.soldat .infos small{color:var(--muted);font-size:11.5px}
+.soldat .infos .niveaux{align-self:flex-start;margin-top:3px;font-size:10.5px}
 .soldat .actions{display:flex;gap:4px}
 .soldat .actions button{all:unset;cursor:pointer;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;color:var(--muted);background:var(--panel3)}
 .soldat .actions button:hover{color:var(--text);background:var(--line2)}
@@ -195,9 +200,141 @@ input.faux{border-color:var(--err)}
 .recrue b{flex:1;font-weight:500}
 .recrue img{width:40px;height:40px;object-fit:contain;flex:none;background:#fff;border-radius:8px;padding:2px}
 .choix-passes{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.engins-ev{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
+.bloc-engins{border:1px solid var(--line2);border-radius:12px;padding:12px 14px;background:var(--panel2);display:grid;gap:8px;align-content:start}
+.bloc-engins .tete{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.bloc-engins .tete b{font-size:14px}.bloc-engins .tete small{color:var(--muted);font-variant-numeric:tabular-nums}
+.bloc-engins .tete small.trop{color:#ff8e7e;font-weight:600}
+.bloc-engins .engin{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;position:relative}
+.bloc-engins .engin input{width:100%;min-width:0}
+.choix-engin{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--panel);color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.choix-engin:hover,.choix-engin[aria-expanded=true]{border-color:var(--accent)}
+.choix-engin img,.grille-engins img{width:40px;height:40px;object-fit:contain;flex:none}
+.choix-engin .vide{color:var(--muted)}.choix-engin .fleche{margin-left:auto;color:var(--muted);font-size:11px}
+.choix-engin b,.grille-engins b{font-size:13px;font-variant-numeric:tabular-nums}
+.grille-engins{position:absolute;z-index:30;top:calc(100% + 4px);left:0;display:grid;grid-template-columns:repeat(3,76px);gap:6px;padding:10px;border:1px solid var(--line2);border-radius:12px;background:var(--panel);box-shadow:0 14px 34px rgba(0,0,0,.5)}
+.grille-engins button{display:grid;justify-items:center;gap:2px;padding:6px 2px;border:1px solid transparent;border-radius:9px;background:none;color:var(--text);font:inherit;cursor:pointer}
+.grille-engins button:hover{border-color:var(--line2);background:var(--panel2)}.grille-engins button.on{border-color:var(--accent)}
+.grille-engins button.pris{opacity:.3;cursor:not-allowed}.grille-engins .aucun{grid-column:1/-1;display:block;padding:7px;color:var(--muted);font-size:13px}
+#choix-modules label.bloque{opacity:.45;cursor:not-allowed}
+.pave-ev{display:flex;align-items:center;gap:14px;width:100%;padding:0;border:0;background:none;color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.pave-ev img{width:54px;height:54px;object-fit:contain;flex:none}.pave-ev h2{margin:0}
+.pave-ev small{display:block;color:var(--muted);margin-top:3px}
+.pave-ev .fleche{margin-left:auto;color:var(--muted);font-size:13px;transition:transform .15s}.pave-ev[aria-expanded=true] .fleche{transform:rotate(180deg)}
+.corps-ev{margin-top:14px}.corps-ev[hidden]{display:none}
 .passe{display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line2);border-radius:9px;cursor:pointer;font-weight:500;user-select:none}
 .passe.on{border-color:var(--accent);background:var(--accentbg)}
 .passe input{accent-color:var(--accent);margin:0}
+.grille-engins.large{grid-template-columns:repeat(2,160px)}
+.grille-engins .nom-engin{font-size:12px;line-height:1.2;text-align:center;padding:2px 4px}
+.choix-engin .nom-engin{font-size:13px;line-height:1.2}
+.plateau-def{display:grid;gap:10px;max-width:880px}
+.cols-def{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:10px}
+@media (max-width:900px){.cols-def{grid-template-columns:1fr}}
+.col-def{border:1px solid var(--line2);border-radius:12px;padding:10px;background:linear-gradient(180deg,#2a2419,var(--panel2));display:grid;gap:8px;align-content:start;justify-items:start}
+.col-def.centre{border-color:color-mix(in srgb,var(--accent) 55%,var(--line2))}
+.tete-def{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%}
+.tete-def b{font-size:13px}
+.pct{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.pct input{width:52px !important;padding:4px 6px;text-align:center}
+.tuiles{display:grid;grid-template-columns:repeat(4,56px);gap:5px}
+.tuiles.portes{grid-template-columns:repeat(2,56px);justify-content:center;width:100%}
+.tuiles.cinq{grid-template-columns:56px auto;align-items:center;gap:8px}.tuiles.cinq small{color:var(--muted);font-size:11px}
+.place-tuile{position:relative}
+.tuile{position:relative;width:56px;height:56px;padding:3px;border:1px solid #6b5a3a;border-radius:8px;background:radial-gradient(circle at 50% 35%,#4a3f2c,#231d14);color:var(--text);cursor:pointer;display:grid;place-items:center;overflow:hidden}
+.tuile:hover{border-color:var(--accent)}
+.tuile.porte{border-color:#c9963f;box-shadow:inset 0 0 0 1px rgba(227,169,78,.35)}
+.tuile.eau{background:radial-gradient(circle at 50% 35%,#2b4256,#152230);border-color:#3e6a8a}
+.tuile.vide .plus{color:#8a7a5a;font-size:18px}.tuile.vide.porte .plus{font-size:11px;color:var(--accent)}
+.tuile.manque{border-color:#ff8e7e}
+.tuile img{width:48px;height:48px;object-fit:contain}
+.tuile .court{font-size:10px;line-height:1.1;text-align:center;font-weight:600;word-break:break-word}
+.tuile .qte{position:absolute;right:2px;bottom:1px;font-style:normal;font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
+.tuile.manque .qte{color:#ff8e7e}
+.pop-def{position:absolute;z-index:40;top:62px;left:0;width:300px;display:grid;gap:8px;padding:10px;border:1px solid var(--line2);border-radius:12px;background:var(--panel);box-shadow:0 14px 34px rgba(0,0,0,.55)}
+.pop-def .choix{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.pop-def .choix button{display:grid;justify-items:center;gap:2px;padding:6px 4px;border:1px solid var(--line2);border-radius:9px;background:var(--panel2);color:var(--text);font:inherit;cursor:pointer}
+.pop-def .choix button.on,.pop-def .choix button:hover{border-color:var(--accent)}
+.pop-def .choix img{width:40px;height:40px;object-fit:contain}.pop-def .choix .court{font-size:11px;font-weight:600}
+.pop-def .choix small{font-size:11px;text-align:center}.pop-def .choix b{font-size:10px;color:var(--muted);font-weight:500;text-align:center}
+.pop-def input{width:110px}
+.melee-def{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;width:100%;font-size:11px}
+.melee-def input[type=range]{width:100%;min-width:50px;accent-color:var(--accent)}
+.melee-def .bout{display:grid;justify-items:center;line-height:1.15;color:var(--muted);white-space:nowrap}
+.melee-def .bout b{font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
+.melee-def .bout.dist b{color:#7fc4ff}.melee-def .bout.mel b{color:#ffb27a}
+.douves-def{display:flex;align-items:center;gap:8px;border-top:1px dashed var(--line2);padding-top:8px;width:100%}
+.douves-def small{color:#7fb2d6;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.bas-def{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.col-def.cour .tuiles{grid-template-columns:repeat(3,56px)}
+.legende-def{display:grid;gap:4px;font-size:12px;color:var(--muted);padding-top:6px}
+.total-def{font-size:13px;color:var(--ok);font-weight:600}.total-def.trop{color:#ff8e7e}
+.secours-def{display:flex;gap:16px;flex-wrap:wrap}
+.cols-def>.col-def:last-child .pop-def{left:auto;right:0}
+.secours-un{display:flex;align-items:center;gap:8px}.secours-un small{color:var(--muted)}
+.volet{border:1px solid var(--line2);border-radius:14px;background:var(--panel2);overflow:hidden;margin:4px 0}
+.volet-tete{width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;border:0;background:transparent;color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.volet-tete:hover{background:rgba(255,255,255,.03)}
+.volet-icone{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:rgba(227,169,78,.14);color:var(--accent);font-size:15px;flex:none}
+.volet-titre{display:grid;gap:2px;flex:1;min-width:0}.volet-titre small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.volet .chevron{font-size:22px;color:var(--muted);transition:transform .2s ease;line-height:1}
+.volet.ouvert .chevron{transform:rotate(90deg);color:var(--accent)}
+.volet-corps{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
+.volet.ouvert .volet-corps{grid-template-rows:1fr}
+.volet-corps>div{overflow:hidden}
+.volet-lignes{padding:0 14px 10px;border-top:1px solid var(--line2)}
+.carte-def{border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line2));border-radius:14px;padding:14px;margin:8px 0;
+  background:linear-gradient(160deg,rgba(227,169,78,.08),transparent 55%),var(--panel2);display:grid;gap:12px}
+.carte-def-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.carte-def-tete>div{display:grid;gap:3px}.carte-def-tete small{color:var(--muted);font-size:12px}
+.puce.err{background:rgba(255,142,126,.14);color:#ff8e7e;border-color:rgba(255,142,126,.35)}
+.mini-def{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mini-cote{border:1px solid var(--line2);border-radius:10px;padding:7px 8px;background:rgba(0,0,0,.18);display:grid;gap:5px}
+.mini-cote.centre{border-color:color-mix(in srgb,var(--accent) 40%,var(--line2))}
+.mini-cote small{color:var(--muted);font-size:11px}
+.mini-cases{display:flex;flex-wrap:wrap;gap:3px}
+.mini-case{width:24px;height:24px;border-radius:5px;border:1px solid #5b4c31;background:#2a2318;display:grid;place-items:center;font-style:normal;font-size:9px;color:var(--muted);overflow:hidden}
+.mini-case img{width:22px;height:22px;object-fit:contain}.mini-case.vide{opacity:.45}
+.carte-def-infos{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted)}
+.ouvrir-def{justify-self:start}
+@media (max-width:700px){.mini-def{grid-template-columns:1fr}}
+body.sans-defilement{overflow:hidden}
+.modal.modal-def{width:min(1060px,calc(100vw - 24px));max-height:calc(100vh - 32px);display:grid;grid-template-rows:auto 1fr auto;padding:0;overflow:hidden}
+.modal-def .tete-modal{padding:16px 18px;border-bottom:1px solid var(--line2);margin:0}
+.corps-modal-def{overflow:auto;padding:16px 18px;display:grid;gap:14px;align-content:start}
+.section-def{border:1px solid var(--line2);border-radius:14px;padding:12px 14px;background:var(--panel2)}
+.section-def h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px}
+.section-def h3 span{color:var(--accent)}
+.deux-def{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.deux-def>div{display:grid;gap:14px}
+@media (max-width:820px){.deux-def{grid-template-columns:1fr}}
+.pied-modal-def{border-top:1px solid var(--line2);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel)}
+.actions-def{display:flex;align-items:center;gap:12px;margin-left:auto}
+.erreurs-def{margin:0;padding-left:18px;color:#ff8e7e;font-size:12px;max-height:72px;overflow:auto}
+#kd{display:grid;gap:14px}
+.vide-kd{padding:18px}
+.kd-tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kd-tuile{border:1px solid var(--line2);border-radius:14px;padding:12px 14px;background:var(--panel2);display:grid;gap:4px;align-content:start}
+.kd-tuile small{color:var(--muted);font-size:12px}.kd-tuile>b{font-size:20px;font-variant-numeric:tabular-nums}.kd-tuile>span{color:var(--muted);font-size:12px}
+.kd-barre{height:8px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}.kd-barre i{display:block;height:100%;background:linear-gradient(90deg,#c0392b,#ff8a3d,#ffd36b);border-radius:99px}
+.kd-tuile.khans{grid-column:span 2}@media (max-width:700px){.kd-tuile.khans{grid-column:auto}}
+.kd-liste{display:flex;flex-wrap:wrap;gap:6px}
+.kd-khan{display:flex;gap:8px;align-items:center;border:1px solid var(--line2);border-radius:99px;padding:4px 10px;font-size:12px;background:var(--panel)}
+.kd-khan span{color:var(--muted)}.kd-khan b{font-variant-numeric:tabular-nums}.kd-khan.proche{border-color:#ff8a3d;color:#ffb27a}
+.kd-section{border:1px solid var(--line2);border-radius:14px;padding:12px 14px;background:var(--panel)}
+.kd-section h3{margin:0 0 10px;font-size:14px}
+.kd-titre{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.kd-titre small{color:var(--muted);font-size:12px}
+.tuile.kd{cursor:default}.tuile.kd .plus{color:#5b4c31}
+.kd-parts{display:flex;justify-content:space-between;width:100%;font-size:12px;font-weight:600}.kd-parts .d{color:#7fc4ff}.kd-parts .m{color:#ffb27a}
+.kd-stock,.kd-soldats{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.kd-engin,.kd-soldat{display:flex;align-items:center;gap:10px;border:1px solid var(--line2);border-radius:12px;padding:8px 10px;background:var(--panel2)}
+.kd-engin img,.kd-soldat img{width:40px;height:40px;object-fit:contain;flex:none}
+.kd-engin>div,.kd-soldat>div{display:grid;gap:1px;min-width:0}.kd-engin small,.kd-soldat small{color:var(--muted);font-size:11px}
+.kd-engin b,.kd-soldat b{font-size:16px;font-variant-numeric:tabular-nums}.kd-engin span,.kd-soldat span{color:var(--muted);font-size:11px}
+.kd-engin.bas{border-color:#ff8a3d}.kd-engin.bas b{color:#ffb27a}
+.kd-soldat.autres{grid-column:1/-1}
+.cout-rubis{color:var(--muted);font-weight:600}.cout-rubis.on{color:#ff6b8a}
+.niveaux{font-size:11px;color:var(--accent);border:1px solid rgba(227,169,78,.4);border-radius:999px;padding:1px 7px;white-space:nowrap}
 .sessions{display:flex;flex-direction:column;gap:8px}
 .session{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)) 30px;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 14px}
 .session.en-cours{border-color:var(--ok);background:var(--okbg)}
@@ -208,6 +345,11 @@ input.faux{border-color:var(--err)}
 .chiffres{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:18px}
 .chiffre{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
 .chiffre small{color:var(--muted);display:block}.chiffre b{font-size:24px;font-variant-numeric:tabular-nums}
+.chiffre .par-royaume{display:grid;gap:3px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.chiffre .par-royaume div{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+.chiffre .par-royaume i{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.chiffre .par-royaume b{font-size:12.5px;color:var(--text);font-weight:600}
+@media (min-width:560px){ .chiffre.large{grid-column:span 2} }
 .choix-module{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .choix-module label{cursor:pointer;border:1px solid var(--line2);border-radius:12px;padding:14px;background:var(--panel2);display:flex;gap:12px;align-items:flex-start}
 .choix-module label.on{border-color:var(--accent);background:linear-gradient(135deg,var(--accentbg),var(--panel2) 70%)}
@@ -249,6 +391,8 @@ input.faux{border-color:var(--err)}
       <div class="titre">Modules</div>
       <button data-page="tours"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21V10L6 8V4h3v2h2V4h2v2h2V4h3v4l-2 2v11"/><path d="M5 21h14M11 21v-4a1 1 0 0 1 2 0v4"/></svg>Tours<span class="pastille" id="p-tours">-</span></button>
       <button data-page="montee"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21V11L4 9V5h3v2h2V5h2v2h2V5h0"/><path d="M4 21h11M9 21v-3a1 1 0 0 1 2 0v3"/><path d="M18 21V8M15 11l3-3 3 3"/></svg>Tours lev max<span class="pastille" id="p-montee">-</span></button>
+      <button data-page="evenements"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 20h18M5 20l7-15 7 15M8.5 13h7"/><path d="M12 5V2.5l3 1.2-3 1.3"/></svg>Événements<span class="pastille" id="p-evenements">-</span></button>
+      <button data-page="khan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21V4l8 3 8-3v17"/><path d="M4 12l8 3 8-3"/></svg>Khan<span class="pastille" id="p-khan">-</span></button>
       <button data-page="forteresses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V11h3V8h3v3h6V8h3v3h3v10"/><path d="M3 21h18M10 21v-4h4v4M12 3v5M12 3l4 1.5L12 6"/></svg>Forteresses<span class="pastille" id="p-forteresses">-</span></button>
       <button data-page="achats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4"/><path d="M3 10.5v4c0 1.4 2.7 2.5 6 2.5 1 0 2-.1 2.8-.3"/><circle cx="17" cy="16" r="4.5"/><path d="M17 14v4M15 16h4"/></svg>Achats<span class="pastille" id="p-achats">-</span></button>
       <button data-page="defense"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Défense<span class="pastille" id="p-defense">-</span></button>
@@ -257,6 +401,7 @@ input.faux{border-color:var(--err)}
       <button data-page="materiaux"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>Matériaux<span class="pastille" id="p-materiaux">-</span></button>
       <div class="titre">Suivi</div>
       <button data-page="journal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>Journal</button>
+      <button data-page="khan-direct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5l3 2"/></svg>Khan en direct</button>
     </div>
     <div class="pied"><span class="point" id="pied-point"></span><span id="pied-texte">Bot arrêté</span></div>
   </nav>
@@ -281,11 +426,6 @@ input.faux{border-color:var(--err)}
           <div class="chiffres" id="chiffres"></div>
         </div>
         <div class="carte">
-          <h2>Sessions</h2>
-          <p class="aide">Durée, pièces et rubis gagnés à chaque session (les dépenses du bot ne sont pas retirées). Les 10 dernières sont gardées.</p>
-          <div class="sessions" id="sessions"></div>
-        </div>
-        <div class="carte">
           <h2>Lancer le bot</h2>
           <p class="aide">Une seule connexion au compte : les modules choisis tournent ensemble. Les forteresses passent toujours avant les tours.</p>
           <div class="choix-module" id="choix-modules"></div>
@@ -304,6 +444,11 @@ input.faux{border-color:var(--err)}
           <ul class="erreurs" id="l-erreurs"></ul>
           <p class="aide" style="margin:16px 0 0">Au démarrage, une fenêtre noire s'ouvre pour le bot : mot de passe seulement si la session a expiré,
             puis les modules attaquent tout seuls, sans rien demander. Arrêter proprement = déconnexion du compte en quelques secondes.</p>
+        </div>
+        <div class="carte">
+          <h2>Sessions</h2>
+          <p class="aide">Durée, pièces et rubis gagnés à chaque session (les dépenses du bot ne sont pas retirées). Les 10 dernières sont gardées.</p>
+          <div class="sessions" id="sessions"></div>
         </div>
         <div class="carte" id="carte-maj">
           <h2>Version du bot</h2>
@@ -382,6 +527,28 @@ input.faux{border-color:var(--err)}
       </section>
 
       <!-- ===================== TOURS LEV MAX -->
+      <section class="page" id="page-evenements">
+        <div class="carte">
+          <button type="button" class="pave-ev" id="ev-pave-nomades" aria-expanded="false" aria-controls="ev-corps-nomades">
+            <img id="ev-logo-nomades" alt="" hidden><span><h2>Nomades</h2><small id="ev-resume-nomades"></small></span><span class="fleche">▼</span></button>
+          <div class="corps-ev" id="ev-corps-nomades" hidden>
+          <p class="aide">Le bot attaque en boucle un camp nomade, par salves avec les commandants choisis ici (4,2 s d'écart entre deux départs).
+            Tant que le camp n'a pas de délai, les salves s'enchaînent ; à son dernier niveau, le bot saute le délai du camp avec les passe-temps
+            cochés juste après chaque victoire, puis relance. Jamais de rubis.</p>
+          <p class="aide">Coche <b>Événements</b> dans le tableau de bord. Le module tours ne prend jamais ces commandants tant que ce module tourne ;
+            le module forteresses peut en garder un avant une forteresse, il revient ensuite dans la boucle.</p>
+          <div id="ev-nomades" style="margin-top:14px;display:grid;gap:14px"></div>
+          </div>
+          <div id="ev-progres"></div>
+        </div>
+        <div class="carte">
+          <h2>Samouraïs, Étrangers, Corbeaux de sang</h2>
+          <p class="aide" style="margin:0">Pas encore disponibles : ils seront ajoutés ici, chacun avec ses réglages.</p>
+        </div>
+        <div class="barre"><div class="msg" id="ev-msg">Aucune modification.</div>
+          <button class="bouton" id="ev-annuler">Annuler</button><button class="bouton principal" id="ev-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="ev-erreurs"></ul>
+      </section>
       <section class="page" id="page-montee">
         <div class="carte">
           <h2>Monter une tour au niveau max</h2>
@@ -398,7 +565,7 @@ input.faux{border-color:var(--err)}
           </div>
           <div class="grille g3" style="margin-top:12px">
             <label class="champ">Commandants dédiés<input type="text" id="mt-cmd" placeholder="ex. 20;21;22;23"></label>
-            <label class="champ">Niveau visé<input type="number" id="mt-niveau" min="1" max="90"></label>
+            <label class="champ">Niveau visé<input type="number" id="mt-niveau" min="1" max="71"></label>
             <div class="champ">Passe-temps à utiliser<div class="choix-passes" id="mt-passes"></div></div>
           </div>
           <p class="aide" id="mt-info" style="margin:10px 0 0"></p>
@@ -570,6 +737,30 @@ input.faux{border-color:var(--err)}
         </div>
         <div class="journal-page"><div class="lignes" id="j-lignes"></div></div>
       </section>
+
+
+      <!-- ===================== KHAN (module a part, 16/11) -->
+      <section class="page" id="page-khan">
+        <div class="carte">
+          <button type="button" class="pave-ev" id="ev-pave-khan" aria-expanded="true" aria-controls="ev-corps-khan">
+            <img id="ev-logo-khan" alt="" hidden><span><h2>Khan</h2><small id="ev-resume-khan"></small></span><span class="fleche">▼</span></button>
+          <div class="corps-ev" id="ev-corps-khan" hidden>
+          <p class="aide">Le bot attaque le camp du Khan de ton alliance (il le trouve tout seul) avec des bannières de rage, juste ce qu'il faut pour
+            remplir ta barre de rage. Le délai du camp est sauté avec les passe-temps cochés. Jamais de rubis.</p>
+          <p class="aide">Coche <b>Khan</b> dans le tableau de bord. C'est un module à lui seul : il ne tourne pas avec les tours, les forteresses,
+            les tours lev max ni les nomades ; défense, recrutement, matériaux, achats et transferts peuvent tourner avec lui, seulement quand il n'a rien à faire. Avec « Déclencher le Khan », le bot garde le nombre d'attaques du Khan choisi en route
+            vers ton château principal, règle ta défense comme ci-dessous pendant toute la durée, puis remet ta défense du début à l'objectif.</p>
+          <div id="ev-khan" style="margin-top:14px;display:grid;gap:14px"></div>
+          </div>
+          <div id="ev-progres-khan"></div>
+        </div>
+        <div class="barre"><div class="msg" id="kh-msg">Aucune modification.</div>
+          <button class="bouton" id="kh-annuler">Annuler</button><button class="bouton principal" id="kh-enregistrer">Enregistrer</button></div>
+        <ul class="erreurs" id="kh-erreurs"></ul>
+      </section>
+
+      <!-- ===================== KHAN EN DIRECT -->
+      <section class="page" id="page-khan-direct"><div id="kd"></div></section>
     </div>
   </main>
 
@@ -580,12 +771,28 @@ input.faux{border-color:var(--err)}
 const $ = s => document.querySelector(s);
 const NOMS = {0:"vert",1:"sables",2:"glacier",3:"feu"};
 const COULEURS = {0:"var(--k0)",1:"var(--k1)",2:"var(--k2)",3:"var(--k3)"};
-const COTES = [["F","Flanc gauche"],["FF","Deux flancs"],["A","Avant"],["AF","Avant + flanc"],["AFF","Avant + 2 flancs"]];
+// côtés où mettre les soldats : trois cases, n'importe quelle combinaison (code rangé "L", "MR", "LMR"...)
+const COTES = [["L","Flanc gauche"],["M","Centre"],["R","Flanc droit"]];
+const ANCIENS_COTES = {F:"L", FF:"LR", A:"M", AF:"LM", AFF:"LMR"};
+function codeCotes(v){ const t = ANCIENS_COTES[v] || String(v || ""); return "LMR".split("").filter(c => t.includes(c)).join(""); }
+function texteCotes(v){ const c = codeCotes(v); return c.length === 3 ? "3 côtés" : c.split("").map(x => ({L:"gauche", M:"centre", R:"droit"})[x]).join(" + "); }
+function choixCotes(valeur, choisir){
+  const actuel = codeCotes(valeur);
+  const boite = el("div",{class:"segment cotes"}, COTES.map(([c, t]) => el("button",{class: actuel.includes(c) ? "on" : "", type:"button",
+    "aria-pressed": actuel.includes(c) ? "true" : "false",
+    onclick:() => {
+      const n = actuel.includes(c) ? actuel.replace(c, "") : actuel + c;
+      if(!n){ aide.textContent = "Au moins un côté."; aide.classList.add("alerte"); return; }   // jamais aucun côté
+      choisir(codeCotes(n));
+    }}, el("i",{class:"coche"}), t)));
+  const aide = el("small",{class:"aide-cotes"}, "un ou plusieurs");
+  return el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"}, boite, aide);
+}
 const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
-const VERSION = "2026-11-14-levmax";     // doit etre egale a VERSION dans interface.py
+const VERSION = "2026-11-17-reliques1";     // doit etre egale a VERSION dans interface.py
 let serveur = null;            // dernier /api/etat
-const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null, recrutement:null, materiaux:null, montee:null};      // formulaires en cours
-const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false, recrutement:false, materiaux:false, montee:false};
+const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null, recrutement:null, materiaux:null, montee:null, evenements:null};      // formulaires en cours
+const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false, recrutement:false, materiaux:false, montee:false, evenements:false, khan:false};
 
 async function api(chemin, corps){
   const opt = corps === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-GGE-Bot":"1"}, body:JSON.stringify(corps)};
@@ -612,25 +819,29 @@ function cmdListe(t){ return String(t||"").split(";").map(x=>x.trim()).filter(x=
 /* ------------------------------------------------------------------ navigation */
 const TITRES = {accueil:["Tableau de bord","Lancer le bot et suivre ce qu'il fait"], compte:["Compte","Nom du compte et mot de passe, gardés sur ce PC"], tours:["Module tours","Réglages enregistrés dans config.json (rubrique tours)"],
   montee:["Module Tours lev max","Monter une tour au niveau max (rubrique montee)"],
+  evenements:["Module Événements","Les événements qui s'enchaînent : nomades (rubrique evenements)"],
+  khan:["Module Khan","Attaque du camp du Khan, déclenchement et défense de ton château principal (rubrique evenements.khan)"],
   forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"],
   achats:["Module achats","Dépenser le surplus de pièces en engins (rubrique achats)"],
   defense:["Module défense","Mettre les soldats à l'abri quand un château est attaqué (rubrique defense)"],
   transferts:["Module transferts","Répartir les ressources entre les royaumes (rubrique transferts)"],
   recrutement:["Module recrutement","Remplir la caserne et l'atelier de siège (rubrique recrutement)"],
-  materiaux:["Module matériaux","Fabriquer les matériaux des engins spéciaux (rubrique materiaux)"], journal:["Journal","Tout ce que le bot affiche, en direct"]};
+  materiaux:["Module matériaux","Fabriquer les matériaux des engins spéciaux (rubrique materiaux)"], journal:["Journal","Tout ce que le bot affiche, en direct"],
+  "khan-direct":["Khan en direct","La défense de ton château principal pendant le module Khan, relue chaque minute"]};
 function aller(page){
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("visible", p.id === "page-"+page));
   document.querySelectorAll("#menu button").forEach(b => b.classList.toggle("actif", b.dataset.page === page));
   $("#titre").textContent = TITRES[page][0]; $("#sous-titre").textContent = TITRES[page][1];
   try{ localStorage.setItem("gge-page", page); }catch(e){}
   if(page === "journal") rafraichirJournal(true);
+  if(page === "khan-direct") dessinerKhanDirect();
 }
 document.querySelectorAll("#menu button").forEach(b => b.addEventListener("click", () => aller(b.dataset.page)));
 
 /* ------------------------------------------------------------------ formulaires : valeurs par defaut */
-function defautTours(){ return {mode:"auto", cotes:"F", echelles:true, cheval:"F", distance_plumes:20, rayon:50, presets:[1,1,1,1], soldats:[216]}; }
+function defautTours(){ return {mode:"auto", cotes:"L", echelles:true, cheval:"F", distance_plumes:20, rayon:50, presets:[1,1,1,1], soldats:[216]}; }
 function reglTours(r){ const b = Object.assign(defautTours(), r || {}); if(!(r && Array.isArray(r.soldats) && r.soldats.length)) b.soldats = [(r && r.soldat) || 216]; b.soldats = [...b.soldats]; return b; }
-function defautFort(){ return {mode:"auto", cotes:"F", cheval:"F", distance_plumes:100, distance_max:50, vagues_remplies:2, presets:[1,1,1,1]}; }
+function defautFort(){ return {mode:"auto", cotes:"L", cheval:"F", distance_plumes:100, distance_max:50, vagues_remplies:2, presets:[1,1,1,1]}; }
 function chargerFormulaires(){
   const ct = serveur.config.tours || {}, cf = serveur.config.forteresses || {};
   etat.tours = {commandants: cmdTexte(ct.commandants), royaumes:[...(ct.royaumes||[])], reglages:{}, achat_echelles: !!ct.achat_echelles, deplacement_accelere: !!ct.deplacement_accelere};
@@ -644,17 +855,21 @@ function chargerFormulaires(){
   etat.recrutement = etatRecrutement(serveur.config.recrutement);
   etat.materiaux = etatMateriaux(serveur.config.materiaux);
   etat.montee = etatMontee(serveur.config.montee);
-  sale.tours = sale.forteresses = sale.achats = sale.defense = sale.transferts = sale.recrutement = sale.materiaux = sale.montee = false;
-  dessinerTours(); dessinerFort(); dessinerAchats(); dessinerDefense(); dessinerTransferts(); dessinerRecrutement(); dessinerMateriaux(); dessinerMontee();
-  marquer("tours"); marquer("forteresses"); marquer("achats"); marquer("defense"); marquer("transferts"); marquer("recrutement"); marquer("materiaux"); marquer("montee");
+  etat.evenements = etatEvenements(serveur.config.evenements);
+  sale.tours = sale.forteresses = sale.achats = sale.defense = sale.transferts = sale.recrutement = sale.materiaux = sale.montee = sale.evenements = sale.khan = false;
+  dessinerTours(); dessinerFort(); dessinerAchats(); dessinerDefense(); dessinerTransferts(); dessinerRecrutement(); dessinerMateriaux(); dessinerMontee(); dessinerEvenements();
+  marquer("tours"); marquer("forteresses"); marquer("achats"); marquer("defense"); marquer("transferts"); marquer("recrutement"); marquer("materiaux"); marquer("montee"); marquer("evenements"); marquer("khan");
   for(const id of ["t-cmd", "f-cmd"]) if($("#" + id).value) verifierCommandants(id);   // reglages enregistres faux : signales tout de suite
 }
 function marquer(mod, texte, classe){
-  const m = $("#" + {tours:"t", forteresses:"f", achats:"a", defense:"d", transferts:"r", recrutement:"rc", materiaux:"m", montee:"mt"}[mod] + "-msg");
-  m.className = "msg " + (classe || (sale[mod] ? "sale" : ""));
-  m.textContent = texte || (sale[mod] ? "Modifications non enregistrées." : "Aucune modification.");
+  // 17/11 : nomades (page Événements) et Khan (page Khan) ont chacun leur état « modifié » et leur enregistrement
+  for(const id of [{tours:"t", forteresses:"f", achats:"a", defense:"d", transferts:"r", recrutement:"rc", materiaux:"m", montee:"mt", evenements:"ev", khan:"kh"}[mod]]){
+    const m = $("#" + id + "-msg"); if(!m) continue;
+    m.className = "msg " + (classe || (sale[mod] ? "sale" : ""));
+    m.textContent = texte || (sale[mod] ? "Modifications non enregistrées." : "Aucune modification.");
+  }
 }
-function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats, defense:dessinerDefense, transferts:dessinerTransferts, recrutement:dessinerRecrutement, materiaux:dessinerMateriaux, montee:dessinerMontee})[mod](); } pastilles(); }
+function changer(mod, redessiner=true){ sale[mod] = true; marquer(mod); if(redessiner){ ({tours:dessinerTours, forteresses:dessinerFort, achats:dessinerAchats, defense:dessinerDefense, transferts:dessinerTransferts, recrutement:dessinerRecrutement, materiaux:dessinerMateriaux, montee:dessinerMontee, evenements:dessinerEvenements, khan:dessinerEvenements})[mod](); } pastilles(); }
 
 /* ------------------------------------------------------------------ blocs communs a un royaume */
 function curseur(min, max, pas, valeur, unite, poser){
@@ -668,7 +883,7 @@ function lignesCommunes(mod, b, avecEchelles){
   lignes.push(el("div",{class:"ligne"}, el("span",{},"Mode d'attaque"),
     segment([["auto","Remplissage automatique"],["presets","Présélections du jeu"]], b.mode, v => { b.mode = v; changer(mod); })));
   if(b.mode === "auto"){
-    lignes.push(el("div",{class:"ligne"}, el("span",{},"Côtés à remplir"), segment(COTES, b.cotes, v => { b.cotes = v; changer(mod); })));
+    lignes.push(el("div",{class:"ligne"}, el("span",{},"Côtés à remplir"), choixCotes(b.cotes, v => { b.cotes = v; changer(mod); })));
   } else {
     // seulement les vagues remplies (les autres partent vides : leur présélection ne sert pas)
     const nb = b.vagues_remplies === undefined ? 4 : Math.min(4, Math.max(1, +b.vagues_remplies || 4));
@@ -711,7 +926,7 @@ function dessinerTours(){
   const blocs = $("#t-blocs"); const ouverts = new Set([...blocs.querySelectorAll("details[open]")].map(d=>d.dataset.k)); blocs.replaceChildren();
   for(const k of s.royaumes){
     const b = s.reglages[k];
-    const resume = (b.mode === "auto" ? "auto " + b.cotes + " · " + b.soldats.length + " unité(s)" : "présélections · remplacement " + uniteTours(b.soldats[0]).nom) + " · cheval " + b.cheval + " · " + b.rayon + " cases";
+    const resume = (b.mode === "auto" ? "auto " + texteCotes(b.cotes) + " · " + b.soldats.length + " unité(s)" : "présélections · remplacement " + uniteTours(b.soldats[0]).nom) + " · cheval " + b.cheval + " · " + b.rayon + " cases";
     const corps = el("div",{class:"corps"}, lignesCommunes("tours", b, true),
       el("div",{class:"ligne haut"}, el("span",{}, b.mode === "presets" ? "Unité de remplacement" : "Soldats"), choixSoldats(b)),
       el("div",{class:"ligne"}, el("span",{},"Distance maximale"), curseur(10, 500, 10, b.rayon, "cases", (v, fin) => { b.rayon = v; changer("tours", fin); })));
@@ -750,31 +965,36 @@ $("#t-cmd").addEventListener("input", e => { etat.tours.commandants = e.target.v
 /* ------------------------------------------------------------------ unites des tours (images) */
 function uniteTours(id){ return (serveur.unites_tours || []).find(u => u.id === id) || {id, nom:"Unité " + id, type:"", vitesse:"?", attaque:"?", image:null}; }
 function portrait(u){ return u.image ? el("img",{src:u.image, alt:u.nom, loading:"lazy"}) : el("div",{class:"sans-image"}, String(u.id)); }
+// ligne d'infos d'une unite ; soldat a niveaux : vitesse et attaque du niveau 10, tous ses niveaux partent (le plus haut d'abord)
+function infosUnite(u){ return u.type + " · vitesse " + u.vitesse + " · attaque " + u.attaque + (u.niveaux ? " (niv. 10)" : ""); }
+function puceNiveaux(u){ return u.niveaux ? el("span",{class:"niveaux", title:"Tous les niveaux de ce soldat partent : le plus haut niveau en stock d'abord, complété par le niveau en dessous, et ainsi de suite."}, "tous niveaux, le plus haut d'abord") : null; }
 function choixRemplacement(b){
   const u = uniteTours(b.soldats[0]);
   return el("div",{}, el("div",{class:"soldats"},
-      el("div",{class:"soldat"}, portrait(u), el("div",{class:"infos"}, el("b",{}, u.nom), el("small",{}, u.type + " · vitesse " + u.vitesse + " · attaque " + u.attaque))),
+      el("div",{class:"soldat"}, portrait(u), el("div",{class:"infos"}, el("b",{}, u.nom), el("small",{}, infosUnite(u)), puceNiveaux(u))),
       el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerie(b, true)}, el("span",{class:"plus"}, "⇄"), "Changer d'unité")),
     el("p",{class:"aide", style:"margin:8px 0 0"}, "Remplace les soldats qui manquent dans une présélection (même en partie). S'il n'y en a plus non plus : unités à distance les plus fortes du château, puis corps à corps."));
 }
-function choixSoldats(b){
+function choixSoldats(b, mod="tours"){
   if(b.mode === "presets") return choixRemplacement(b);
   const liste = b.soldats;
   const zone = el("div",{class:"soldats"});
   liste.forEach((id, i) => {
     const u = uniteTours(id);
     zone.append(el("div",{class:"soldat"}, el("span",{class:"rang", title:"ordre d'utilisation"}, String(i + 1)), portrait(u),
-      el("div",{class:"infos"}, el("b",{}, u.nom), el("small",{}, u.type + " · vitesse " + u.vitesse + " · attaque " + u.attaque)),
+      el("div",{class:"infos"}, el("b",{}, u.nom), el("small",{}, infosUnite(u)), puceNiveaux(u)),
       el("div",{class:"actions"},
-        i > 0 ? el("button",{type:"button", title:"Utiliser avant la précédente", onclick:() => { [liste[i-1], liste[i]] = [liste[i], liste[i-1]]; changer("tours"); }}, "↑") : null,
-        liste.length > 1 ? el("button",{type:"button", title:"Retirer", onclick:() => { liste.splice(i, 1); changer("tours"); }}, "×") : null)));
+        i > 0 ? el("button",{type:"button", title:"Utiliser avant la précédente", onclick:() => { [liste[i-1], liste[i]] = [liste[i], liste[i-1]]; changer(mod); }}, "↑") : null,
+        liste.length > 1 ? el("button",{type:"button", title:"Retirer", onclick:() => { liste.splice(i, 1); changer(mod); }}, "×") : null)));
   });
   if(liste.length < (serveur.nb_soldats_max || 4))
-    zone.append(el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerie(b)}, el("span",{class:"plus"}, "+"), "Ajouter une unité"));
+    zone.append(el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerie(b, false, mod)}, el("span",{class:"plus"}, "+"), "Ajouter une unité"));
+  const aNiveaux = liste.some(id => uniteTours(id).niveaux);
   return el("div",{}, zone, el("p",{class:"aide", style:"margin:8px 0 0"},
-    liste.length > 1 ? "La 1re unité part d'abord ; s'il en manque, la suivante complète (2 unités au plus par flanc)." : "Ajoute d'autres unités pour compléter quand celle-ci manque."));
+    (liste.length > 1 ? "La 1re unité part d'abord ; s'il en manque, la suivante complète (2 unités au plus par flanc)." : "Ajoute d'autres unités pour compléter quand celle-ci manque.")
+    + (aNiveaux ? " Soldat à niveaux : le plus haut niveau en stock part d'abord, complété par le niveau en dessous, et ainsi de suite (chaque niveau prend une case)." : "")));
 }
-function ouvrirGalerie(b, remplacer){
+function ouvrirGalerie(b, remplacer, mod="tours"){
   const fermer = () => { fond.remove(); document.removeEventListener("keydown", echap); };
   const echap = e => { if(e.key === "Escape") fermer(); };
   const fond = el("div",{class:"fond-modal", onclick:e => { if(e.target === fond) fermer(); }});
@@ -782,9 +1002,9 @@ function ouvrirGalerie(b, remplacer){
   for(const u of serveur.unites_tours || []){
     const pris = remplacer ? b.soldats[0] === u.id : b.soldats.includes(u.id);
     grille.append(el("button",{type:"button", class:"carte-unite" + (pris ? " prise" : ""), disabled:pris,
-      onclick:() => { if(remplacer) b.soldats.splice(0, b.soldats.length, u.id); else b.soldats.push(u.id); fermer(); changer("tours"); }},
-      el("div",{class:"cadre"}, portrait(u)), el("b",{}, u.nom), el("small",{}, u.type + " · vitesse " + u.vitesse + " · attaque " + u.attaque),
-      pris ? el("span",{class:"puce ok"}, "déjà choisie") : el("span",{class:"puce"}, "n° " + u.id)));
+      onclick:() => { if(remplacer) b.soldats.splice(0, b.soldats.length, u.id); else b.soldats.push(u.id); fermer(); changer(mod); }},
+      el("div",{class:"cadre"}, portrait(u)), el("b",{}, u.nom), el("small",{}, infosUnite(u)),
+      pris ? el("span",{class:"puce ok"}, "déjà choisie") : el("span",{class:"puce"}, u.niveaux ? "tous niveaux" : "n° " + u.id)));
   }
   fond.append(el("div",{class:"modal"}, el("div",{class:"tete-modal"}, el("div",{}, el("h2",{}, "Choisir une unité"),
       el("p",{class:"aide", style:"margin:2px 0 0"}, remplacer ? "Unité de remplacement des présélections." : "Elle s'ajoute à la fin de la liste. Seules les unités présentes dans le château partent.")),
@@ -840,7 +1060,7 @@ function dessinerFort(){
   const blocs = $("#f-blocs"); const ouverts = new Set([...blocs.querySelectorAll("details[open]")].map(d=>d.dataset.k)); blocs.replaceChildren();
   for(const k of s.royaumes){
     const b = s.reglages[k];
-    const resume = (b.mode === "auto" ? "auto " + b.cotes : "présélections") + " · " + (b.vagues_remplies >= 4 ? "toutes les vagues" : b.vagues_remplies + " vague(s)") + " · " + b.distance_max + " cases";
+    const resume = (b.mode === "auto" ? "auto " + texteCotes(b.cotes) : "présélections") + " · " + (b.vagues_remplies >= 4 ? "toutes les vagues" : b.vagues_remplies + " vague(s)") + " · " + b.distance_max + " cases";
     const vagues = el("div",{class:"ligne haut"}, el("span",{},"Vagues à remplir"), choixVagues(b.vagues_remplies, v => { b.vagues_remplies = v; changer("forteresses"); }));
     const corps = el("div",{class:"corps"}, lignesCommunes("forteresses", b, false), vagues,
       el("div",{class:"ligne"}, el("span",{},"Distance maximale"), curseur(10, 500, 5, b.distance_max, "cases", (v, fin) => { b.distance_max = v; changer("forteresses", fin); })));
@@ -1222,6 +1442,518 @@ $("#m-enregistrer").addEventListener("click", async () => {
     liste.replaceChildren(...(ex.erreurs || ["Erreur inconnue."]).map(x => el("li",{}, x)));
   }
 });
+/* ------------------------------------------------------------------ evenements : nomades */
+function etatEvenements(c){ return {nomades: etatCamp((c && c.nomades) || {}), khan: etatCamp((c && c.khan) || {})}; }
+// une partie commencée (commandants, coordonnées, ou Khan à déclencher) est envoyée et vérifiée : avant (16/11), le Khan sans
+// commandant était retiré en silence à l'enregistrement, et l'interrupteur « Déclencher le Khan » se décochait
+const campRempli = (n, genre) => !!(n.commandants || (genre === "nomades" && (n.x || n.y)) || (genre === "khan" && n.declencher));
+function etatCamp(n){
+  const info = (serveur && serveur.evenements) || {}, d = info.engins_defaut || {flanc:[], centre:[]};
+  const eng = (l, cases) => { const r = (l || []).map(p => [p[0], String(p[1])]); while(r.length < cases) r.push([0, ""]); return r.slice(0, cases); };
+  const e = n.engins || d, k = n.coffres || {actif:true, types:[], ordre:"forts"};
+  return {x: String(n.x ?? ""), y: String(n.y ?? ""), commandants: cmdTexte(n.commandants), mode: n.mode || "auto", cotes: codeCotes(n.cotes || "LMR") || "LMR",
+    soldats: (n.soldats || [216]).slice(), soldats_suite: (n.soldats_suite || []).slice(), presets: (n.presets || [1,1,1,1]).slice(), cheval: n.cheval || "F", distance_plumes: n.distance_plumes ?? 20,
+    engins: {flanc: eng(e.flanc, 2), centre: eng(e.centre, 3)}, coffres: {actif: !!k.actif, types: (k.types || []).slice(), ordre: k.ordre || "forts"},
+    cour: !!(n.remplir_cour || n.soldats_cour), passes: (n.passes || ["MS5","MS4","MS3"]).slice(),
+    max_attaques: String(n.max_attaques ?? 0), max_tablettes: String(n.max_tablettes ?? 0),
+    bannieres: (n.bannieres || [106]).slice(), declencher: !!n.declencher,
+    en_cours: String(n.en_cours ?? 3), objectif_declenchements: String(n.objectif_declenchements ?? n.objectif_defenses ?? 0), objectif_points: String(n.objectif_points ?? 0),
+    defense: etatDefenseKhan(n.defense)};
+}
+function etatDefenseKhan(d){
+  d = d || {};
+  const W = [110, "999"], P = [626, "999"];
+  const cases = (l, n, defaut) => { const r = (Array.isArray(l) ? l : defaut).map(c => c && c[0] ? [c[0], String(c[1] ?? "")] : [0, ""]);
+    while(r.length < n) r.push([0, ""]); return r.slice(0, n); };
+  const m = d.mur || {};
+  const cote = (c, n, defaut, sold) => { const s = m[c] || {}; return {cases: cases(s.cases, n, defaut), soldats: String(s.soldats ?? sold), melee: String(s.melee ?? 50)}; };
+  const dv = d.douves || {}, cour = d.cour || {}, sec = d.secours || {}, a = d.abri || {};
+  return {mur: {L: cote("L", 5, [W, W, W, W, null], 39), M: cote("M", 6, [W, P, W, W, P, W], 22), R: cote("R", 5, [W, W, W, W, null], 39)},
+    douves: Object.fromEntries(["L","M","R"].map(c => [c, c in dv ? (dv[c] ? [dv[c][0], String(dv[c][1])] : [0, ""]) : [112, "999"]])),
+    cour: {malles: ((cour.malles || [0, 0, 0]).concat([0, 0, 0])).slice(0, 3).map(String), melee: String(cour.melee ?? 20)},
+    secours: {mur: "mur" in sec ? (sec.mur || 0) : 627, porte: "porte" in sec ? (sec.porte || 0) : 626, douves: "douves" in sec ? (sec.douves || 0) : 625},
+    defenseurs: (d.defenseurs || ["valkyrie", "protecteur"]).slice(),
+    abri: {x: String(a.x ?? ""), y: String(a.y ?? "")}, achat_malles: String(d.achat_malles ?? 0), achat_engins: d.achat_engins !== false};
+}
+const NOMS_COTES_DEF = {L:"flanc gauche", M:"centre", R:"flanc droit"};
+function erreursDefenseKhan(d){
+  const e = [], nb = v => /^\d+$/.test(String(v).trim()), qmax = ((serveur && serveur.evenements) || {}).quantite_case_max || 999;
+  let total = 0;
+  for(const c of ["L","M","R"]){
+    const s = d.mur[c];
+    if(s.cases.some((p, i) => !(c !== "M" && i === 4) && p[0] && !(nb(p[1]) && +p[1] >= 1 && +p[1] <= qmax))) e.push("Khan, défense (" + NOMS_COTES_DEF[c] + ") : quantité de 1 à " + qmax + " pour chaque engin posé.");
+    if(!(nb(s.soldats) && +s.soldats <= 100)) e.push("Khan, défense (" + NOMS_COTES_DEF[c] + ") : % des soldats de 0 à 100.");
+    total += +s.soldats || 0;
+    const v = d.douves[c];
+    if(v[0] && !(nb(v[1]) && +v[1] >= 1 && +v[1] <= qmax)) e.push("Khan, douves (" + NOMS_COTES_DEF[c] + ") : quantité de 1 à " + qmax + ".");
+  }
+  if(total !== 100) e.push("Khan, défense : la répartition des soldats doit faire 100 % (flanc gauche + centre + flanc droit), pas " + total + " %.");
+  if(d.cour.malles.some(q => !nb(q))) e.push("Khan, cour : nombre de malles de pilleur (0 = case vide).");
+  if(!d.defenseurs.length) e.push("Khan, défense : choisis au moins un type de soldat qui défend.");
+  if(!nb(d.abri.x) || +d.abri.x > 2000 || !nb(d.abri.y) || +d.abri.y > 2000) e.push("Khan, défense : coordonnées X et Y du joueur protégé (0 à 2000).");
+  if(!nb(d.achat_malles) || +d.achat_malles > (((serveur && serveur.evenements) || {}).achat_malles_max || 1000)) e.push("Khan : nombre de malles à acheter (0 = aucune).");
+  return e;
+}
+function corpsDefenseKhan(d){
+  const cas = p => p[0] ? [p[0], +p[1]] : null;
+  // 5e case des flancs jamais envoyée : contre le Khan elle n'existe pas (elle ne sert que contre les seigneurs)
+  return {mur: Object.fromEntries(["L","M","R"].map(c => [c, {cases: d.mur[c].cases.map((p, i) => c !== "M" && i === 4 ? null : cas(p)), soldats: +d.mur[c].soldats, melee: +d.mur[c].melee}])),
+    douves: Object.fromEntries(["L","M","R"].map(c => [c, cas(d.douves[c])])),
+    cour: {malles: d.cour.malles.map(Number), melee: +d.cour.melee},
+    secours: {mur: d.secours.mur || null, porte: d.secours.porte || null, douves: d.secours.douves || null},
+    defenseurs: d.defenseurs.slice(), abri: {x: +d.abri.x, y: +d.abri.y}, achat_malles: +d.achat_malles, achat_engins: d.achat_engins};
+}
+function erreursEvenements(ev){
+  return ["nomades","khan"].filter(g => campRempli(ev[g], g)).flatMap(g => erreursCamp(ev[g], g));
+}
+function erreursCamp(n, genre){
+  const e = [], nb = v => /^\d+$/.test(String(v).trim()), N = genre === "khan" ? "Khan" : "Nomades";
+  if(genre === "nomades" && (!nb(n.x) || +n.x > 2000 || !nb(n.y) || +n.y > 2000)) e.push("Nomades : coordonnées du camp (X et Y, de 0 à 2000).");
+  if(!cmdListe(n.commandants).length) e.push(N + " : au moins un commandant (ex. " + (genre === "khan" ? "4;5" : "1;2;3") + ").");
+  if(n.mode === "auto"){
+    if(!n.soldats.length) e.push("Nomades : choisis au moins une unité de soldats.");
+    const qmax = ((serveur && serveur.evenements) || {}).quantite_max || 50;
+    for(const g of ["flanc","centre"]){
+      const pris = n.engins[g].filter(p => p[0]);
+      if(pris.some(p => !nb(p[1]) || +p[1] < 1 || +p[1] > qmax)) e.push("Nomades, engins de la vague 1 (" + g + ") : quantité de 1 à " + qmax + " pour chaque engin choisi.");
+      const place = (((serveur && serveur.evenements) || {}).place_engins || {flanc:40, centre:50})[g], total = pris.reduce((a, p) => a + (+p[1] || 0), 0);
+      if(total > place) e.push("Nomades, engins de la vague 1 (" + (g === "flanc" ? "chaque flanc" : "centre") + ") : " + place + " engins au plus en tout, " + total + " choisis.");
+      if(g === "flanc" && pris.some(p => (((serveur && serveur.evenements) || {}).engins || []).some(x => x[0] === p[0] && x[4] === "beliers"))) e.push("Nomades, engins de la vague 1 (chaque flanc) : pas de bélier sur un flanc, les béliers vont au centre.");
+      if(new Set(pris.map(p => p[0])).size !== pris.length) e.push("Nomades, engins de la vague 1 (" + g + ") : le même engin est choisi deux fois.");
+    }
+    if(genre === "nomades" && n.coffres.actif && !n.coffres.types.length) e.push("Nomades : coche au moins un coffre, ou désactive les coffres.");
+  } else if(n.presets.some(p => !nb(p) || +p < 1 || +p > 30)) e.push("Nomades : numéros de présélection de 1 à 30.");
+  if(n.cheval === "CF" && !(+n.distance_plumes > 0)) e.push("Nomades : distance à partir de laquelle utiliser les plumes.");
+  if(!n.passes.length) e.push("Nomades : coche au moins un passe-temps.");
+  if(genre === "nomades") for(const [k, t] of [["max_attaques","nombre d'attaques"],["max_tablettes","nombre de tablettes"]])
+    if(!nb(n[k])) e.push("Nomades, " + t + " : nombre entier (0 = aucun).");
+  if(genre === "khan"){
+    if(!n.bannieres.length) e.push("Khan : coche au moins un outil de rage (bannière ou coffre du pilleur).");
+    if(n.declencher){
+      const mx = ((serveur && serveur.evenements) || {}).en_cours_max || 20;
+      if(!(nb(n.en_cours) && +n.en_cours >= 1 && +n.en_cours <= mx)) e.push("Khan : attaques du Khan gardées en route, de 1 à " + mx + ".");
+      if(!nb(n.objectif_declenchements) || !nb(n.objectif_points)) e.push("Khan, objectif : nombres entiers (0 = pas de limite).");
+      e.push(...erreursDefenseKhan(n.defense));
+    }
+  }
+  return e;
+}
+function corpsEvenements(ev){
+  const c = {};
+  for(const g of ["nomades","khan"]) if(campRempli(ev[g], g)) c[g] = corpsCamp(ev[g], g);
+  return c;
+}
+function corpsCamp(n, genre){
+  const eng = l => l.filter(p => p[0]).map(p => [p[0], +p[1]]);
+  const c = {x:+n.x, y:+n.y, commandants:n.commandants, mode:n.mode, cotes:n.cotes, soldats:n.soldats, soldats_suite:n.soldats_suite, presets:n.presets.map(Number),
+    cheval:n.cheval, distance_plumes:+n.distance_plumes, engins:{flanc:eng(n.engins.flanc), centre:eng(n.engins.centre)}, coffres:n.coffres,
+    remplir_cour: n.cour, passes:n.passes, max_attaques:+n.max_attaques, max_tablettes:+n.max_tablettes};
+  if(genre === "khan"){
+    Object.assign(c, {bannieres:n.bannieres, declencher:n.declencher});
+    if(n.declencher) Object.assign(c, {en_cours:+n.en_cours, objectif_declenchements:+n.objectif_declenchements, objectif_points:+n.objectif_points, defense:corpsDefenseKhan(n.defense)});
+    return c;
+  }
+  return c;
+}
+function dessinerEvenements(){
+  if(!etat.evenements || !serveur) return;
+  dessinerCamp("nomades"); dessinerCamp("khan");
+  progresEvenements();
+}
+function dessinerCamp(genre){
+  const ev = etat.evenements, khan = genre === "khan";
+  const n = ev[genre], info = serveur.evenements || {}, M = genre === "khan" ? "khan" : "evenements";
+  const champ = (titre, k, attrs) => el("label",{class:"champ"}, titre, el("input", Object.assign({value:n[k], oninput:e => { n[k] = e.target.value.trim(); changer(M, false); }}, attrs)));
+  const lignes = [khan ? el("div",{class:"grille g3"}, champ("Commandants", "commandants", {type:"text", placeholder:"ex. 4;5"}))
+    : el("div",{class:"grille g3"}, champ("Camp : coordonnée X", "x", {type:"number", min:0, max:2000}), champ("Camp : coordonnée Y", "y", {type:"number", min:0, max:2000}),
+    champ("Commandants", "commandants", {type:"text", placeholder:"ex. 1;2;3"}))];
+  n.mode = "auto";                                   // nomades : remplissage automatique seulement
+  lignes.push(...lignesCommunes(M, n, false).slice(1));
+  if(n.mode === "auto"){
+    lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vague 1 : soldats"), choixSoldats(n, M)));
+    lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues suivantes : soldats"), el("div",{},
+      n.soldats_suite.length ? choixSoldats({mode:"auto", soldats:n.soldats_suite, vide_ok:true}, M)
+        : el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerie({mode:"auto", soldats:n.soldats_suite}, false, M)}, el("span",{class:"plus"}, "+"), "Choisir d'autres soldats"),
+      n.soldats_suite.length ? el("button",{type:"button", class:"bouton", style:"margin-top:8px", onclick:() => { n.soldats_suite.length = 0; changer(M); }}, "Reprendre les soldats de la vague 1") : null,
+      el("p",{class:"aide", style:"margin:8px 0 0"}, n.soldats_suite.length ? "Ces soldats partent avec les " + (khan ? "bannières" : "coffres") + ", à partir de la vague 2." : "Rien de choisi : les mêmes soldats que la vague 1. En général : distance en vague 1, mêlée ensuite."))));
+    const places = info.place_engins || {flanc:40, centre:50};
+    const bloc = (g, titre) => {
+      const total = n.engins[g].reduce((a, p) => a + (p[0] ? (+p[1] || 0) : 0), 0);
+      const compteur = el("small",{class: total > places[g] ? "trop" : ""}, total + " / " + places[g] + " engins");
+      const maj = () => { const t = n.engins[g].reduce((a, p) => a + (p[0] ? (+p[1] || 0) : 0), 0); compteur.textContent = t + " / " + places[g] + " engins"; compteur.className = t > places[g] ? "trop" : ""; };
+      return el("div",{class:"bloc-engins"}, el("div",{class:"tete"}, el("b",{}, titre), compteur), n.engins[g].map(p => el("div",{class:"engin"},
+        choixEngin(p, n.engins[g], (info.engins || []).filter(e => g === "centre" || e[4] !== "beliers"), () => changer(M)),   // pas de bélier sur un flanc
+        p[0] ? el("input",{type:"number", min:1, max:places[g], value:p[1], title:"quantité", oninput:e => { p[1] = e.target.value.trim(); maj(); changer(M, false); }}) : el("span",{}))));
+    };
+    lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vague 1 : engins"), el("div",{},
+      el("div",{class:"engins-ev"}, bloc("flanc", "Chaque flanc"), bloc("centre", "Centre")),
+      el("p",{class:"aide", style:"margin:8px 0 0"}, "Mets les quantités que le remplissage du jeu propose pour ce camp : " + places.flanc + " engins au plus par flanc, " + places.centre + " au centre. S'il manque un engin ou des soldats pour la vague 1, le bot n'attaque pas et le dit."))));
+    const k = n.coffres;
+    if(khan) lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues suivantes : rage"), el("div",{},
+      el("div",{class:"choix-passes", style:"margin-top:0"}, (info.bannieres || []).map(([w, nom, b, image]) => el("label",{class:"passe" + (n.bannieres.includes(w) ? " on" : ""), title:nom},
+        el("input",{type:"checkbox", checked:n.bannieres.includes(w), onchange:e => { n.bannieres = e.target.checked ? [...n.bannieres, w] : n.bannieres.filter(x => x !== w); changer(M); }}),
+        image ? el("img",{src:image, alt:nom, style:"width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-right:6px"}) : nom + " ", "+" + b + " % de rage"))),
+      el("p",{class:"aide", style:"margin:8px 0 0"}, "Le bot lit ta barre de rage avant chaque attaque et met juste ce qu'il faut pour la remplir (40 par flanc, 50 au centre, à partir de la vague 2). Si un commandant ne suffit pas, il part plein et le suivant complète."))));
+    else lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues suivantes : coffres"), el("div",{},
+      el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:k.actif, onchange:e => { k.actif = e.target.checked; changer(M); }}), el("i"), "Remplir de coffres de tablettes (40 par flanc, 50 au centre)"),
+      k.actif ? el("div",{class:"choix-passes"}, (info.coffres || []).map(([w, b]) => el("label",{class:"passe" + (k.types.includes(w) ? " on" : "")},
+        el("input",{type:"checkbox", checked:k.types.includes(w), onchange:e => { k.types = e.target.checked ? [...k.types, w] : k.types.filter(x => x !== w); changer(M); }}), "+" + b + " %"))) : null,
+      k.actif ? el("div",{style:"margin-top:8px"}, segment([["forts","Les plus forts d'abord"],["faibles","Les plus faibles d'abord"]], k.ordre, v => { k.ordre = v; changer(M); })) : null,
+      k.actif ? el("p",{class:"aide", style:"margin:8px 0 0"}, "Coche les coffres que le bot a le droit d'utiliser (bonus de tablettes de chaque coffre). Quand un coffre est épuisé, il passe au suivant ; sans coffre, l'attaque part quand même.") : null)));
+  }
+  lignes.push(el("div",{class:"ligne"}, el("span",{},"Cour (ligne ★)"),
+    el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:n.cour, onchange:e => { n.cour = e.target.checked; changer(M); }}), el("i"), "Remplir la cour au maximum à chaque attaque")));
+  lignes.push(el("div",{class:"ligne"}, el("span",{},"Passe-temps"), el("div",{class:"choix-passes", style:"margin-top:0"}, ((serveur.montee || {}).passes || []).map(([c, t]) =>
+    el("label",{class:"passe" + (n.passes.includes(c) ? " on" : "")}, el("input",{type:"checkbox", checked:n.passes.includes(c),
+      onchange:e => { n.passes = e.target.checked ? [...n.passes, c] : n.passes.filter(x => x !== c); changer(M); }}), t)))));
+  if(khan){
+    lignes.push(el("div",{class:"ligne" + (n.declencher ? " haut" : "")}, el("span",{},"Déclencher le Khan"), el("div",{},
+      el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:n.declencher, onchange:e => { n.declencher = e.target.checked; changer(M); }}), el("i"), "Déclencher le Khan et défendre mon château principal"),
+      el("p",{class:"aide", style:"margin:8px 0 0"}, n.declencher ? "Le bot déclenche le Khan dès que ta barre de rage est pleine et qu'il manque une attaque du Khan en route. Chaque défense te rend de la rage ; ce qui manque, il le complète en attaquant le camp avec des bannières."
+        : "Décoché : le module remplit la barre puis s'arrête, et tu déclenches le Khan toi-même (le bot ne touche pas à ta défense)."))));
+    if(n.declencher){
+      // 16/11 (demande du joueur) : tout ce qui suit le bouton est rangé : un volet qui se déplie pour le déclenchement et
+      // l'objectif, une carte résumé de la défense qui ouvre une grande fenêtre (l'écran de défense du jeu et ses réglages)
+      const od = +n.objectif_declenchements || 0, op = +n.objectif_points || 0;
+      const resumeObj = (n.en_cours || "?") + " attaque(s) du Khan en route · " + (od || op ? "arrêt après " + [od ? od + " déclenchement(s)" : "", op ? op.toLocaleString("fr-FR") + " points" : ""].filter(Boolean).join(" ou ") : "pas d'objectif");
+      lignes.push(volet("khan-objectif", "⚑", "Déclenchement et objectif", resumeObj, el("div",{class:"volet-lignes"},
+        el("div",{class:"ligne"}, el("span",{},"Attaques du Khan"), el("label",{class:"en-ligne"}, "garder",
+          el("input",{type:"number", min:1, max:(info.en_cours_max || 20), value:n.en_cours, oninput:e => { n.en_cours = e.target.value.trim(); changer(M, false); }}),
+          "attaque(s) du Khan en route en permanence")),
+        el("div",{class:"ligne haut"}, el("span",{},"Objectif"), el("div",{},
+          el("div",{style:"display:flex;gap:14px;flex-wrap:wrap"},
+            el("label",{class:"en-ligne"}, "arrêter après", el("input",{type:"number", min:0, value:n.objectif_declenchements, oninput:e => { n.objectif_declenchements = e.target.value.trim(); changer(M, false); }}), "déclenchements du Khan"),
+            el("label",{class:"en-ligne"}, "ou après", el("input",{type:"number", min:0, value:n.objectif_points, oninput:e => { n.objectif_points = e.target.value.trim(); changer(M, false); }}), "points nomades"),
+            el("small",{class:"aide-cotes"}, "0 = pas de limite")),
+          el("p",{class:"aide", style:"margin:8px 0 0"}, "Points nomades : 1 tablette = 1 point, 1 médaille du Khan = 7 points (gagnés depuis le lancement). Seuls les déclenchements faits par le bot comptent. À l'objectif, le bot ne déclenche plus et n'attaque plus le camp, défend les attaques du Khan encore en route, remet la défense que tu avais au début et rappelle les soldats envoyés chez le joueur protégé.")))), M));
+      lignes.push(carteDefenseKhan(n, M));
+    }
+  }
+  if(!khan) lignes.push(el("div",{class:"ligne"}, el("span",{},"Arrêt"), el("div",{style:"display:flex;gap:14px;flex-wrap:wrap"},
+    el("label",{class:"en-ligne"}, "après", el("input",{type:"number", min:0, value:n.max_attaques, oninput:e => { n.max_attaques = e.target.value.trim(); changer(M, false); }}), "attaques"),
+    el("label",{class:"en-ligne"}, "ou après", el("input",{type:"number", min:0, value:n.max_tablettes, oninput:e => { n.max_tablettes = e.target.value.trim(); changer(M, false); }}), "tablettes gagnées"),
+    el("small",{class:"aide-cotes"}, "0 = pas de limite"))));
+  $("#ev-" + genre).replaceChildren(...lignes);
+  if(khan && fenetreDef){ if(n.declencher) fenetreDef.rendre(n, M); else fenetreDef.fermer(); }
+}
+function lireVolet(cle, defaut){ try{ const v = localStorage.getItem("volet-" + cle); return v === null ? defaut : v === "1"; }catch(e){ return defaut; } }
+function volet(cle, icone, titre, resume, contenu, M, defaut=false){
+  // un volet qui se déplie (son état ouvert / fermé est retenu dans ce navigateur)
+  const boite = el("div",{class:"volet" + (lireVolet(cle, defaut) ? " ouvert" : "")});
+  const tete = el("button",{type:"button", class:"volet-tete", "aria-expanded":String(lireVolet(cle, defaut)), onclick:() => {
+      const o = !boite.classList.contains("ouvert"); boite.classList.toggle("ouvert", o); tete.setAttribute("aria-expanded", String(o));
+      try{ localStorage.setItem("volet-" + cle, o ? "1" : "0"); }catch(e){} }},
+    el("span",{class:"volet-icone"}, icone), el("span",{class:"volet-titre"}, el("b",{}, titre), el("small",{}, resume)), el("span",{class:"chevron"}, "›"));
+  boite.append(tete, el("div",{class:"volet-corps"}, el("div",{}, contenu)));
+  return boite;
+}
+let fenetreDef = null;
+function miniDefense(d){
+  // aperçu du mur : les engins de chaque côté en petites images, et la part des soldats
+  const info = (serveur && serveur.evenements) || {}, eng = id => (info.defense_engins || []).find(e => e[0] === id);
+  const icone = p => { const e = p && p[0] ? eng(p[0]) : null;
+    return el("i",{class:"mini-case" + (e ? "" : " vide"), title: e ? e[1] + (p[1] ? " × " + p[1] : "") : "vide"}, e && e[4] ? el("img",{src:e[4], alt:""}) : (e ? (COURTS_DEF[e[0]] || "?").slice(0, 2) : "")); };
+  const cote = (c, titre) => el("div",{class:"mini-cote" + (c === "M" ? " centre" : "")}, el("small",{}, titre + " · " + (d.mur[c].soldats || "?") + " %"),
+    el("div",{class:"mini-cases"}, d.mur[c].cases.filter((p, i) => !(c !== "M" && i === 4 && !p[0])).map(icone), icone(d.douves[c])));
+  return el("div",{class:"mini-def"}, cote("L", "Gauche"), cote("M", "Centre"), cote("R", "Droit"));
+}
+function carteDefenseKhan(n, M){
+  const d = n.defense, err = erreursDefenseKhan(d), info = (serveur && serveur.evenements) || {};
+  const noms = (info.defenseurs || []).filter(x => d.defenseurs.includes(x[0])).map(x => x[1]);
+  const malles = d.cour.malles.reduce((a, q) => a + (+q || 0), 0);
+  return el("div",{class:"carte-def"},
+    el("div",{class:"carte-def-tete"}, el("div",{}, el("b",{}, "🛡 Défense du château principal"),
+        el("small",{}, "Mur, douves et cour, soldats qui défendent, joueur protégé, malles et recharge des engins")),
+      err.length ? el("span",{class:"puce err"}, err.length + " point(s) à régler") : el("span",{class:"puce ok"}, "prête")),
+    miniDefense(d),
+    el("div",{class:"carte-def-infos"},
+      el("span",{}, "⚔ ", noms.length ? noms.join(", ") : "aucun soldat choisi"),
+      el("span",{}, "🏰 joueur protégé " + (d.abri.x !== "" && d.abri.y !== "" ? "(" + d.abri.x + "," + d.abri.y + ")" : "à choisir")),
+      el("span",{}, "🧰 " + malles + " malle(s) dans la cour" + (+d.achat_malles ? " · " + d.achat_malles + " à acheter" : "")),
+      el("span",{}, d.achat_engins ? "♻ recharge en pièces activée" : "♻ recharge en pièces désactivée")),
+    el("button",{type:"button", class:"bouton principal ouvrir-def", onclick:() => ouvrirDefenseKhan(n, M)}, "Régler la défense"));
+}
+function ouvrirDefenseKhan(n, M){
+  if(fenetreDef) return;
+  const corps = el("div",{class:"corps-modal-def"}), pied = el("div",{class:"pied-modal-def"});
+  const fermer = () => { fond.remove(); document.removeEventListener("keydown", echap); document.body.classList.remove("sans-defilement"); fenetreDef = null; changer(M); };
+  const echap = e => { if(e.key === "Escape" && !document.querySelector(".pop-def")) fermer(); };
+  const section = (icone, titre, aide, contenu) => el("section",{class:"section-def"},
+    el("h3",{}, el("span",{}, icone), titre), aide ? el("p",{class:"aide", style:"margin:-4px 0 10px"}, aide) : null, contenu);
+  const rendre = (n2, M2) => {
+    n = n2 || n; M = M2 || M;
+    const d = n.defense, info = (serveur && serveur.evenements) || {}, haut = corps.scrollTop;
+    const ch = (k, t) => el("label",{class:"champ"}, t, el("input",{type:"number", min:0, max:2000, value:d.abri[k], oninput:e => { d.abri[k] = e.target.value.trim(); changer(M, false); majPied(); }}));
+    const prixMalle = info.prix_malle || 42, cout = el("b",{class:"cout-rubis"});
+    const majCout = () => { const q = /^\d+$/.test(String(d.achat_malles).trim()) ? +d.achat_malles : 0;
+      cout.textContent = "= " + (q * prixMalle).toLocaleString("fr-FR") + " rubis"; cout.className = "cout-rubis" + (q ? " on" : ""); };
+    majCout();
+    const nomsPieces = (info.engins_pieces || []).map(w => ((info.defense_engins || []).find(e => e[0] === w) || [w, String(w)])[1]).join(" et ");
+    corps.replaceChildren(
+      section("🏰", "Mur, douves et cour", "Comme l'écran de défense du jeu : clique sur une case pour choisir l'engin et sa quantité (les portes seulement dans les 2 cases du bas du centre). Le chiffre en haut de chaque côté est la part des soldats (total 100 %), le curseur la part distance / mêlée. Dès qu'une case passe sous " + (info.seuil_case || 100) + " engins, le bot remet toute la défense au plein.",
+        plateauDefense(d, M)),
+      el("div",{class:"deux-def"},
+        section("⚔", "Soldats qui défendent", null, defenseursKhan(d, M)),
+        el("div",{},
+          section("🏳", "Les autres soldats défensifs", "Ils partent en soutien chez ce joueur (il doit être en protection) et y restent jusqu'à l'objectif, avec des commandants qu'aucun module n'utilise.",
+            el("div",{class:"grille g2"}, ch("x", "Joueur protégé : X"), ch("y", "Joueur protégé : Y"))),
+          section("🔁", "Engins de secours", null, secoursDefense(d, M)))),
+      el("div",{class:"deux-def"},
+        section("🧰", "Malles de pilleur", "Payées en RUBIS (" + prixMalle + " la malle), une seule fois quand le module démarre ; le bot n'en rachète jamais ensuite.",
+          el("label",{class:"en-ligne"}, "acheter", el("input",{type:"number", min:0, max:(info.achat_malles_max || 1000), value:d.achat_malles, oninput:e => { d.achat_malles = e.target.value.trim(); majCout(); changer(M, false); majPied(); }}),
+            "malle(s) au démarrage", cout)),
+        section("♻", "Recharge des engins", "Sous " + (info.seuil_achat || 3000).toLocaleString("fr-FR") + " en stock, le bot en rachète " + (info.lot_achat || 3000).toLocaleString("fr-FR")
+            + " en pièces sans descendre sous " + ((info.reserve_pieces || 5000000) / 1e6) + " millions. Les engins en rubis ne sont jamais achetés.",
+          el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:d.achat_engins, onchange:e => { d.achat_engins = e.target.checked; changer(M); }}), el("i"),
+            "Racheter en pièces (" + (nomsPieces || "rochers, porte en bois") + ")"))));
+    corps.scrollTop = haut;
+    majPied();
+  };
+  const majPied = () => { const err = erreursDefenseKhan(n.defense);
+    pied.replaceChildren(err.length ? el("ul",{class:"erreurs-def"}, err.map(x => el("li",{}, x))) : el("span",{class:"puce ok"}, "Défense prête"),
+      el("div",{class:"actions-def"}, el("small",{class:"aide"}, "Les réglages sont gardés en quittant ; clique ensuite sur « Enregistrer »."),
+        el("button",{type:"button", class:"bouton principal", onclick:fermer}, "Terminé"))); };
+  const fond = el("div",{class:"fond-modal", onclick:e => { if(e.target === fond) fermer(); }},
+    el("div",{class:"modal modal-def", role:"dialog", "aria-label":"Défense du château principal"},
+      el("div",{class:"tete-modal"}, el("div",{}, el("h2",{}, "🛡 Défense contre le Khan"),
+          el("p",{class:"aide", style:"margin:2px 0 0"}, "Château principal du royaume vert : posée au démarrage, gardée jusqu'à l'objectif, puis ta défense du début est remise.")),
+        el("button",{type:"button", class:"fermer", title:"Fermer", onclick:fermer}, "×")),
+      corps, pied));
+  fenetreDef = {rendre, fermer};
+  document.body.append(fond); document.body.classList.add("sans-defilement"); document.addEventListener("keydown", echap);
+  rendre(n, M);
+}
+function choixEngin(p, rang, engins, apres, opts={}){
+  // un engin se choisit sur son image (pas de nom : on le reconnaît plus vite) ; le bonus de tablettes est écrit dessous
+  const actuel = engins.find(e => e[0] === p[0]), bonus = opts.bonus || (e => e[2] ? "+" + e[2] + " %" : "sans bonus");
+  const bouton = el("button",{type:"button", class:"choix-engin", "aria-expanded":"false", title: actuel ? actuel[1] : "Choisir un engin"},
+    actuel ? (actuel[3] ? el("img",{src:actuel[3], alt:actuel[1]}) : el("span",{class:"nom-engin"}, actuel[1])) : el("span",{class:"vide"}, opts.vide || "aucun engin"),
+    actuel ? el("b",{}, bonus(actuel)) : null, el("span",{class:"fleche"}, "▼"));
+  const fermer = () => { const g = bouton.parentNode && bouton.parentNode.querySelector(".grille-engins"); if(g) g.remove(); bouton.setAttribute("aria-expanded", "false"); document.removeEventListener("click", dehors, true); };
+  const dehors = e => { if(!bouton.parentNode || !bouton.parentNode.contains(e.target)) fermer(); };
+  bouton.addEventListener("click", () => {
+    if(bouton.getAttribute("aria-expanded") === "true"){ fermer(); return; }
+    document.querySelectorAll(".grille-engins").forEach(g => g.remove());
+    const pris = new Set(rang.filter(q => q !== p && q[0]).map(q => q[0]));
+    const choisir = id => { fermer(); p[0] = id; if(id && !p[1]) p[1] = opts.defaut ?? "5"; apres(); };
+    bouton.after(el("div",{class:"grille-engins" + (opts.large ? " large" : "")}, engins.map(e => el("button",{type:"button", class:(e[0] === p[0] ? "on" : "") + (pris.has(e[0]) ? " pris" : ""),
+        title:e[1] + (pris.has(e[0]) ? " (déjà choisi)" : ""), disabled:pris.has(e[0]), onclick:() => choisir(e[0])},
+        e[3] ? el("img",{src:e[3], alt:e[1]}) : el("span",{class:"nom-engin"}, e[1]), el("b",{}, bonus(e)))),
+      el("button",{type:"button", class:"aucun", onclick:() => choisir(0)}, opts.vide ? "Aucun (" + opts.vide + ")" : "Aucun engin")));
+    bouton.setAttribute("aria-expanded", "true");
+    setTimeout(() => document.addEventListener("click", dehors, true), 0);
+  });
+  return bouton;
+}
+function enginsDef(genre){
+  // [id, nom, genre, bonus, image] -> forme de choixEngin [id, nom, bonus, image]
+  return (((serveur && serveur.evenements) || {}).defense_engins || []).filter(e => e[2] === genre).map(e => [e[0], e[1], e[3], e[4]]);
+}
+function choixEnginDef(p, genre, M, opts={}){
+  return choixEngin(p, [p], enginsDef(genre), () => changer(M), Object.assign({bonus: e => e[2], defaut: "", large: true}, opts));
+}
+const COURTS_DEF = {110:"Meurtrière", 624:"Archère", 627:"Mâchi-coulis", 637:"Rochers", 622:"Herse", 111:"Porte nomade", 626:"Porte", 625:"Douves enfl.", 112:"Douves inf.", 108:"Malle"};
+function tuileDef(p, genre, M, opts={}){
+  // une case comme dans l'écran de défense du jeu : l'image de l'engin, la quantité en bas à droite ; clic = choisir / régler
+  const liste = (((serveur && serveur.evenements) || {}).defense_engins || []).filter(e => e[2] === genre);
+  const e = liste.find(x => x[0] === p[0]);
+  const ok = !e || opts.sansQuantite || (/^\d+$/.test(String(p[1]).trim()) && +p[1] >= 1);
+  const visuel = x => x[4] ? el("img",{src:x[4], alt:x[1]}) : el("span",{class:"court"}, COURTS_DEF[x[0]] || x[1]);
+  const t = el("button",{type:"button", class:"tuile" + (opts.porte ? " porte" : "") + (genre === "douves" ? " eau" : "") + (e ? "" : " vide") + (ok ? "" : " manque"),
+      title: e ? e[1] + " (" + e[3] + ")" + (opts.sansQuantite ? "" : " : " + (p[1] || "?")) : (opts.titre || "case vide : clique pour choisir")},
+    e ? visuel(e) : el("span",{class:"plus"}, opts.porte ? "porte" : "+"),
+    e && !opts.sansQuantite ? el("i",{class:"qte"}, String(p[1] || "?")) : null);
+  const fermer = () => { document.querySelectorAll(".pop-def").forEach(x => x.remove()); document.removeEventListener("click", dehors, true); };
+  const dehors = ev => { if(!ev.target.closest || !ev.target.closest(".pop-def, .tuile")) fermer(); };
+  t.addEventListener("click", () => {
+    const ouvert = t.parentNode && t.parentNode.querySelector(".pop-def");
+    fermer(); if(ouvert) return;
+    const qte = opts.sansQuantite ? null : el("input",{type:"number", min:1, max:999, value:p[1], placeholder:"1 à 999",
+      oninput:ev => { p[1] = ev.target.value.trim(); if(opts.apres) opts.apres(); changer(M, false); }});
+    const pop = el("div",{class:"pop-def"},
+      el("div",{class:"choix"}, liste.map(x => el("button",{type:"button", class:x[0] === p[0] ? "on" : "", title:x[1],
+        onclick:() => { p[0] = x[0]; if(!opts.sansQuantite && !p[1]) p[1] = genre === "cour" ? "1" : "999"; if(opts.apres) opts.apres(); fermer(); changer(M); }}, x[4] ? visuel(x) : null, el("small",{}, x[1]), el("b",{}, x[3])))),
+      qte ? el("label",{class:"en-ligne"}, "Quantité", qte) : null,
+      el("button",{type:"button", class:"bouton", onclick:() => { p[0] = 0; p[1] = ""; if(opts.apres) opts.apres(); fermer(); changer(M); }}, opts.vider || "Vider la case"));
+    t.after(pop);
+    if(qte && p[0]) setTimeout(() => qte.focus(), 0);
+    setTimeout(() => document.addEventListener("click", dehors, true), 0);
+  });
+  return el("div",{class:"place-tuile"}, t);
+}
+function plateauDefense(d, M){
+  const total = el("span",{class:"total-def"});
+  const majTotal = () => { const t = ["L","M","R"].reduce((a, c) => a + (+d.mur[c].soldats || 0), 0);
+    total.textContent = "soldats : " + t + " %" + (t === 100 ? "" : " (doit faire 100 %)"); total.className = "total-def" + (t === 100 ? "" : " trop"); };
+  const melee = obj => {
+    // les deux parts écrites en clair aux deux bouts : glisser vers la gauche = plus de distance, vers la droite = plus de mêlée
+    const dist = el("b",{}), mel = el("b",{});
+    const maj = () => { const m = +obj.melee || 0; dist.textContent = (100 - m) + " %"; mel.textContent = m + " %"; };
+    maj();
+    return el("div",{class:"melee-def", title:"glisse vers la gauche pour plus de soldats à distance, vers la droite pour plus de soldats de mêlée"},
+      el("span",{class:"bout dist"}, "🏹 Distance", dist),
+      el("input",{type:"range", min:0, max:100, step:1, value:obj.melee, oninput:e => { obj.melee = e.target.value; maj(); changer(M, false); }}),
+      el("span",{class:"bout mel"}, "Mêlée ⚔", mel)); };
+  const col = (c, titre) => {
+    const s = d.mur[c], cases = s.cases.map((p, i) => ({p, i, porte: c === "M" && (i === 1 || i === 4)}));
+    const murs = cases.filter(x => !x.porte && !(c !== "M" && x.i === 4)), portes = cases.filter(x => x.porte);
+    return el("div",{class:"col-def" + (c === "M" ? " centre" : "")},
+      el("div",{class:"tete-def"}, el("b",{}, titre), el("label",{class:"pct", title:"part des soldats du mur de ce côté"},
+        el("input",{type:"number", min:0, max:100, value:s.soldats, oninput:e => { s.soldats = e.target.value.trim(); majTotal(); changer(M, false); }}), "% soldats")),
+      el("div",{class:"tuiles"}, murs.map(x => tuileDef(x.p, "mur", M))),
+      portes.length ? el("div",{class:"tuiles portes"}, portes.map(x => tuileDef(x.p, "porte", M, {porte:true}))) : null,
+      melee(s),
+      el("div",{class:"douves-def"}, el("small",{}, "Douves"), tuileDef(d.douves[c], "douves", M)));
+  };
+  majTotal();
+  const malles = d.cour.malles.map((q, i) => { const p = [+q > 0 ? 108 : 0, +q > 0 ? q : ""];
+    return tuileDef(p, "cour", M, {apres: () => { d.cour.malles[i] = p[0] ? (p[1] || "0") : "0"; }}); });
+  return el("div",{class:"plateau-def"},
+    el("div",{class:"cols-def"}, col("L", "Flanc gauche"), col("M", "Centre"), col("R", "Flanc droit")),
+    el("div",{class:"bas-def"},
+      el("div",{class:"col-def cour"}, el("div",{class:"tete-def"}, el("b",{}, "Cour")), el("div",{class:"tuiles"}, malles), melee(d.cour)),
+      el("div",{class:"legende-def"}, total, el("span",{}, "Curseur : à gauche = plus de distance 🏹, à droite = plus de mêlée ⚔"), el("span",{}, "clic sur une case : engin et quantité"))));
+}
+function secoursDefense(d, M){
+  const bloc = (g, titre) => { const p = [d.secours[g] || 0, ""];
+    return el("div",{class:"secours-un"}, tuileDef(p, g, M, {sansQuantite:true, vider:"Pas de secours", titre:"pas de secours", apres: () => { d.secours[g] = p[0] || 0; }}), el("small",{}, titre)); };
+  return el("div",{}, el("div",{class:"secours-def"}, bloc("mur", "Mur"), bloc("porte", "Porte"), bloc("douves", "Douves")),
+    el("p",{class:"aide", style:"margin:8px 0 0"}, "Si un engin manque dans une case, le bot met cet engin de secours à la place (même quantité). Sans secours, il met ce qui reste ou laisse la case vide."));
+}
+function defenseursKhan(d, M){
+  const liste = ((serveur && serveur.evenements) || {}).defenseurs || [];
+  return el("div",{}, el("div",{class:"recrues"}, liste.map(([c, nom, niveaux, image]) => {
+      const on = d.defenseurs.includes(c);
+      return el("label",{class:"recrue" + (on ? " on" : "")},
+        el("input",{type:"checkbox", checked:on, onchange:e => { d.defenseurs = e.target.checked ? liste.map(x => x[0]).filter(x => x === c || d.defenseurs.includes(x)) : d.defenseurs.filter(x => x !== c); changer(M); }}),
+        image ? el("img",{src:image, alt:""}) : null, el("b",{}, nom), niveaux > 1 ? el("span",{class:"niveaux", title:"tous les niveaux de ce soldat (" + niveaux + ") comptent ensemble"}, "tous niveaux") : null);
+    })),
+    el("p",{class:"aide", style:"margin:8px 0 0"}, "Ces soldats restent au château principal et le défendent. La Valkyrie franc-tireuse et le Protecteur du nord existent en plusieurs niveaux : en cochant l'un d'eux, tu gardes TOUS ses niveaux (niveau 1, 2… jusqu'au plus haut) ; ils comptent comme un seul type. Tous les autres soldats défensifs partent chez le joueur protégé. Les soldats d'attaque (pour les attaques du camp) ne bougent pas."));
+}
+function resumeCamps(){
+  if(!etat.evenements) return;
+  const tous = Object.values(((serveur.bot || {}).etat === "en_marche" && serveur.bot.evenements) || {});
+  for(const g of ["nomades","khan"]){
+    const n = etat.evenements[g], p = tous.find(x => x.evenement === g);
+    $("#ev-resume-" + g).textContent = (g === "nomades" ? (n.x && n.y ? "Camp (" + n.x + "," + n.y + ")" : "Pas encore réglé") : (n.commandants ? "Camp du Khan de l'alliance" : "Pas encore réglé"))
+      + (n.commandants ? " · commandants " + n.commandants : "")
+      + (p ? " · en cours : " + p.attaques + " attaque(s)" + (g === "khan" ? ", rage " + (p.rage ?? "?") + " / " + (p.rage_max ?? "?") + (p.declencher ? ", " + (p.defenses || 0) + " défense(s), " + (p.points || 0) + " point(s)" : "") : ", " + p.tablettes + " tablette(s)") : "");
+    const logo = (serveur.evenements || {})["logo_" + g], img = $("#ev-logo-" + g);
+    if(logo && img.hidden){ img.src = logo; img.hidden = false; }
+    const zone = $(g === "nomades" ? "#ev-progres" : "#ev-progres-khan");
+    if(g === "khan") zone.replaceChildren(...(p ? [el("p",{class:"aide", style:"margin:8px 0 0;color:var(--text)"},
+      "En cours : camp du Khan (" + p.x + "," + p.y + ")" + (p.niveau ? " niveau " + p.niveau : "") + ", rage " + (p.rage ?? "?") + " sur " + (p.rage_max ?? "?") + ", " + p.attaques + " attaque(s) envoyée(s)"
+      + (p.en_route ? " dont " + p.en_route + " en route" : "")
+      + (p.declencher ? ", Khan déclenché " + p.declenchements + " fois, " + (p.khan_en_route ?? 0) + " attaque(s) du Khan en route sur " + p.en_cours
+        + ", " + (p.defenses || 0) + " défense(s)" + (p.objectif_declenchements ? ", déclenché " + p.declenchements + " fois sur " + p.objectif_declenchements : "") + (p.perdues ? " (" + p.perdues + " perdue(s) pendant une attaque de joueur)" : "")
+        + ", " + (p.points || 0) + " point(s) nomades" + (p.objectif_points ? " sur " + p.objectif_points : "") + (p.soutiens ? ", " + p.soutiens + " envoi(s) chez le joueur protégé" : "")
+        + (p.fin ? ". Objectif atteint : " + p.fin + " — fin des défenses en cours" : "") : "")
+      + (Object.keys(p.passes || {}).length ? ", passe-temps : " + Object.entries(p.passes).map(([c, q]) => q + " × " + nomPasse(c)).join(", ") : "") + (p.pause ? ". En pause : " + p.pause : "."))] : []));
+  }
+}
+for(const g of ["nomades","khan"]){
+  const pave = $("#ev-pave-" + g), corps = $("#ev-corps-" + g);
+  const ouvrir = o => { pave.setAttribute("aria-expanded", o ? "true" : "false"); corps.hidden = !o; };
+  let o = g === "khan"; try{ const v = localStorage.getItem("ev-" + g + "-ouvert"); if(v !== null && g !== "khan") o = v === "1"; }catch(e){}
+  ouvrir(o);
+  pave.addEventListener("click", () => { const v = corps.hidden; ouvrir(v); try{ localStorage.setItem("ev-" + g + "-ouvert", v ? "1" : "0"); }catch(e){} });
+}
+/* ------------------------------------------------------------------ page Khan en direct (16/11) */
+function majComptesKhan(){
+  // compte à rebours des attaques du Khan, sans attendre la prochaine lecture de l'état
+  const b = serveur.bot || {}, ecart = Date.now()/1000 - (+b.maj || Date.now()/1000);
+  document.querySelectorAll("[data-khan-dans]").forEach(x => { const r = +x.dataset.khanDans - ecart;
+    x.textContent = r > 0 ? dureeTxt(r) : "arrive…"; x.closest(".kd-khan")?.classList.toggle("proche", r < 60); });
+  const lu = $("#kd-lu"); if(lu && lu.dataset.t) lu.textContent = "relue il y a " + dureeTxt(Date.now()/1000 - +lu.dataset.t);
+}
+function dessinerKhanDirect(){
+  const zone = $("#kd"); if(!zone || !$("#page-khan-direct").classList.contains("visible")) return;
+  const b = serveur.bot || {}, p = ((b.evenements || {}).khan) || null, info = (serveur && serveur.evenements) || {};
+  const eng = id => (info.defense_engins || []).find(e => e[0] === id);
+  if(!p || b.etat !== "en_marche"){
+    zone.replaceChildren(el("div",{class:"carte vide-kd"}, el("b",{}, "Le module Khan ne tourne pas."),
+      el("p",{class:"aide"}, "Lance le bot avec le module Khan (« Déclencher le Khan et défendre mon château principal » coché) : cette page montrera la défense de ton château en direct.")));
+    return;
+  }
+  const v = p.vue, rmax = p.rage_max || 0, rage = p.rage ?? 0, pct = rmax ? Math.min(100, Math.round(100 * rage / rmax)) : 0;
+  const tuile = (titre, valeur, sous, cls="") => el("div",{class:"kd-tuile " + cls}, el("small",{}, titre), el("b",{}, valeur), sous ? el("span",{}, sous) : null);
+  const khans = (p.khan_dans || []).map((s, i) => el("div",{class:"kd-khan"}, el("span",{}, "Attaque " + (i + 1)), el("b",{"data-khan-dans":String(s)}, dureeTxt(s))));
+  const haut = el("div",{class:"kd-tuiles"},
+    el("div",{class:"kd-tuile rage"}, el("small",{}, "Rage"), el("b",{}, fmtN(rage) + " / " + fmtN(rmax)),
+      el("div",{class:"kd-barre"}, el("i",{style:"width:" + pct + "%"})), el("span",{}, pct >= 100 ? "barre pleine" : fmtN(Math.max(0, rmax - rage)) + " à remplir")),
+    tuile("Khan déclenché", String(p.declenchements || 0) + (p.objectif_declenchements ? " / " + p.objectif_declenchements : ""), p.fin ? "objectif atteint" : "par le bot"),
+    tuile("Défenses", String(p.defenses || 0), p.perdues ? p.perdues + " perdue(s) (attaque de joueur)" : "depuis le lancement"),
+    tuile("Points nomades", fmtN(p.points || 0) + (p.objectif_points ? " / " + fmtN(p.objectif_points) : ""), fmtN(p.tablettes || 0) + " tablette(s), " + fmtN(p.medailles || 0) + " médaille(s)"),
+    el("div",{class:"kd-tuile khans"}, el("small",{}, "Attaques du Khan en route (" + (p.khan_en_route || 0) + " / " + (p.en_cours || "?") + ")"),
+      khans.length ? el("div",{class:"kd-liste"}, khans) : el("span",{}, "aucune pour l'instant")));
+  if(!v){ zone.replaceChildren(haut, el("p",{class:"aide"}, "La défense n'a pas encore été lue (premier passage du module)."));
+    majComptesKhan(); return; }
+  const case_ = (x, cls="") => { const e = x && x[0] !== -1 ? eng(x[0]) : null, q = x ? x[1] : 0;
+    return el("div",{class:"tuile kd " + cls + (e ? "" : " vide") + (e && q < (info.seuil_case || 100) ? " manque" : ""), title: e ? e[1] + " : " + q : "case vide"},
+      e ? (e[4] ? el("img",{src:e[4], alt:e[1]}) : el("span",{class:"court"}, COURTS_DEF[e[0]] || e[1])) : el("span",{class:"plus"}, "·"),
+      e ? el("i",{class:"qte"}, fmtN(q)) : null); };
+  const parts = (uc) => el("div",{class:"kd-parts"}, el("span",{class:"d"}, "🏹 " + (100 - (+uc || 0)) + " %"), el("span",{class:"m"}, (+uc || 0) + " % ⚔"));
+  const col = (c, titre) => { const m = v.mur[c], murs = m.S.filter((x, i) => !(c === "M" && (i === 1 || i === 4))), portes = c === "M" ? [m.S[1], m.S[4]] : [];
+    return el("div",{class:"col-def" + (c === "M" ? " centre" : "")}, el("div",{class:"tete-def"}, el("b",{}, titre), el("span",{class:"pct"}, (m.UP ?? "?") + " % soldats")),
+      el("div",{class:"tuiles"}, murs.map(x => case_(x))), portes.length ? el("div",{class:"tuiles portes"}, portes.map(x => case_(x, "porte"))) : null,
+      parts(m.UC), el("div",{class:"douves-def"}, el("small",{}, "Douves"), case_(v.douves[c], "eau"))); };
+  const stock = el("div",{class:"kd-stock"}, (v.stock || []).map(([w, n]) => { const e = eng(w), piece = (info.engins_pieces || []).includes(w), bas = piece && n < (info.seuil_achat || 3000);
+    return el("div",{class:"kd-engin" + (bas ? " bas" : "")}, e && e[4] ? el("img",{src:e[4], alt:""}) : el("span",{class:"court"}, e ? (COURTS_DEF[w] || e[1]) : w),
+      el("div",{}, el("small",{}, e ? e[1] : "engin " + w), el("b",{}, fmtN(n)), el("span",{}, piece ? (bas ? "rachat en pièces au prochain passage" : "rachat en pièces sous " + fmtN(info.seuil_achat || 3000)) : (w === 108 ? "rubis (pas de rachat)" : "rubis : pas de rachat"))));
+  }));
+  const defs = info.defenseurs || [];
+  const soldats = el("div",{class:"kd-soldats"}, (v.soldats || []).map(([c, nom, n]) => { const d = defs.find(x => x[0] === c);
+      return el("div",{class:"kd-soldat"}, d && d[3] ? el("img",{src:d[3], alt:""}) : null, el("div",{}, el("small",{}, nom + (d && d[2] > 1 ? " (tous niveaux)" : "")), el("b",{}, fmtN(n)))); }),
+    el("div",{class:"kd-soldat autres"}, el("div",{}, el("small",{}, "Autres soldats défensifs encore au château"), el("b",{}, fmtN(v.autres || 0)),
+      el("span",{}, (p.soutiens || 0) + " envoi(s) chez le joueur protégé (" + (v.abri || []).join(",") + ")"))));
+  zone.replaceChildren(haut,
+    el("div",{class:"kd-section"}, el("div",{class:"kd-titre"}, el("h3",{}, "🏰 Défense en place"), el("small",{id:"kd-lu", "data-t":String(v.t)}, "")),
+      el("div",{class:"cols-def"}, col("L", "Flanc gauche"), col("M", "Centre"), col("R", "Flanc droit")),
+      el("div",{class:"bas-def"}, el("div",{class:"col-def cour"}, el("div",{class:"tete-def"}, el("b",{}, "Cour")), el("div",{class:"tuiles"}, v.cour.S.map(x => case_(x))), parts(v.cour.UC)),
+        el("p",{class:"aide", style:"margin:6px 0 0;max-width:420px"}, "Chiffre sur une case = engins posés. En rouge : sous " + (info.seuil_case || 100) + ", le bot remet toute la défense au plein au prochain passage. Les soldats se répartissent sur le mur selon le % de chaque côté, comme dans le jeu."))),
+    el("div",{class:"deux-def"},
+      el("div",{class:"kd-section"}, el("h3",{}, "⚔ Soldats au château"), soldats),
+      el("div",{class:"kd-section"}, el("h3",{}, "🧰 Engins en stock"), stock)));
+  majComptesKhan();
+}
+function progresEvenements(){
+  resumeCamps();
+  const p = Object.values(((serveur.bot || {}).etat === "en_marche" && serveur.bot.evenements) || {}).find(x => x.evenement === "nomades");
+  $("#ev-progres").replaceChildren(...(p ? [el("p",{class:"aide", style:"margin:8px 0 0;color:var(--text)"},
+    "En cours : camp (" + p.x + "," + p.y + ")" + (p.niveau ? " niveau " + p.niveau : "") + ", " + p.attaques + " attaque(s) envoyée(s)" + (p.en_route ? " dont " + p.en_route + " en route" : "") + ", " + p.victoires_gagnees + " victoire(s), "
+    + p.tablettes + " tablette(s) gagnée(s)" + (p.stock_tablettes != null ? " (stock " + p.stock_tablettes + ")" : "")
+    + (Object.keys(p.passes || {}).length ? ", passe-temps : " + Object.entries(p.passes).map(([c, q]) => q + " × " + nomPasse(c)).join(", ") : "")
+    + (p.pause ? ". En pause : " + p.pause : "."))] : []));
+}
+// 17/11 : chaque page enregistre seulement sa partie (nomades ou Khan) ; l'autre est renvoyée telle qu'elle est enregistrée,
+// et ce qui y est en cours de modification reste à l'écran, pas enregistré
+for(const [pre, genre, mod] of [["ev", "nomades", "evenements"], ["kh", "khan", "khan"]]){
+const autre = genre === "khan" ? "nomades" : "khan";
+$("#" + pre + "-annuler").addEventListener("click", () => {
+  etat.evenements[genre] = etatCamp(((serveur.config.evenements || {})[genre]) || {}); sale[mod] = false;
+  dessinerEvenements(); marquer(mod); $("#" + pre + "-erreurs").replaceChildren(); pastilles(); });
+$("#" + pre + "-enregistrer").addEventListener("click", async () => {
+  const liste = $("#" + pre + "-erreurs"); liste.replaceChildren();
+  const n = etat.evenements[genre];
+  const err = campRempli(n, genre) ? erreursCamp(n, genre) : [];
+  if(err.length){ marquer(mod, "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x)));
+    liste.scrollIntoView({block:"center", behavior:"smooth"}); return; }
+  const corps = {};
+  if(campRempli(n, genre)) corps[genre] = corpsCamp(n, genre);
+  const enreg = (serveur.config.evenements || {})[autre];
+  if(enreg) corps[autre] = enreg;                                     // l'autre partie : telle qu'elle est enregistrée
+  try{
+    const rep = await api("/api/config/evenements", corps);
+    serveur.config.evenements = rep.config; etat.evenements[genre] = etatCamp(rep.config[genre] || {}); sale[mod] = false;
+    if(!sale[autre === "khan" ? "khan" : "evenements"]) etat.evenements[autre] = etatCamp(rep.config[autre] || {});
+    marquer(mod, "Enregistré dans config.json.", "ok"); dessinerEvenements(); pastilles(); dessinerModules();
+  }catch(e){
+    marquer(mod, "Pas enregistré : corrige les points ci-dessous.", "err");
+    liste.replaceChildren(...(e.erreurs || [e.message || "Erreur."]).map(x => el("li",{}, x)));
+  }
+});
+}
+
 /* ------------------------------------------------------------------ montee d'une tour (page Tours) */
 const DU = {0:"du vert",1:"des sables",2:"du glacier",3:"du feu"};
 function armeeMontee(kid){ const r = ((((serveur || {}).config || {}).tours || {}).reglages || {})[String(kid)]; return !!(r && r.mode); }
@@ -1230,13 +1962,14 @@ function etatMontee(c){ c = c || {};
   return {kid: Number.isInteger(c.kid) ? c.kid : 3, x: c.x != null ? String(c.x) : "", y: c.y != null ? String(c.y) : "",
           commandants: cmdTexte(c.commandants), niveau_vise: String(c.niveau_vise || ((serveur && serveur.montee) || {}).niveau_vise || 71),
           passes: Array.isArray(c.passes) ? [...c.passes] : ["MS5","MS4","MS3"]}; }
+const nivMax = () => ((serveur && serveur.montee) || {}).niveau_max || 71;      // niveau maximum d'une tour (comme le module tours)
 function erreursMontee(m){
   const e = [];
   for(const [k, n] of [["x","X"],["y","Y"]]) if(!/^\d+$/.test(String(m[k]).trim()) || +m[k] > 2000) e.push("Coordonnée " + n + " de la tour : un nombre entre 0 et 2000.");
   const cm = cmdListe(m.commandants);
   if(!cm.length || cm.some(x => x < 1 || x > 35) || new Set(cm).size !== cm.length || String(m.commandants).split(";").some(x => !/^\s*\d+\s*$/.test(x)))
     e.push("Commandants dédiés : numéros de 1 à 35 séparés par des ; (ex. 20;21;22).");
-  if(!/^\d+$/.test(String(m.niveau_vise).trim()) || +m.niveau_vise < 1 || +m.niveau_vise > 90) e.push("Niveau visé : entre 1 et 90.");
+  if(!/^\d+$/.test(String(m.niveau_vise).trim()) || +m.niveau_vise < 1 || +m.niveau_vise > nivMax()) e.push("Niveau visé : entre 1 et " + nivMax() + " (niveau maximum d'une tour).");
   if(!m.passes.length) e.push("Coche au moins un passe-temps.");
   return e;
 }
@@ -1248,10 +1981,13 @@ function dessinerMontee(){
   for(const [id, k] of [["mt-x","x"],["mt-y","y"],["mt-cmd","commandants"],["mt-niveau","niveau_vise"]]) if(document.activeElement !== $("#" + id)) $("#" + id).value = m[k];
   $("#mt-passes").replaceChildren(...(info.passes || []).map(([c, t]) => el("label",{class:"passe" + (m.passes.includes(c) ? " on" : "")},
     el("input",{type:"checkbox", checked:m.passes.includes(c), onchange:e => { m.passes = e.target.checked ? [...m.passes, c] : m.passes.filter(x => x !== c); changer("montee"); }}), t)));
-  const mx = maxi[String(m.kid)], nv = +m.niveau_vise || 0;
+  const mx = maxi[String(m.kid)], nv = +m.niveau_vise || 0, lim = mx != null ? Math.min(nivMax(), mx) : nivMax();
+  $("#mt-niveau").max = String(nivMax());
   const ct = ((serveur.config || {}).tours || {}).commandants, tc = Array.isArray(ct) ? ct : cmdListe(ct), communs = cmdListe(m.commandants).filter(x => tc.includes(x));
-  $("#mt-info").textContent = (mx != null ? "Dernier niveau d'une tour " + DU[m.kid] + " dans les données du jeu : " + mx
-      + (nv > mx ? " (le bot s'arrêtera à " + mx + ")." : ".") : "")
+  $("#mt-info").textContent = "Niveau visé : " + nivMax() + " au maximum"
+      + (mx != null && mx < nivMax() ? " (" + mx + " pour une tour " + DU[m.kid] + ", son dernier niveau)" : "")
+      + (nv > lim && nv <= nivMax() ? " : le bot s'arrêtera à " + lim : "") + ". Jamais d'attaque en trop : les départs s'arrêtent dès que"
+      + " les attaques en route suffisent, et le module s'arrête dès que la tour y est."
     + " Les passe-temps sont combinés pour gâcher le moins de temps (blocage de 3 h → 3 × 1 h ; 2 h 33 → 2 × 1 h + 30 min + 10 min)."
     + (communs.length ? " Commandant(s) " + communs.join(";") + " aussi dans la liste du module tours : si les deux tournent, il(s) ne servira(ont) qu'à la montée." : "")
     + (armeeMontee(m.kid) ? "" : " ATTENTION : l'armée " + DU[m.kid] + " n'est pas réglée dans la page Tours (coche ce royaume, règle-le, enregistre ; tu peux le décocher ensuite).");
@@ -1281,6 +2017,8 @@ function configOk(nom){
   const c = serveur && serveur.config[nom];
   if(nom === "materiaux") return !!(c && !erreursMateriaux(etatMateriaux(c)).length);
   if(nom === "montee") return !!(c && !erreursMontee(etatMontee(c)).length && armeeMontee(c.kid));
+  if(nom === "evenements") return !!(c && c.nomades && c.nomades.commandants && c.nomades.commandants.length && !erreursCamp(etatCamp(c.nomades), "nomades").length);
+  if(nom === "khan"){ const k = (serveur.config.evenements || {}).khan; return !!(k && k.commandants && k.commandants.length && !erreursCamp(etatCamp(k), "khan").length); }
   if(nom === "recrutement") return !!(c && !erreursRecrutement(etatRecrutement(c)).length);
   if(nom === "transferts") return !!(c && !erreursTransferts(etatTransferts(c)).length);
   if(nom === "defense") return !!(c && c.seuil && !erreursDefense(etatDefense(c)).length);
@@ -1288,13 +2026,14 @@ function configOk(nom){
   return !!(c && c.commandants && c.commandants.length && c.royaumes && c.royaumes.length);
 }
 function pastilles(){
-  for(const nom of ["tours","montee","forteresses","achats","defense","transferts","recrutement","materiaux"]){
+  for(const nom of ["tours","montee","evenements","khan","forteresses","achats","defense","transferts","recrutement","materiaux"]){
     const p = $("#p-"+nom); if(!p || !serveur) continue;
-    const ok = configOk(nom); p.textContent = sale[nom] ? "modifié" : ok ? "prêt" : "à régler"; p.className = "pastille" + (ok && !sale[nom] ? " ok" : "");
+    const sl = sale[nom];
+    const ok = configOk(nom); p.textContent = sl ? "modifié" : ok ? "prêt" : "à régler"; p.className = "pastille" + (ok && !sl ? " ok" : "");
   }
 }
 const choixModules = new Set();
-const NOMS_MODULES = {defense:"Défense", montee:"Tours lev max", materiaux:"Matériaux"};
+const NOMS_MODULES = {defense:"Défense", montee:"Tours lev max", materiaux:"Matériaux", evenements:"Événements", khan:"Khan"};
 function dessinerModules(){
   const zone = $("#choix-modules"); zone.replaceChildren();
   const desc = {tours:"Tours les plus proches, couronne par couronne.", forteresses:"Forteresses lues sur la carte, minuteur personnel.",
@@ -1303,13 +2042,24 @@ function dessinerModules(){
     transferts:"Ressources réparties entre les royaumes (spéciale de chaque royaume, bois et pierre en trop).",
     recrutement:"Caserne et atelier de siège remplis en continu, aide de l'alliance demandée.",
     materiaux:"Raffinerie, outilleur et butin du dragon : fabrications lancées en continu.",
-    montee:"Une tour montée au niveau max : salves d'attaques, blocage sauté avec des passe-temps (réglages : page Tours lev max)."};
+    montee:"Une tour montée au niveau max : salves d'attaques, blocage sauté avec des passe-temps (réglages : page Tours lev max).",
+    evenements:"Nomades : un camp attaqué en boucle par salves, délai sauté avec des passe-temps (réglages : page Événements).",
+    khan:"Camp du Khan : attaques avec bannières de rage, déclenchement du Khan et défense de ton château principal jusqu'à l'objectif (réglages : page Khan). Seul avec défense, recrutement, matériaux, achats et transferts, qui ne passent que quand il n'a rien à faire."};
+  // 16/11 : un module peut en exclure d'autres (le Khan garde le compte pour lui : pas de tours, forteresses, tours lev max ni nomades)
+  const nomM = n => NOMS_MODULES[n] || (n[0].toUpperCase() + n.slice(1));
+  const bloquePar = n => serveur.modules.find(x => choixModules.has(x.nom) && x.nom !== n && ((x.incompatibles || []).includes(n)
+    || (serveur.modules.find(y => y.nom === n)?.incompatibles || []).includes(x.nom)));
   for(const m of serveur.modules){
-    const ok = configOk(m.nom), on = choixModules.has(m.nom);
-    const cb = el("input",{type:"checkbox", checked:on, onchange:e => { e.target.checked ? choixModules.add(m.nom) : choixModules.delete(m.nom); dessinerModules(); }});
-    zone.append(el("label",{class: on ? "on" : ""}, cb, el("div",{}, el("b",{}, (NOMS_MODULES[m.nom] || (m.nom[0].toUpperCase() + m.nom.slice(1))) + "  "),
+    const ok = configOk(m.nom), on = choixModules.has(m.nom), bloc = on ? null : bloquePar(m.nom);
+    const cb = el("input",{type:"checkbox", checked:on, disabled:!!bloc, onchange:e => {
+      if(e.target.checked){ choixModules.add(m.nom);
+        for(const x of serveur.modules) if((m.incompatibles || []).includes(x.nom) || (x.incompatibles || []).includes(m.nom)) choixModules.delete(x.nom); }
+      else choixModules.delete(m.nom);
+      dessinerModules(); }});
+    zone.append(el("label",{class: (on ? "on" : "") + (bloc ? " bloque" : ""), title: bloc ? "Pas avec le module " + nomM(bloc.nom) + " : décoche-le d'abord." : ""}, cb, el("div",{}, el("b",{}, nomM(m.nom) + "  "),
       m.priorite === Math.min(...serveur.modules.map(x=>x.priorite)) ? el("span",{class:"puce or"},"prioritaire") : null, " ",
-      el("span",{class:"puce " + (ok ? "ok" : "err")}, ok ? "réglages OK" : "à régler"), el("small",{style:"display:block;margin-top:4px"}, desc[m.nom] || ""))));
+      bloc ? el("span",{class:"puce"}, "pas avec " + nomM(bloc.nom)) : el("span",{class:"puce " + (ok ? "ok" : "err")}, ok ? "réglages OK" : "à régler"),
+      el("small",{style:"display:block;margin-top:4px"}, desc[m.nom] || ""))));
   }
 }
 function depuis(t){ const s = Math.max(0, Date.now()/1000 - t); return s < 90 ? Math.round(s)+" s" : s < 5400 ? Math.round(s/60)+" min" : (s/3600).toFixed(1)+" h"; }
@@ -1337,6 +2087,18 @@ function dessinerEtat(){
     for(const [nom, v] of Object.entries(b.defense || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Défense"),
         el("b",{}, String(v[1])), el("small",{}, v[0] + " attaque(s) vue(s), " + v[1] + " mise(s) à l'abri"),
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
+    for(const [nom, p] of Object.entries(b.evenements || {})) ch.append(p.evenement === "khan" ? el("div",{class:"chiffre"}, el("small",{}, "Khan : rage"),
+        el("b",{}, (p.rage ?? "?") + " / " + (p.rage_max ?? "?")),
+        el("small",{}, p.attaques + " attaque(s)" + (p.declencher ? " · Khan déclenché " + p.declenchements + " fois · " + (p.khan_en_route ?? 0) + "/" + p.en_cours + " Khan en route" : "") + (p.niveau ? " · camp niveau " + p.niveau : "") + " · " + p.en_route + " en route"),
+        p.declencher ? el("small",{}, (p.defenses || 0) + " défense(s)" + (p.objectif_declenchements ? " · déclenché " + p.declenchements + " / " + p.objectif_declenchements : "") + " · " + (p.points || 0) + " point(s) nomades" + (p.objectif_points ? " / " + p.objectif_points : "")) : null,
+        p.fin ? el("small",{style:"color:#ffcf7a"}, "objectif atteint : fin des défenses en cours") : null,
+        p.pause ? el("small",{style:"color:#ffcf7a"}, "en pause : " + p.pause) : null,
+        (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null)
+      : el("div",{class:"chiffre"}, el("small",{}, "Nomades : tablettes gagnées"),
+        el("b",{}, String(p.tablettes).replace(/\B(?=(\d{3})+(?!\d))/g, " ")),
+        el("small",{}, p.attaques + " attaque(s), " + p.victoires_gagnees + " victoire(s)" + (p.niveau ? " · camp niveau " + p.niveau : "") + " · " + p.en_route + " en route"),
+        p.pause ? el("small",{style:"color:#ffcf7a"}, "en pause : " + p.pause) : null,
+        (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
     for(const [nom, p] of Object.entries(b.montee || {})) ch.append(el("div",{class:"chiffre"}, el("small",{}, "Tours lev max : tour " + NOMS[p.royaume] + " (" + p.x + "," + p.y + "), niveau"),
         el("b",{}, p.niveau != null ? p.niveau + " / " + p.niveau_vise : "…"),
         el("small",{}, (p.victoires != null ? p.victoires + " / " + p.victoires_visees + " victoires · " : "") + p.attaques + " attaque(s), " + p.en_route + " en route"
@@ -1344,15 +2106,22 @@ function dessinerEtat(){
         p.pause ? el("small",{style:"color:#ffc46b"}, "pause : " + p.pause) : null,
         (b.arretes||{})[nom] ? el("small",{style:(p.fini && /NIVEAU VISE/.test(b.arretes[nom]) ? "color:#7fe0a8" : "color:#ff8e7e")},
           (p.fini && /NIVEAU VISE/.test(b.arretes[nom]) ? "terminé : " : "arrêté : ") + b.arretes[nom]) : null));
-    for(const [nom, n] of Object.entries(b.attaques || {}))
-      ch.append(el("div",{class:"chiffre"}, el("small",{}, "Attaques " + nom), el("b",{}, String(n)),
+    for(const [nom, n] of Object.entries(b.attaques || {})){
+      // forteresses : combien d'attaques dans chaque royaume, et sur combien de forteresses différentes
+      const pr = nom === "forteresses" ? (b.attaques_royaumes || {})[nom] || {} : {};
+      const lignes = [0, 2, 1, 3].filter(k => pr[k] && pr[k][0]).map(k => el("div",{style:"--c:" + COULEURS[k]}, el("i",{}),
+        el("span",{}, NOMS[k][0].toUpperCase() + NOMS[k].slice(1) + " : "), el("b",{}, pr[k][0] + " attaque" + (pr[k][0] > 1 ? "s" : "")),
+        el("span",{}, "sur " + pr[k][1] + " forteresse" + (pr[k][1] > 1 ? "s" : ""))));
+      ch.append(el("div",{class:"chiffre" + (lignes.length ? " large" : "")}, el("small",{}, "Attaques " + nom), el("b",{}, String(n)),
+        lignes.length ? el("div",{class:"par-royaume"}, ...lignes) : null,
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null));
+    }
   }
   $("#b-demarrer").disabled = marche || attente; $("#b-arreter").disabled = !(marche || attente) || b.arret_demande;
 }
 $("#b-demarrer").addEventListener("click", async () => {
   $("#l-erreurs").replaceChildren(); $("#l-msg").textContent = "";
-  if(sale.tours || sale.forteresses || sale.achats || sale.defense || sale.transferts || sale.recrutement || sale.materiaux || sale.montee){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
+  if(sale.tours || sale.forteresses || sale.achats || sale.defense || sale.transferts || sale.recrutement || sale.materiaux || sale.montee || sale.evenements || sale.khan){ $("#l-erreurs").append(el("li",{},"Enregistre d'abord les réglages modifiés.")); return; }
   const corps = {modules:[...choixModules], duree:$("#l-duree").value.trim(), max_attaques: $("#l-max").value ? +$("#l-max").value : null, simulation:$("#l-simu").checked, ecran_allume:$("#l-ecran").checked};
   try{ await api("/api/demarrer", corps); $("#l-msg").textContent = "Démarré : regarde la fenêtre du bot."; }
   catch(e){ $("#l-erreurs").replaceChildren(...(e.erreurs||["Erreur"]).map(x => el("li",{},x))); }
@@ -1502,7 +2271,11 @@ $("#maj-installer").addEventListener("click", installerMaj);
 async function majEtat(){
   try{ const d = await api("/api/etat"); serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; serveur.sessions = d.sessions;
     if(!sale.montee && JSON.stringify(d.config.montee) !== JSON.stringify(serveur.config.montee)){ serveur.config.montee = d.config.montee; etat.montee = etatMontee(d.config.montee); }
-    dessinerEtat(); dessinerSessions(); dessinerMontee(); }catch(e){}
+    if(JSON.stringify(d.config.evenements) !== JSON.stringify(serveur.config.evenements)){ serveur.config.evenements = d.config.evenements;
+      if(!sale.evenements) etat.evenements.nomades = etatCamp((d.config.evenements || {}).nomades || {});
+      if(!sale.khan) etat.evenements.khan = etatCamp((d.config.evenements || {}).khan || {});
+      dessinerEvenements(); }
+    dessinerEtat(); dessinerSessions(); dessinerMontee(); progresEvenements(); dessinerKhanDirect(); }catch(e){}
 }
 function dureeTxt(s){ s = Math.max(0, Math.round(s)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60);
   return h ? h + " h " + String(m).padStart(2,"0") + " min" : m ? m + " min" : s + " s"; }
@@ -1543,6 +2316,7 @@ async function debut(){
   setInterval(() => verifierMaj(false), 30 * 60 * 1000);
   setInterval(() => rafraichirJournal(false), 1500);
   setInterval(majEtat, 4000);
+  setInterval(() => { if($("#page-khan-direct").classList.contains("visible")) majComptesKhan(); }, 1000);
   setInterval(() => { if((serveur.sessions || []).some(s => s.en_cours)) dessinerSessions(); }, 1000);   // duree en direct
 }
 debut().catch(e => { document.body.innerHTML = '<p style="padding:40px;color:#ff8e7e">Interface injoignable : lance outils\\lancer_interface.bat</p>'; });

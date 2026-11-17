@@ -53,7 +53,7 @@ TYPE_AIDE = 6                   # ahr T=6 : aide au recrutement
 TYPES_PRINCIPAUX = (1, 12)      # chateau principal (grand empire) / chateau d'un royaume
 # noms affiches (interface, journal) ; un type absent garde son nom du jeu
 NOMS = {"MeadRanger": "Valkyrie pisteuse", "MeadShieldMaiden": "Vierge au bouclier", "MeadBow": "Valkyrie franc-tireuse",
-        "MeadMace": "Protecteur du nord",
+        "MeadMace": "Protecteur du nord", "RelicShortBow": "Guerrier a arc court relique", "RelicAxe": "Guerrier a hache relique",
         "SceatFameShield": "Tour de gloire", "SceatAttWallMelee": "Canon lance-grappin", "SceatAttMoatAttRange": "Hwacha",
         "SceatAttWallAttRange": "Mortier de siege", "SceatSuppAttWaves": "Chariot de guerre",
         "SceatSuppAttPowerYard": "Lance-flammes d'assaut"}

@@ -41,14 +41,18 @@ import materiaux    # noqa: E402
 import defense      # noqa: E402
 import transferts   # noqa: E402
 import montee       # noqa: E402
+import evenements   # noqa: E402
+import khan         # noqa: E402,F401
+import khan_defense  # noqa: E402
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(ICI, "interface.html")
 PORT = 8770
 DOSSIER_IMAGES = os.path.join(ICI, "images")
-NOMS_UNITES = {215: "Vierge à bouclier niv. 10", 6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
+NOMS_UNITES = {215: "Vierge à bouclier", 2069: "Guerrier à arc court relique", 2029: "Guerrier à hache relique",
+               6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-14-levmax"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-17-reliques1"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -114,10 +118,11 @@ def _reglages_communs(src, nom, erreurs, b):
         return
     b["mode"] = mode
     if mode == "auto":
-        if src.get("cotes") not in combat.COTES:
-            erreurs.append("%s : côtés F, FF, A, AF ou AFF." % nom)
+        cotes = combat.normaliser_cotes(src.get("cotes"))
+        if cotes is None:
+            erreurs.append("%s : choisis au moins un côté (flanc gauche, centre, flanc droit)." % nom)
         else:
-            b["cotes"] = src["cotes"]
+            b["cotes"] = cotes
     else:
         p = src.get("presets")
         if not isinstance(p, list) or len(p) != tours.NB_PRESELECTIONS_DEMANDEES:
@@ -303,7 +308,7 @@ def normaliser_montee(data, ancienne=None):
     cmds = _commandants(data.get("commandants", ""), erreurs)
     p = data.get("passes")
     if not isinstance(p, list) or not p or not all(c in montee.PASSES for c in p):
-        erreurs.append("Passe-temps : coche au moins un passe-temps (1 h, 30 min ou 10 min).")
+        erreurs.append("Passe-temps : coche au moins un passe-temps (24 h, 5 h, 1 h, 30 min ou 10 min).")
     nv = _entier(data.get("niveau_vise", montee.NIVEAU_VISE), "Niveau visé", 1, montee.NIVEAU_MAX_SAISIE, erreurs)
     if erreurs:
         raise ErreurSaisie(erreurs)
@@ -320,6 +325,8 @@ def normaliser_lanceur(data, ancienne=None):
     mods = data.get("modules")
     if not isinstance(mods, list) or not mods or not all(m in noms for m in mods):
         erreurs.append("Modules : coche au moins un module.")
+    else:
+        erreurs.extend("Modules : " + x for x in bot.incompatibilites(mods))
     duree = (data.get("duree") or "").strip() if isinstance(data.get("duree", ""), str) else None
     if duree is None:
         erreurs.append("Durée : texte attendu (ex. 3h, 90m, 2h30) ou vide.")
@@ -451,7 +458,8 @@ def normaliser_transferts(data, ancienne=None):
 
 
 NOMS_RECRUTEMENT = {"MeadRanger": "Valkyrie pisteuse", "MeadShieldMaiden": "Vierge au bouclier", "MeadBow": "Valkyrie franc-tireuse",
-                    "MeadMace": "Protecteur du nord", "SceatFameShield": "Tour de gloire", "SceatAttWallMelee": "Canon lance-grappin",
+                    "MeadMace": "Protecteur du nord", "RelicShortBow": "Guerrier à arc court relique",
+                    "RelicAxe": "Guerrier à hache relique", "SceatFameShield": "Tour de gloire", "SceatAttWallMelee": "Canon lance-grappin",
                     "SceatAttMoatAttRange": "Hwacha", "SceatAttWallAttRange": "Mortier de siège",
                     "SceatSuppAttWaves": "Chariot de guerre", "SceatSuppAttPowerYard": "Lance-flammes d'assaut"}
 _catalogue = []
@@ -577,6 +585,181 @@ def normaliser_materiaux(data, ancienne=None):
     return cfg
 
 
+NOMS_ENGINS_NOMADES = {740: "Échelle en tronc", 168: "Échelle en tronc améliorée", 142: "Échelle combinée d'élite",
+                       738: "Bélier de feu", 167: "Bélier de feu amélioré", 141: "Bélier combiné d'élite",
+                       739: "Boucliers roulants", 169: "Boucliers roulants améliorés", 143: "Bouclier combiné d'élite", 635: "Mur de boucliers"}
+
+
+def _image(dossier, nom):
+    return "images/%s/%s.png" % (dossier, nom) if os.path.exists(os.path.join(DOSSIER_IMAGES, dossier, "%s.png" % nom)) else None
+
+
+def _engins_nomades(liste, nom, cases, erreurs):
+    """[[id, quantite], ...] de la page -> liste validee (cases vides ignorees)."""
+    res = []
+    for p in liste if isinstance(liste, list) else []:
+        if not isinstance(p, list) or len(p) != 2 or p[0] in (None, "", 0):
+            continue
+        if p[0] not in evenements.ENGINS:
+            erreurs.append("%s : engin inconnu." % nom)
+            return None
+        if cases == 2 and p[0] not in evenements.ENGINS_FLANC:
+            erreurs.append("%s : pas de bélier sur un flanc (les béliers vont au centre)." % nom)
+            return None
+        q = _entier(p[1], "%s, %s" % (nom, NOMS_ENGINS_NOMADES[p[0]]), 1, evenements.QUANTITE_MAX, erreurs)
+        if q is None:
+            return None
+        res.append([p[0], q])
+    if len(res) > cases or len({p[0] for p in res}) != len(res):
+        erreurs.append("%s : %d engins différents au plus." % (nom, cases))
+        return None
+    place = evenements.PLACE_ENGINS["flanc" if cases == 2 else "centre"]
+    if sum(p[1] for p in res) > place:
+        erreurs.append("%s : %d engins au plus en tout (%d choisis)." % (nom, place, sum(p[1] for p in res)))
+        return None
+    return res
+
+
+def normaliser_evenements(data, ancienne=None):
+    """Page Evenements -> rubrique "evenements" ({"nomades": {...}, "khan": {...}}), ou ErreurSaisie.
+    Une partie absente de la page (pas remplie) est retiree des reglages."""
+    erreurs = []
+    cfg = dict(ancienne) if isinstance(ancienne, dict) else {}
+    for genre in ("nomades", "khan"):
+        if isinstance(data.get(genre), dict):
+            cfg[genre] = _normaliser_camp(data[genre], genre, erreurs)
+        else:
+            cfg.pop(genre, None)
+    if erreurs:
+        raise ErreurSaisie(erreurs)
+    return cfg
+
+
+def _normaliser_camp(d, genre, erreurs):
+    khan = genre == "khan"
+    nb_avant = len(erreurs)
+    n = {}
+    if not khan:
+        n["x"] = _entier(d.get("x"), "Nomades, coordonnée X du camp", 0, 2000, erreurs)
+        n["y"] = _entier(d.get("y"), "Nomades, coordonnée Y du camp", 0, 2000, erreurs)
+    n["commandants"] = _commandants(d.get("commandants", ""), erreurs)
+    _reglages_communs(dict(d, mode="auto"), "Nomades", erreurs, n)     # nomades : remplissage automatique seulement
+    if n.get("mode") == "auto":
+        s = d.get("soldats")
+        if not (isinstance(s, list) and 1 <= len(s) <= tours.NB_SOLDATS_MAX and len(set(s)) == len(s)
+                and all(isinstance(u, int) and not isinstance(u, bool) and u > 0 for u in s)):
+            erreurs.append("Nomades : choisis de 1 à %d unités de soldats." % tours.NB_SOLDATS_MAX)
+        else:
+            n["soldats"] = list(s)
+        s2 = d.get("soldats_suite", [])
+        if not (isinstance(s2, list) and len(s2) <= tours.NB_SOLDATS_MAX and len(set(s2)) == len(s2)
+                and all(isinstance(u, int) and not isinstance(u, bool) and u > 0 for u in s2)):
+            erreurs.append("Nomades : soldats des vagues suivantes invalides.")
+        else:
+            n["soldats_suite"] = list(s2)
+        e = d.get("engins") if isinstance(d.get("engins"), dict) else {}
+        n["engins"] = {"flanc": _engins_nomades(e.get("flanc"), "Engins de la vague 1, flanc", 2, erreurs),
+                       "centre": _engins_nomades(e.get("centre"), "Engins de la vague 1, centre", 3, erreurs)}
+        k = d.get("coffres") if isinstance(d.get("coffres"), dict) and not khan else {}
+        types = [w for w in evenements.COFFRES if w in (k.get("types") or [])]
+        if k.get("actif") and not types:
+            erreurs.append("Nomades : coche au moins un coffre, ou désactive les coffres.")
+        n["coffres"] = {"actif": bool(k.get("actif")), "types": types, "ordre": "faibles" if k.get("ordre") == "faibles" else "forts"}
+    p = d.get("passes")
+    if not isinstance(p, list) or not p or not all(c in montee.PASSES for c in p):
+        erreurs.append("Nomades, passe-temps : coche au moins un passe-temps (24 h, 5 h, 1 h, 30 min ou 10 min).")
+    n["remplir_cour"] = bool(d.get("remplir_cour"))
+    if khan:
+        n.pop("coffres", None)
+        n["bannieres"] = [w for w in evenements.BANNIERES if w in (d.get("bannieres") or [])]
+        if not n["bannieres"]:
+            erreurs.append("Khan : coche au moins un outil de rage.")
+        n["declencher"] = bool(d.get("declencher"))
+        if n["declencher"]:
+            n["en_cours"] = _entier(d.get("en_cours", 3), "Khan, attaques du Khan gardées en route", 1, evenements.EN_COURS_MAX, erreurs)
+            n["objectif_declenchements"] = _entier(d.get("objectif_declenchements", d.get("objectif_defenses", 0)), "Khan, objectif en déclenchements", 0, 10 ** 9, erreurs)
+            n["objectif_points"] = _entier(d.get("objectif_points", 0), "Khan, objectif en points nomades", 0, 10 ** 12, erreurs)
+            n["defense"] = _defense_khan(d.get("defense"), erreurs)
+    else:
+        n["max_attaques"] = _entier(d.get("max_attaques", 0), "Nomades, arrêt après un nombre d'attaques", 0, 10 ** 6, erreurs)
+        n["max_tablettes"] = _entier(d.get("max_tablettes", 0), "Nomades, arrêt après un nombre de tablettes", 0, 10 ** 9, erreurs)
+    if len(erreurs) > nb_avant:
+        if khan:
+            erreurs[nb_avant:] = [e.replace("Nomades", "Khan") for e in erreurs[nb_avant:]]
+        return None
+    n["passes"] = [c for c in montee.PASSES if c in p]
+    if not (evenements.khan_valides(n) if khan else evenements.nomades_valides(n)):
+        erreurs.append("%s : réglages incomplets." % ("Khan" if khan else "Nomades"))
+        return None
+    return n
+
+
+NOMS_COTES_DEF = {"L": "flanc gauche", "M": "centre", "R": "flanc droit"}
+
+
+def _case_def(c, genre, nom, erreurs):
+    """[engin, quantite] (ou vide) d'une case de la defense Khan -> case validee, None (vide) ou False (erreur)."""
+    if not isinstance(c, list) or len(c) != 2 or c[0] in (None, "", 0, -1):
+        return None
+    if c[0] not in khan_defense.ENGINS_DEFENSE or khan_defense.ENGINS_DEFENSE[c[0]][1] != genre:
+        erreurs.append("Khan, défense, %s : cet engin ne va pas dans cette case." % nom)
+        return False
+    q = _entier(c[1], "Khan, défense, %s (%s)" % (nom, khan_defense.ENGINS_DEFENSE[c[0]][0]), 1, khan_defense.QUANTITE_CASE_MAX, erreurs)
+    return False if q is None else [c[0], q]
+
+
+def _defense_khan(d, erreurs):
+    """Reglages de la defense Khan de la page -> dict valide (khan_defense.defense_valide), ou None (erreurs ajoutees)."""
+    d = d if isinstance(d, dict) else {}
+    nb = len(erreurs)
+    res = {"mur": {}, "douves": {}, "secours": {}}
+    mur = d.get("mur") if isinstance(d.get("mur"), dict) else {}
+    for c in "LMR":
+        s = mur.get(c) if isinstance(mur.get(c), dict) else {}
+        cases = list(s.get("cases") or []) if isinstance(s.get("cases"), list) else []
+        cases = (cases + [None] * khan_defense.CASES[c])[:khan_defense.CASES[c]]
+        r = [None if c != "M" and i == 4 else _case_def(x, khan_defense.genre_case(c, i), "%s, case %d" % (NOMS_COTES_DEF[c], i + 1), erreurs)
+             for i, x in enumerate(cases)]                    # 5e case des flancs : pas contre le Khan (seulement contre les seigneurs)
+        res["mur"][c] = {"cases": r, "soldats": _entier(s.get("soldats", 0), "Khan, défense, %s : %% des soldats" % NOMS_COTES_DEF[c], 0, 100, erreurs),
+                         "melee": _entier(s.get("melee", 50), "Khan, défense, %s : %% de mêlée" % NOMS_COTES_DEF[c], 0, 100, erreurs)}
+    if len(erreurs) == nb and sum(res["mur"][c]["soldats"] for c in "LMR") != 100:
+        erreurs.append("Khan, défense : la répartition des soldats (flanc gauche + centre + flanc droit) doit faire 100 %%, pas %d %%."
+                       % sum(res["mur"][c]["soldats"] for c in "LMR"))
+    dv = d.get("douves") if isinstance(d.get("douves"), dict) else {}
+    for c in "LMR":
+        res["douves"][c] = _case_def(dv.get(c), "douves", "douves (%s)" % NOMS_COTES_DEF[c], erreurs)
+    cour = d.get("cour") if isinstance(d.get("cour"), dict) else {}
+    malles = (list(cour.get("malles") or []) + [0, 0, 0])[:3] if isinstance(cour.get("malles"), list) else [0, 0, 0]
+    res["cour"] = {"malles": [_entier(q if q not in (None, "") else 0, "Khan, défense, cour : malles de la case %d" % (i + 1), 0,
+                                      khan_defense.QUANTITE_CASE_MAX, erreurs) for i, q in enumerate(malles)],
+                   "melee": _entier(cour.get("melee", 50), "Khan, défense, cour : % de mêlée", 0, 100, erreurs)}
+    sec = d.get("secours") if isinstance(d.get("secours"), dict) else {}
+    for g in ("mur", "porte", "douves"):
+        w = sec.get(g)
+        if w in (None, "", 0, -1):
+            res["secours"][g] = None
+        elif w in khan_defense.ENGINS_DEFENSE and khan_defense.ENGINS_DEFENSE[w][1] == g:
+            res["secours"][g] = w
+        else:
+            erreurs.append("Khan, défense : engin de secours invalide (%s)." % g)
+    ds = [x for x in khan_defense.IDS_DEFENSEURS if x in (d.get("defenseurs") or [])]
+    if not ds:
+        erreurs.append("Khan, défense : choisis au moins un type de soldat qui défend.")
+    res["defenseurs"] = ds
+    a = d.get("abri") if isinstance(d.get("abri"), dict) else {}
+    res["abri"] = {"x": _entier(a.get("x"), "Khan, défense : coordonnée X du joueur protégé", 0, 2000, erreurs),
+                   "y": _entier(a.get("y"), "Khan, défense : coordonnée Y du joueur protégé", 0, 2000, erreurs)}
+    res["achat_malles"] = _entier(d.get("achat_malles", 0), "Khan, défense : malles à acheter au démarrage", 0, khan_defense.ACHAT_MALLES_MAX, erreurs)
+    res["achat_engins"] = bool(d.get("achat_engins", True))
+    if len(erreurs) > nb or any(x is False for c in "LMR" for x in res["mur"][c]["cases"]) or any(res["douves"][c] is False for c in "LMR"):
+        return None
+    return res
+
+
+def evenements_valides(c):
+    return isinstance(c, dict) and evenements.nomades_valides(c.get("nomades"))
+
+
 def demarrer_bot(lanceur, popen=subprocess.Popen):
     with _verrou:
         if etat_bot()["etat"] != "arrete":
@@ -591,10 +774,12 @@ def demarrer_bot(lanceur, popen=subprocess.Popen):
                            "transferts": (transferts.RUBRIQUE, transferts.config_valide),
                            "recrutement": (recrutement.RUBRIQUE, recrutement.config_valide),
                            "materiaux": (materiaux.RUBRIQUE, materiaux.config_valide),
-                           "montee": (montee.RUBRIQUE, montee.config_valide)}[nom]
+                           "montee": (montee.RUBRIQUE, montee.config_valide),
+                           "evenements": (evenements.RUBRIQUE, evenements_valides),
+                           "khan": (evenements.RUBRIQUE, lambda c: isinstance(c, dict) and evenements.khan_valides(c.get("khan")))}[nom]
             if not valide((tout or {}).get(rub)):
                 raise ErreurSaisie(["Module %s : réglages incomplets, enregistre-les d'abord."
-                                    % ("Tours lev max" if nom == "montee" else m.LANCEUR_NOM)])
+                                    % ({"montee": "Tours lev max", "evenements": "Événements", "khan": "Khan"}.get(nom, m.LANCEUR_NOM))])
             if nom == "montee":
                 kid = tout[rub]["kid"]
                 if not tours.reglages_valides(((tout.get("tours") or {}).get("reglages") or {}).get(str(kid))):
@@ -626,8 +811,24 @@ def tout_etat():
     return {"config": {"tours": tout.get("tours"), "forteresses": tout.get(forteresses.RUBRIQUE), "lanceur": tout.get(bot.RUBRIQUE),
                        "achats": tout.get(achats.RUBRIQUE), "defense": tout.get(defense.RUBRIQUE),
                        "transferts": tout.get(transferts.RUBRIQUE), "recrutement": tout.get(recrutement.RUBRIQUE),
-                       "materiaux": tout.get(materiaux.RUBRIQUE), "montee": tout.get(montee.RUBRIQUE)},
-            "montee": {"niveaux_max": niveaux_max_montee(), "niveau_vise": montee.NIVEAU_VISE,
+                       "materiaux": tout.get(materiaux.RUBRIQUE), "montee": tout.get(montee.RUBRIQUE),
+                       "evenements": tout.get(evenements.RUBRIQUE)},
+            "evenements": {"engins": [[w, NOMS_ENGINS_NOMADES[w], evenements.ENGINS[w][1], _image("engins", w), famille]
+                                      for famille, ids in evenements.FAMILLES_ENGINS.items() for w in ids],
+                           "logo_nomades": _image("evenements", "nomades"), "logo_khan": _image("evenements", "khan"),
+                           "bannieres": [[w, {106: "Bannière de rage", 107: "Coffre du pilleur"}[w], b, _image("engins", w)]
+                                         for w, b in evenements.BANNIERES.items()],
+                           "coffres": [[w, b] for w, b in evenements.COFFRES.items()],
+                           "defense_engins": [[w, nom, genre, bonus, _image("engins", w)] for w, (nom, genre, bonus) in khan_defense.ENGINS_DEFENSE.items()],
+                           "defenseurs": [[c, nom, len(ids), _image("recrutement", t) or _image("unites", ids[-1])]
+                                          for c, nom, t, ids in khan_defense.DEFENSEURS],
+                           "en_cours_max": evenements.EN_COURS_MAX, "quantite_case_max": khan_defense.QUANTITE_CASE_MAX,
+                           "achat_malles_max": khan_defense.ACHAT_MALLES_MAX, "prix_malle": khan_defense.PRIX_MALLE,
+                           "seuil_case": khan_defense.SEUIL_CASE, "seuil_achat": khan_defense.SEUIL_ACHAT, "lot_achat": khan_defense.LOT_ACHAT,
+                           "reserve_pieces": tours.PIECES_RESERVE, "engins_pieces": sorted(w for w in khan_defense.ENGINS_DEFENSE if w in achats.ENGINS),
+                           "engins_defaut": evenements.ENGINS_DEFAUT, "quantite_max": evenements.QUANTITE_MAX,
+                           "place_engins": evenements.PLACE_ENGINS},
+            "montee": {"niveaux_max": niveaux_max_montee(), "niveau_vise": montee.NIVEAU_VISE, "niveau_max": montee.NIVEAU_MAX_SAISIE,
                        "passes": [[c, montee.NOMS_PASSES[c]] for c in montee.PASSES]},
             "materiaux": catalogue_materiaux(),
             "recrutement": dict(catalogue_recrutement(), avant_postes=avant_postes_connus()),
@@ -637,11 +838,12 @@ def tout_etat():
                        for w in achats.ENGINS],
             "seuil_min": achats.SEUIL_MIN, "pieces_max": achats.PIECES_MAX, "part_budget": achats.PART_BUDGET,
             "pseudo": tout.get("pseudo"), "bot": etat_bot(), "sessions": sessions.pour_interface(etat_perime=ETAT_PERIME),
-            "modules": [{"nom": m.LANCEUR_NOM, "priorite": getattr(m, "LANCEUR_PRIORITE", bot.PRIORITE_DEFAUT)} for m in bot.a_choisir()],
+            "modules": [{"nom": m.LANCEUR_NOM, "priorite": getattr(m, "LANCEUR_PRIORITE", bot.PRIORITE_DEFAUT),
+                         "incompatibles": list(getattr(m, "LANCEUR_INCOMPATIBLES", ()))} for m in bot.a_choisir()],
             "royaumes": {str(k): v for k, v in tours.ROYAUMES.items()}, "soldat_tours": tours.ID_SOLDAT,
             "reserve_max_secondes": forteresses.RESERVE_MAX_SECONDES, "compte": coffre.etat(), "version": VERSION,
             "unites_tours": [{"id": u[0], "nom": NOMS_UNITES.get(u[0], u[1]), "type": u[2].replace("corps a corps", "corps à corps"),
-                              "vitesse": u[3], "attaque": u[4],
+                              "vitesse": u[3], "attaque": u[4], "niveaux": len(tours.niveaux_unite(u[0])) - 1 if u[0] in tours.NIVEAUX_UNITES else None,
                               "image": "images/unites/%d.png" % u[0] if os.path.exists(os.path.join(DOSSIER_IMAGES, "unites", "%d.png" % u[0])) else None}
                              for u in tours.UNITES_TOURS], "nb_soldats_max": tours.NB_SOLDATS_MAX}
 
@@ -700,6 +902,8 @@ def enregistrer(rubrique, data):
             cfg = normaliser_materiaux(data, tout.get(materiaux.RUBRIQUE))
         elif rubrique == "montee":
             cfg = normaliser_montee(data, tout.get(montee.RUBRIQUE))
+        elif rubrique == "evenements":
+            cfg = normaliser_evenements(data, tout.get(evenements.RUBRIQUE))
         else:
             raise ErreurSaisie(["Rubrique inconnue."])
         tours.memoriser_config(cfg, rubrique={"forteresses": forteresses.RUBRIQUE, "lanceur": bot.RUBRIQUE}.get(rubrique, rubrique))

@@ -50,9 +50,11 @@ import transferts   # noqa: E402
 import recrutement  # noqa: E402
 import materiaux    # noqa: E402
 import montee       # noqa: E402
+import evenements   # noqa: E402
+import khan         # noqa: E402
 from tours import ArretModule, demander, duree  # noqa: E402
 
-MODULES = [tours, forteresses, achats, defense, transferts, recrutement, materiaux, montee]  # ordre = numero affiche (1 tours, 2 forteresses, 3 achats, 4 defense, 5 transferts)
+MODULES = [tours, forteresses, achats, defense, transferts, recrutement, materiaux, montee, evenements, khan]  # ordre = numero affiche (1 tours, 2 forteresses, 3 achats, 4 defense, 5 transferts)
 # montee = "Tours lev max" (monter une tour au niveau max) : module a part, seul ou avec les autres.
 # Un module avec LANCEUR_PARENT (aucun pour l'instant) ne serait pas propose au choix : il demarrerait avec son parent.
 RUBRIQUE = "lanceur"
@@ -108,8 +110,23 @@ def analyseur_modules(modules=None):
                 raise ValueError("'%s' n'est pas un module : %s." % (p, ", ".join("%d = %s" % (i + 1, n) for i, n in enumerate(noms))))
             if nom not in res:
                 res.append(nom)
+        err = incompatibilites(res, modules)
+        if err:
+            raise ValueError(" ".join(err))
         return res
     return analyser
+
+
+def incompatibilites(choix, modules=None):
+    """Textes d'erreur pour les modules qui ne peuvent pas tourner ensemble (LANCEUR_INCOMPATIBLES d'un module)."""
+    par_nom = {m.LANCEUR_NOM: m for m in a_choisir(modules)}
+    err = []
+    for n in choix:
+        autres = [x for x in getattr(par_nom.get(n), "LANCEUR_INCOMPATIBLES", ()) if x in choix]
+        if autres:
+            err.append("le module %s ne tourne pas avec : %s (il garde le compte pour lui ; seuls defense, recrutement, materiaux, "
+                       "achats et transferts peuvent tourner avec lui)." % (n, ", ".join(autres)))
+    return err
 
 
 def choisir_modules(args, lire=None, sortie=print, modules=None):
@@ -135,6 +152,9 @@ def choisir_modules(args, lire=None, sortie=print, modules=None):
         sortie("    Ecris les numeros separes par des ';'.   Exemples :  1   ou   2   ou   1;2")
         choix = demander(lire, sortie, "    Modules%s > " % (" (Entree = %s)" % ";".join(str(noms.index(n) + 1) for n in anc) if anc else ""),
                          analyser, anc or None)
+    err = incompatibilites(choix, modules)
+    if err:
+        raise ArretModule("Modules : " + " ".join(err))
     tout = tours.lire_config()
     if not isinstance(tout, dict) or (tout.get(RUBRIQUE) or {}).get("modules") != choix:
         rub = dict(tout.get(RUBRIQUE) or {}) if isinstance(tout, dict) and isinstance(tout.get(RUBRIQUE), dict) else {}
@@ -248,6 +268,15 @@ async def ordonnancer(entrees, horloge=time.time, dormir=asyncio.sleep, vivante=
             return
         # modules a faire passer maintenant : leur heure est venue, ou ils ont une urgence ; le plus prioritaire d'abord
         prets = [x for x in actives if x.prochain <= t or x.urgent(t)]
+        # 16/11 : le module Khan est prioritaire et ne doit pas etre gene. Quand il a quelque chose a faire bientot (attaque du
+        # Khan qui arrive, attaque du camp en route, declenchement, salve), seuls lui et le module defense passent ; les autres
+        # (recrutement, materiaux, achats, transferts) travaillent dans les moments calmes.
+        if prets and any(getattr(x.module, "occupe_bientot", None) and x.module.occupe_bientot() for x in actives):
+            gardes = [x for x in prets if getattr(x.module, "occupe_bientot", None) or x.nom == "defense"]
+            if not gardes:
+                await dormir(min(2.0, max(0.2, min(x.prochain for x in actives) - t)))
+                continue
+            prets = gardes
         if not prets:
             prochain = min(x.prochain for x in actives)
             pause = min(prochain - t, VERIF_SESSION if arret is None else PAUSE_MAX_ARRET)
@@ -427,11 +456,14 @@ def battement_etat(modules, debut, horloge=time.time, fichier=None, tous_les=3, 
         pieces = next((getattr(e.module.partage, "pieces", None) for e in entrees if getattr(e.module, "partage", None)), None)
         ecrire_etat({"etat": "en_marche", "pid": os.getpid(), "modules": modules, "debut": debut, "maj": t, "pieces": pieces,
                      "achats": {e.nom: e.module.nb_achats for e in entrees if hasattr(e.module, "nb_achats")},
-                     "montee": {e.nom: e.module.progres() for e in entrees if hasattr(e.module, "progres")},
+                     "montee": {e.nom: e.module.progres() for e in entrees if hasattr(e.module, "progres") and e.nom not in ("evenements", "khan")},
+                     "evenements": {e.nom: e.module.progres() for e in entrees if hasattr(e.module, "progres") and e.nom in ("evenements", "khan")},
                      "attaques": {e.nom: e.module.nb_attaques for e in entrees if not hasattr(e.module, "nb_achats")
                                   and not hasattr(e.module, "progres")
                                   and not hasattr(e.module, "nb_abris") and not hasattr(e.module, "nb_transferts")
                                   and not hasattr(e.module, "nb_recrutements") and not hasattr(e.module, "nb_fabrications")},
+                     "attaques_royaumes": {e.nom: e.module.attaques_par_royaume() for e in entrees
+                                           if hasattr(e.module, "attaques_par_royaume") and not hasattr(e.module, "progres")},
                      "fabrications": {e.nom: e.module.nb_fabrications for e in entrees if hasattr(e.module, "nb_fabrications")},
                      "recrutements": {e.nom: e.module.nb_recrutements for e in entrees if hasattr(e.module, "nb_recrutements")},
                      "transferts": {e.nom: e.module.nb_transferts for e in entrees if hasattr(e.module, "nb_transferts")},

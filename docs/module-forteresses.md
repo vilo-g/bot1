@@ -23,7 +23,7 @@ partir du 2e :
 |---|----------|---------|-----|
 | 1 | Mode | `P` présélections / `R` remplissage automatique | `mode` = `presets` / `auto` |
 | 2a | (P) présélection des vagues 1 à 4 | numéros du jeu ; la 4e sert pour les vagues suivantes | `presets` |
-| 2b | (R) côtés | `F`, `FF`, `A`, `AF`, `AFF` (comme les tours) | `cotes` |
+| 2b | (R) côtés | un ou plusieurs parmi flanc gauche `L`, centre `M`, flanc droit `R` (comme les tours) | `cotes` |
 | 3 | Cheval | `C` pièces, `F` plumes, `CF` pièces puis plumes à partir d'une distance | `cheval`, `distance_plumes` |
 | 4 | Distance maximale | cases, du château de départ à la forteresse (les plus éloignées sont ignorées) | `distance_max` |
 | 5 | Nombre de vagues à remplir | `1`, `2`, `3` (les suivantes partent vides) ou `4` (toutes, avec les vagues en plus du commandant) ; absent = toutes | `vagues_remplies` |

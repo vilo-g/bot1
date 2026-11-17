@@ -42,18 +42,30 @@ FICHIER_ITEMS = os.path.join(DOSSIER_CAPTURES, "items.json")
 FICHIER_CHEVAUX = os.path.join(DOSSIER_CAPTURES, "chevaux.json")
 FICHIER_JOURNAL = os.path.join(DOSSIER_CAPTURES, "journal_tours.txt")
 
-ID_SOLDAT = 216                 # unite par defaut (Valkyrie pisteuse niveau 10)
+ID_SOLDAT = 216                 # unite par defaut (Valkyrie pisteuse, du plus haut niveau en stock au plus bas)
 # Unites proposees pour les tours : (numero dans le jeu, nom, type, vitesse, attaque) ; numeros trouves dans items.json et dans le
 # stock du chateau (adi). Images : src/images/unites/<numero>.png. Plusieurs unites : la 1re d'abord, completee par la suivante.
+# Soldats a niveaux (NIVEAUX_UNITES) : le numero de la liste est celui du niveau 10 (vitesse et attaque de ce niveau).
 UNITES_TOURS = (
-    (216, "Valkyrie pisteuse niv. 10", "distance", 34, 310),
-    (215, "Vierge a bouclier niv. 10", "corps a corps", 34, 325),
+    (216, "Valkyrie pisteuse", "distance", 34, 310),
+    (215, "Vierge a bouclier", "corps a corps", 34, 325),
+    (2069, "Guerrier a arc court relique", "distance", 30, 200),
+    (2029, "Guerrier a hache relique", "corps a corps", 30, 214),
     (6, "Frondeur veteran", "distance", 28, 139),
     (35, "Lanceur de kunai renegat", "distance", 50, 148),
     (10, "Horreur mortelle veteran", "distance", 30, 175),
     (9, "Horreur demoniaque veteran", "corps a corps", 30, 200),
 )
 IDS_UNITES_TOURS = tuple(u[0] for u in UNITES_TOURS)
+# Soldats a niveaux (demande du 17/11) : numeros de chaque niveau dans items.json (champ type), du PLUS HAUT au plus bas. Choisir
+# l'unite = l'attaque part avec le plus haut niveau en stock, completee par le niveau en dessous, etc. ; quand plus aucun niveau
+# n'est en stock, c'est comme pour les autres unites (unite suivante choisie, sinon cote incomplet).
+NIVEAUX_UNITES = {
+    216: (508, 216, 214, 213, 212, 211, 210, 209, 208, 207, 206, 205),     # MeadRanger : niveau 11 (gloire), 10 ... 0
+    215: (215, 204, 203, 202, 201, 200, 199, 198, 197, 196, 195),          # MeadShieldMaiden : niveau 10 ... 0
+    2069: (2069, 2068, 2067, 2066, 2065, 2064, 2063, 2062, 2061, 2060, 149),   # RelicShortBow : niveau 10 ... 0
+    2029: (2029, 2028, 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020, 148),   # RelicAxe : niveau 10 ... 0
+}
 NB_SOLDATS_MAX = 4              # unites choisies au plus par royaume (2 au plus par flanc dans une vague, cases du jeu)
 ID_ECHELLE = 614                # echelle en bois (valide dans une attaque reelle)
 NB_ECHELLES = 10                # sur la 1re vague de chaque cote choisi
@@ -90,6 +102,8 @@ PRIX_ECHELLE = 220              # pieces par echelle (items.json : packagePriceC
 PAUSE_ACHAT = 600               # secondes avant de reessayer un achat refuse / sans assez de pieces
 COMMANDANT_REFUSE = 180         # secondes : commandant refuse 2 fois de suite (sans doute pas au chateau) laisse de cote
 REFUS_MAX = 5                   # refus de suite (avec au moins 3 commandants differents) avant l'arret du module
+CODE_COMMANDANT_PRIS = 256       # LORD_IS_USED (code du jeu, ggs.dll) : le commandant est deja parti (a la main, autre appareil...)
+COMMANDANT_PRIS = 600            # il est alors mis de cote 10 min ; la cible, elle, reste attaquable par les autres
 CIBLE_REFUSEE = (1800, 10800)   # cible ignoree par le serveur : laissee de cote 30 min, puis 3 h si elle est encore refusee
 ESSAIS_PAR_PASSAGE = 8          # cibles essayees au plus par passage (une cible refusee ne bloque pas le commandant)
 CODE_PAS_PRETE = 95             # abi/adi refuse alors que la carte la dit libre : le jeu la libere ~1 min plus tard (11/11)
@@ -158,11 +172,18 @@ def analyser_mode(texte):
     raise ValueError("Reponds exactement P (preselections) ou R (remplissage automatique).")
 
 
+QUESTION_COTES = ("    Ecris les cotes ou mettre les soldats, une lettre par cote (un ou plusieurs) :",
+                  "    G = flanc gauche   C = centre   D = flanc droit      ex. G, D, GD, GC, GCD")
+
+
 def analyser_cotes(texte):
+    """G / C / D (gauche, centre, droit), combinables ; les anciens codes F, FF, A, AF, AFF restent acceptes."""
     t = sans_accents(texte).strip().upper()
-    if t not in combat.COTES:
-        raise ValueError("Reponds exactement F, FF, A, AF ou AFF.")
-    return t
+    code = combat.normaliser_cotes(t) if t in combat.ANCIENS_COTES else \
+        combat.normaliser_cotes(t.translate(str.maketrans("GCD", "LMR"))) if set(t) <= set("GCD") else None
+    if code is None:
+        raise ValueError("Reponds avec G (flanc gauche), C (centre) et/ou D (flanc droit), ex. GD ou GCD.")
+    return code
 
 
 def analyser_oui_non(texte):
@@ -241,7 +262,34 @@ def soldats_de(b):
     return [b.get("soldat", ID_SOLDAT)]
 
 
+def niveaux_unite(wid):
+    """Numeros a utiliser pour une unite choisie : tous ses niveaux du plus haut au plus bas (soldat a niveaux), sinon elle seule."""
+    return NIVEAUX_UNITES.get(wid, (wid,))
+
+
+def deplier(ordre):
+    """Unites choisies (dans l'ordre) -> numeros reels a utiliser : chaque soldat a niveaux remplace par ses niveaux, du plus
+    haut au plus bas ; sans doublon, ordre conserve."""
+    res = []
+    for wid in ordre or []:
+        for w in niveaux_unite(wid):
+            if w not in res:
+                res.append(w)
+    return res
+
+
+def niveau_de(wid):
+    """(unite choisie, niveau) pour un numero de soldat a niveaux, sinon None."""
+    for base, ids in NIVEAUX_UNITES.items():
+        if wid in ids:
+            return base, len(ids) - 1 - ids.index(wid)
+    return None
+
+
 def nom_unite(wid):
+    nv = niveau_de(wid)
+    if nv and nv[0] != wid:
+        return next(("%d %s niv. %d" % (wid, u[1], nv[1]) for u in UNITES_TOURS if u[0] == nv[0]), "unite %s" % wid)
     return next(("%d %s" % (u[0], u[1]) for u in UNITES_TOURS if u[0] == wid), "unite %s" % wid)
 
 
@@ -357,11 +405,8 @@ def questions_royaume(lire, sortie, kid, ancien=None):
     else:
         sortie("")
         sortie("[2] COTES A REMPLIR - royaume %s" % nom)
-        sortie("    F   = un flanc (toujours le GAUCHE)")
-        sortie("    FF  = les deux flancs (gauche + droit)")
-        sortie("    A   = l'avant (front) seulement")
-        sortie("    AF  = l'avant + un flanc (gauche)")
-        sortie("    AFF = l'avant + les deux flancs")
+        for ligne in QUESTION_COTES:
+            sortie(ligne)
         b["cotes"] = demander(lire, sortie, "    > ", analyser_cotes)
 
     sortie("")
@@ -488,7 +533,7 @@ def lignes_reglages(b):
                  % (nom_unite(soldats_de(b)[0]), "oui (%d sur la vague 1 d'un cote sans soldat)" % NB_ECHELLES if b.get("echelles") else "non"))
     else:
         cotes = b["cotes"]
-        l.append("mode : REMPLISSAGE AUTOMATIQUE, cotes %s (%s)" % (cotes, " + ".join(combat.NOMS_COTES[c] for c in combat.COTES[cotes])))
+        l.append("mode : REMPLISSAGE AUTOMATIQUE, cotes : %s" % combat.texte_cotes(cotes))
         l.append("echelles en bois : %s" % ("oui (%d sur la vague 1 de chaque cote)" % NB_ECHELLES if b.get("echelles") else "non"))
         l.append("soldats : %s" % ", puis ".join(nom_unite(x) for x in soldats_de(b)))
     if b["cheval"] == "CF":
@@ -903,7 +948,7 @@ def construire_attaque(cfg, adi, pos, tour, kid, chateau, effets, appris, cheval
                 raise ArretModule("Preselection numero %d introuvable (ou pas debloquee) : arret du module." % num)
             vague, stock_apres, avert = combat.appliquer_preselection(fiche["groupes"], stock, niv, outil_ok)
             # soldats manquants (meme en partie) : unite de remplacement choisie, puis distance la plus forte, puis corps a corps
-            ordre = combat.ordre_complement(stock_apres, unites, kid, cfg.get("soldat", ID_SOLDAT))
+            ordre = combat.ordre_complement(stock_apres, unites, kid, niveaux_unite(cfg.get("soldat", ID_SOLDAT)))
             vague, stock_apres, ajouts, reste = combat.completer_preselection(
                 vague, fiche["groupes"], stock_apres, niv, ordre, NB_ECHELLES if cfg.get("echelles") and i == 0 else 0, ID_ECHELLE)
             if ajouts:
@@ -925,10 +970,11 @@ def construire_attaque(cfg, adi, pos, tour, kid, chateau, effets, appris, cheval
                     for i, vg in enumerate(vagues) if not any(vg[c]["U"] for c in "LRM")]
         if not any(vg[c]["U"] for vg in vagues for c in "LRM"):
             raise PlusDeSoldats("Plus aucun soldat disponible (preselections ni remplacement) dans le royaume %s." % kid)
-    elif cfg.get("soldats_ordre") or len(soldats_de(cfg)) > 1:
-        # plusieurs unites, la 1re d'abord, completee par les suivantes : forteresses (la plus rapide d'abord) ou tours (ordre choisi)
+    elif cfg.get("soldats_ordre") or len(deplier(soldats_de(cfg))) > 1:
+        # plusieurs unites, la 1re d'abord, completee par les suivantes : forteresses (la plus rapide d'abord) ou tours (ordre choisi ;
+        # un soldat a niveaux compte pour tous ses niveaux, le plus haut d'abord)
         vagues, _, manques, utilisees = combat.remplir_cotes_complets(
-            stock, cfg.get("soldats_ordre") or soldats_de(cfg), combat.COTES[cfg["cotes"]], niv, nb_remplies, bonus_f, bonus_a,
+            stock, cfg.get("soldats_ordre") or deplier(soldats_de(cfg)), combat.COTES[cfg["cotes"]], niv, nb_remplies, bonus_f, bonus_a,
             NB_ECHELLES if cfg.get("echelles") else 0, ID_ECHELLE)
         vagues += [vide() for _ in range(nb_vagues - nb_remplies)]
         if not any(vg[c]["U"] for vg in vagues for c in "LRM"):
@@ -1076,12 +1122,14 @@ class ModuleTours:
         self.retards = []          # retards du jeu sur le minuteur de la carte (secondes)
         self.pas_prete_carte = {}  # (royaume, x, y) -> derniere relecture de sa zone pendant ces essais
         self.nb_attaques = 0
+        self.par_royaume = {}      # royaume -> [attaques lancees, cibles differentes touchees] (tableau de bord, 14/11)
         self.echecs = 0
         self._dernier_msg = ("", 0)
         self.cache = {}            # royaume -> {zone: (instant de lecture, {(x, y): entree})} : zones deja lues (les tours ne bougent pas)
         self.cran = {}             # royaume -> nombre de couronnes deja lues
         self._crans = {}           # royaume -> [[zones de la couronne 0], [couronne 1], ...]
         self.refus_commandant = {}  # commandant -> cibles refusees de suite pour lui (2 = il n'est sans doute pas au chateau)
+        self.deja_signale_pris = {}   # commandant -> deja signale "deja utilise" (code 256) : message une seule fois
         self.echelles = {}         # royaume -> echelles en bois dans le chateau de depart (lu dans adi / sbp)
         self.achat_pause = {}      # royaume -> instant avant lequel on ne retente pas d'acheter des echelles
         self.refus_suite = []      # commandants des refus consecutifs (tous commandants confondus)
@@ -1166,6 +1214,15 @@ class ModuleTours:
             self._dernier_msg = (cle, t)
 
     # ---------------------------------------------------------------- retour des commandants
+    def _compter(self, kid, cle):
+        e = self.par_royaume.setdefault(kid, [0, set()])
+        e[0] += 1
+        e[1].add(cle)
+
+    def attaques_par_royaume(self):
+        """Pour le tableau de bord (bot_etat.json) : {royaume: [attaques, cibles differentes]}."""
+        return {str(k): [n, len(c)] for k, (n, c) in sorted(self.par_royaume.items())}
+
     async def _vider(self):
         """Vide les messages recus, apres avoir lu ceux qui annoncent le retour d'un commandant (cat)."""
         self.partage.signe_de_vie()                 # chaque demande au jeu prouve que le bot travaille
@@ -1513,6 +1570,7 @@ class ModuleTours:
             self.libre_a[pos] = self.horloge() + 120
             self.engagees[cle] = self.horloge() + 3600
             self.nb_attaques += 1
+            self._compter(kid, cle)
             return True
         reste = self.dernier_envoi + DELAI_MIN_ATTAQUES - self.horloge()
         if reste > 0:                      # script trop rapide : on attend juste ce qu'il manque pour avoir 4 s
@@ -1528,6 +1586,7 @@ class ModuleTours:
             tt = (d["AAM"].get("M") or {}).get("TT") or 60
             self.echecs = 0
             self.nb_attaques += 1
+            self._compter(kid, cle)
             # borne haute de securite (aller + retour identiques) ; remplacee par la vraie duree des l'arrivee (message cat)
             self.libre_a[pos] = self.horloge() + 2 * tt + 15
             self.royaume_du_commandant[pos] = kid
@@ -1537,6 +1596,7 @@ class ModuleTours:
                         % (self.nb_attaques, pos, info["nom"], nom, info["niveau"], info["distance"], info["mode"], info["soldat"], info["cheval"],
                            texte_vagues(info), tt))
             self.refus_commandant.pop(pos, None)
+            self.deja_signale_pris.pop(pos, None)
             self.refus_suite = []
             if kid in self.echelles:                    # echelles parties avec l'attaque (le prochain adi donne le vrai stock)
                 try:
@@ -1545,6 +1605,18 @@ class ModuleTours:
                     pass
             self._sauver_etat()
             return True
+        if rep and rep[1] == CODE_COMMANDANT_PRIS:
+            # 16/11 : le jeu dit que CE commandant est deja utilise (parti a la main, depuis un autre appareil...) : la cible n'y
+            # est pour rien. Avant, elle etait laissee de cote 30 min et le commandant retente aussitot ailleurs.
+            self.engagees.pop(cle, None)
+            self.refus_commandant.pop(pos, None)
+            self.libre_a[pos] = self.horloge() + COMMANDANT_PRIS
+            if not self.deja_signale_pris.get(pos):
+                self._noter("   commandant %d : le jeu dit qu'il est deja utilise (parti en dehors du bot ?). Il est mis de cote %s puis "
+                            "reessaye ; %s reste dans la liste pour les autres commandants." % (pos, duree(COMMANDANT_PRIS), nom))
+            self.deja_signale_pris[pos] = True
+            self._sauver_etat()
+            return False
         self.echecs += 1
         self.refus_suite.append(pos)
         deja = self.refus_commandant.setdefault(pos, [])

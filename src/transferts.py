@@ -203,7 +203,11 @@ class ModuleTransferts:
         self.nb_attaques = 0
         self.nb_transferts = 0
         self.plus_de_passes = False
-        self.passes_vides = set()   # passe-temps refuses (plus en stock) : plus utilises pendant la session
+        self.stock = {}             # passe-temps -> stock vu dans le jeu (message sce apres chaque utilisation, 14/11)
+        self.refuses = set()        # passe-temps refuses au dernier essai (pour ne pas repeter le message) ; reessayes a l'envoi suivant
+        self._ecouteur = isinstance(getattr(jeu, "ecouteurs", None), list)
+        if self._ecouteur:
+            jeu.ecouteurs.append(self._lire_sce)
         self.occupes = set()
         self.reserve_vert = None    # module materiaux : ressources gardees au vert (calcule au premier passage)
 
@@ -228,6 +232,19 @@ class ModuleTransferts:
                     self.sortie("   module materiaux actif : gardes au vert (jamais envoyes) : %s."
                                 % ", ".join("%s %s" % (fmt(q), NOMS_RES.get(r, r)) for r, q in sorted(self.reserve_vert.items())))
         return self.reserve_vert
+
+    def _lire_sce(self, msg):
+        """Message sce du jeu : stock d'un passe-temps apres utilisation (par ce module ou un autre), ex. [["MS4",984]]."""
+        try:
+            cmd, code, payload = msg[0], msg[1], msg[2]
+        except (TypeError, IndexError):
+            return
+        if cmd != "sce" or code != 0 or not isinstance(payload, str):
+            return
+        d = T.json_ou_none(payload)
+        for e in d if isinstance(d, list) else []:
+            if isinstance(e, list) and len(e) == 2 and e[0] in PASSES and isinstance(e[1], int) and not isinstance(e[1], bool):
+                self.stock[e[0]] = e[1]
 
     async def _demander(self, cmd, donnees, delai=10):
         await self.jeu.vider()
@@ -291,8 +308,12 @@ class ModuleTransferts:
                                                                        "code %s" % rep[1] if rep else "pas de reponse", texte))
 
     async def _accelerer(self, dst, restant=None):
-        """Passe-temps sur l'envoi en cours vers dst, combines pour gacher le moins de temps. -> True si l'envoi est arrive."""
-        dispo = {c: PASSES[c] for c in self.cfg.get("passes", PASSES_DEFAUT) if c in PASSES and c not in self.passes_vides}
+        """Passe-temps sur l'envoi en cours vers dst, combines pour gacher le moins de temps. -> True si l'envoi est arrive.
+        Un passe-temps refuse est mis de cote pour CET envoi seulement (on complete avec les autres) et reessaye a l'envoi
+        suivant : un refus passager ne le fait pas abandonner. Seul un stock a 0 vu dans le jeu (message sce) le fait sauter
+        sans essai, jusqu'a ce que le jeu en annonce de nouveau (14/11)."""
+        choisis = [c for c in self.cfg.get("passes", PASSES_DEFAUT) if c in PASSES]
+        dispo = {c: PASSES[c] for c in choisis if self.stock.get(c, 1) > 0}
         utilises = []
         if restant is None:
             rep = await self._demander("kpi", {})
@@ -304,28 +325,41 @@ class ModuleTransferts:
                 break
             code = plan[0]
             rep = await self._demander("msk", {"MST": code, "KID": str(dst), "TT": "2"})
+            if not self._ecouteur:
+                for m in list(getattr(self.jeu, "recus", None) or []):
+                    self._lire_sce(m)                      # sans ecouteur (tests) : le stock est lu ici
+            dispo = {c: v for c, v in dispo.items() if self.stock.get(c, 1) > 0}   # dernier utilise (stock 0) : on passe aux autres
             if not rep or rep[1] != 0:
-                self.passes_vides.add(code)                # plus de ce passe-temps : on complete avec les autres
-                dispo.pop(code, None)
-                self.sortie("   passe-temps %s refuse (%s) : plus en stock ? Il n'est plus utilise%s."
-                            % (NOMS_PASSES[code], "code %s" % rep[1] if rep else "pas de reponse",
-                               ", on complete avec les autres" if dispo else ""))
+                dispo.pop(code, None)                      # pour cet envoi : on complete avec les autres
+                if code not in self.refuses:
+                    self.refuses.add(code)
+                    vide = self.stock.get(code, 1) <= 0
+                    self.sortie("   passe-temps %s refuse (%s)%s%s." % (
+                        NOMS_PASSES[code], "code %s" % rep[1] if rep else "pas de reponse",
+                        " : plus en stock" if vide else " : on reessaiera a l'envoi suivant",
+                        ", on complete avec les autres" if dispo else ""))
                 continue
+            if code in self.refuses:
+                self.refuses.discard(code)
+                self.sortie("   passe-temps %s de nouveau accepte." % NOMS_PASSES[code])
             utilises.append(code)
             _, _, rs = lire_kpi(T.json_ou_none(rep[2]))
             restant = rs.get(dst, 0)
             if restant <= 0:
                 break
         if utilises:
+            self.plus_de_passes = False
             detail = ", ".join("%d x %s" % (utilises.count(c), NOMS_PASSES[c]) for c in sorted(set(utilises), key=lambda c: -PASSES[c]))
             if restant <= 0:
                 self.sortie("   envoi accelere : arrive (%s)." % detail)
             else:
                 self.sortie("   envoi accelere (%s) : encore %s de trajet." % (detail, duree(restant)))
-        elif not dispo:
-            if not self.plus_de_passes:
-                self.plus_de_passes = True
-                self.sortie("   plus aucun passe-temps choisi en stock : les envois ne sont plus acceleres.")
+        elif restant > 0 and not dispo and not self.plus_de_passes:
+            self.plus_de_passes = True
+            if choisis and all(self.stock.get(c, 1) <= 0 for c in choisis):
+                self.sortie("   plus aucun des passe-temps choisis en stock : envois pas acceleres (repris si le jeu en annonce de nouveaux).")
+            else:
+                self.sortie("   aucun passe-temps accepte pour cet envoi : pas accelere, nouvel essai au prochain envoi.")
         return restant <= 0
 
 

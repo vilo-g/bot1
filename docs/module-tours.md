@@ -22,9 +22,9 @@ Puis, **pour chaque royaume** (stockés dans `reglages["<royaume>"]`) :
 |---|----------|---------|----------------|
 | 1 | Mode | `P` présélections / `R` remplissage automatique | `mode` = `presets` / `auto` |
 | 2a | (P) présélection des vagues 1 à 4 | numéros du jeu (1 = la première) ; la 4e sert pour les vagues 5, 6… | `presets` |
-| 2b | (R) côtés | `F` flanc gauche, `FF` deux flancs, `A` front, `AF` front + gauche, `AFF` front + deux flancs | `cotes` |
+| 2b | (R) côtés | trois cases, un ou plusieurs côtés : flanc gauche `L`, centre `M`, flanc droit `R` (ex. `R`, `LR`, `LMR` ; à la console : `G`, `C`, `D`). Les anciens codes `F`, `FF`, `A`, `AF`, `AFF` restent lus | `cotes` |
 | 3 | Échelles en bois | O/N : 10 sur la vague 1 de chaque côté rempli automatiquement (mode P : seulement pour les vagues de secours) | `echelles` |
-| 4 | Soldats | 1 à 4 unités dans l'ordre (`216;215`, Entrée = 216) parmi : 216 Valkyrie pisteuse niv. 10, 215 Vierge à bouclier niv. 10, 6 Frondeur vétéran, 35 Lanceur de kunai renégat, 10 Horreur mortelle vétéran, 9 Horreur démoniaque vétéran | `soldats` (et `soldat` = la 1re) |
+| 4 | Soldats | 1 à 4 unités dans l'ordre (`216;215`, Entrée = 216) parmi : 216 Valkyrie pisteuse, 215 Vierge à bouclier, 2069 Guerrier à arc court relique, 2029 Guerrier à hache relique, 6 Frondeur vétéran, 35 Lanceur de kunai renégat, 10 Horreur mortelle vétéran, 9 Horreur démoniaque vétéran. Les 4 premières sont des soldats à niveaux : tous leurs niveaux partent, le plus haut en stock d'abord, complété par le niveau en dessous, etc. (le numéro est celui du niveau 10) | `soldats` (et `soldat` = la 1re) |
 | 5 | Cheval | `C` pièces, `F` plumes, `CF` pièces puis plumes à partir d'une distance (en cases, château → tour) | `cheval`, `distance_plumes` |
 | 6 | Rayon de recherche | nombre de cases autour du château de CE royaume (Entrée = valeur enregistrée pour ce royaume) | `rayon` |
 

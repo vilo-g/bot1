@@ -1,9 +1,11 @@
 {
-  "version": 11,
-  "date": "14/11/2026",
+  "version": 12,
+  "date": "17/11/2026",
   "nouveautes": [
-    "Nouveau module Tours lev max : monte une tour au niveau voulu (71 par défaut) en salves d'attaques, en sautant son blocage avec les passe-temps choisis juste après chaque combat. Seul ou avec les autres modules (page Tours lev max, case du tableau de bord).",
-    "Défense : les armées du bot qui rentrent avant une attaque sont attendues, puis leurs soldats repartent à l'abri avec les autres (rattrapage jusqu'à 30 s avant l'attaque, puis une armée à la fois).",
-    "Forteresses : le bot apprend le petit retard du jeu à la fin du minuteur et réessaie toutes les secondes au début, pour partir plus vite."
+    "Nouveau module Événements : attaque le camp des nomades en salves (engins choisis à la vague 1, coffres de tablettes aux vagues suivantes, cour remplie), en sautant son blocage avec les passe-temps.",
+    "Nouveau module Khan : déclenche et attaque le camp du Khan de l'alliance, puis défend ses attaques sur ton château (mur réglé comme dans le jeu, engins remis sur les cases et rachetés tout seuls, malles en rubis, soldats défensifs à l'abri chez un joueur protégé). Page « Khan en direct ». Il est prioritaire : tours, forteresses, tours lev max et événements ne tournent pas en même temps.",
+    "Nouveaux soldats : Guerrier à arc court relique et Guerrier à hache relique, dans les attaques et le recrutement. Soldats à niveaux (aussi Valkyrie pisteuse et Vierge à bouclier) : le plus haut niveau en stock part d'abord, complété par le niveau en dessous.",
+    "Côtés à remplir au choix : flanc gauche, centre, flanc droit (tours, forteresses). Les 2 cases d'un flanc servent d'abord à le remplir : un petit stock ne les gâche plus.",
+    "Tours lev max : passe-temps 5 h et 24 h. Transferts : un passe-temps refusé est réessayé à l'envoi suivant."
   ]
 }
