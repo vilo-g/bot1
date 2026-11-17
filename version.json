@@ -1,11 +1,9 @@
 {
-  "version": 12,
+  "version": 13,
   "date": "17/11/2026",
   "nouveautes": [
-    "Nouveau module Événements : attaque le camp des nomades en salves (engins choisis à la vague 1, coffres de tablettes aux vagues suivantes, cour remplie), en sautant son blocage avec les passe-temps.",
-    "Nouveau module Khan : déclenche et attaque le camp du Khan de l'alliance, puis défend ses attaques sur ton château (mur réglé comme dans le jeu, engins remis sur les cases et rachetés tout seuls, malles en rubis, soldats défensifs à l'abri chez un joueur protégé). Page « Khan en direct ». Il est prioritaire : tours, forteresses, tours lev max et événements ne tournent pas en même temps.",
-    "Nouveaux soldats : Guerrier à arc court relique et Guerrier à hache relique, dans les attaques et le recrutement. Soldats à niveaux (aussi Valkyrie pisteuse et Vierge à bouclier) : le plus haut niveau en stock part d'abord, complété par le niveau en dessous.",
-    "Côtés à remplir au choix : flanc gauche, centre, flanc droit (tours, forteresses). Les 2 cases d'un flanc servent d'abord à le remplir : un petit stock ne les gâche plus.",
-    "Tours lev max : passe-temps 5 h et 24 h. Transferts : un passe-temps refusé est réessayé à l'envoi suivant."
+    "Tours lev max : niveau maximum selon le monde (vert 81, feu 71, sables 61, glacier 51).",
+    "Passe-temps 5 min et 1 min (Tours lev max, nomades, Khan).",
+    "Tours lev max : ordre des passe-temps au choix, les plus forts d'abord ou les plus faibles d'abord (30 passe-temps au plus par blocage)."
   ]
 }

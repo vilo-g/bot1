@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-montee.py : module "Tours lev max" : MONTER UNE TOUR au niveau voulu (71 par defaut).
+montee.py : module "Tours lev max" : MONTER UNE TOUR au niveau voulu (au plus : vert 81, feu 71, sables 61, glacier 51).
 
 Reglages (interface, page Tours lev max) : rubrique "montee" de config.json
-  {"kid": 3, "x": 470, "y": 443, "commandants": [20, 21, 22], "passes": ["MS5", "MS4", "MS3"], "niveau_vise": 71}
+  {"kid": 3, "x": 470, "y": 443, "commandants": [20, 21, 22], "passes": ["MS5", "MS4", "MS3"], "niveau_vise": 71,
+   "ordre_passes": "forts"}
 Module a part (case "Tours lev max" du tableau de bord) : seul, ou avec le module tours et les autres. L'armee de chaque attaque
 est celle reglee dans le module tours pour ce royaume (remplissage automatique ou preselections, cheval, echelles), calculee sur
 le VRAI niveau de la tour a chaque attaque ; le module tours n'a pas besoin de tourner.
@@ -13,11 +14,14 @@ Fonctionnement (demande du joueur, 14/11) :
     l'autre (4,2 s d'ecart : le jeu ignore une attaque partie moins de 4 s apres la precedente). Les arrivees sont aussi espacees
     d'au moins 4,2 s (le bot connait le trajet de chaque commandant), pour laisser le temps de sauter le blocage entre deux combats.
   - A CHAQUE COMBAT (message cat de l'armee : la tour avec ses victoires et son blocage), le bot saute aussitot le blocage
-    (~3 h, moins avec un commandant qui le reduit : 9180 s avec -15 %) avec les passe-temps choisis (1 h, 30 min, 10 min),
-    combines pour gacher le moins de temps. Il lit le blocage exact, jamais de rubis.
+    (~3 h, moins avec un commandant qui le reduit : 9180 s avec -15 %) avec les passe-temps choisis (24 h, 5 h, 1 h, 30 min,
+    10 min, 5 min, 1 min). Ordre (17/11, "ordre_passes") : "forts" = le plus long qui tient dans le blocage d'abord, puis le
+    suivant... ; "faibles" = le plus petit en stock d'abord (1 min tant qu'il y en a, puis 5 min...). Le dernier bout est couvert
+    par le plus petit passe-temps qui suffit. Il lit le blocage exact, jamais de rubis.
   - Quand la derniere attaque de la salve est arrivee, nouvelle salve avec les commandants revenus, jusqu'au niveau vise.
   - Le niveau : la carte donne le NOMBRE DE VICTOIRES de la tour, converti en niveau selon le royaume (combat.niveau_reel) :
-    feu 112 victoires = niveau 71, sables 112 = 61, glacier 154 = 51 (fin des donnees du jeu, items.json "dungeons").
+    vert 845 victoires = niveau 81, feu 112 = 71, sables 112 = 61, glacier 154 = 51 (fin des donnees du jeu, items.json
+    "dungeons") : niveau maximum de chaque monde (NIVEAUX_MAX).
   - Commandants : le module tours ne les prend jamais ; le module forteresses peut en garder (reservation, comme avec ceux du
     module tours) quand une forteresse devient attaquable bientot ; ils reviennent a la montee ensuite. Le module tours ne
     touche pas non plus a la tour en montee.
@@ -29,6 +33,7 @@ Messages du jeu (capture du 14/11) :
   + sce [["MS5", stock restant]] + push gaa {"AI":[[...la tour...]]} ; cat (combat) : A.M.SA = la tour apres le combat.
 """
 import json
+from collections import Counter
 import os
 import sys
 
@@ -39,11 +44,16 @@ import transferts       # noqa: E402
 from tours import ArretModule, PlusDeSoldats, ROYAUMES, T, duree   # noqa: E402
 
 RUBRIQUE = "montee"
-PASSES = {"MS7": 86400, "MS6": 18000, "MS5": 3600, "MS4": 1800, "MS3": 600}   # 24 h, 5 h (16/11 : gros delais du Khan), 1 h, 30 min, 10 min
-NOMS_PASSES = {"MS7": "24 h", "MS6": "5 h", "MS5": "1 h", "MS4": "30 min", "MS3": "10 min"}
+# 24 h, 5 h (16/11 : gros delais du Khan), 1 h, 30 min, 10 min, 5 min et 1 min (17/11 ; codes vus pour les transferts)
+PASSES = {"MS7": 86400, "MS6": 18000, "MS5": 3600, "MS4": 1800, "MS3": 600, "MS2": 300, "MS1": 60}
+NOMS_PASSES = {"MS7": "24 h", "MS6": "5 h", "MS5": "1 h", "MS4": "30 min", "MS3": "10 min", "MS2": "5 min", "MS1": "1 min"}
 PASSES_DEFAUT = ["MS5", "MS4", "MS3"]
+ORDRES_PASSES = ("forts", "faibles")     # les plus longs d'abord / les plus petits d'abord (17/11)
+PASSES_PAR_BLOCAGE = 30    # au plus 30 passe-temps pour un blocage (~8 s a 0,27 s chacun, entre deux arrivees) : sinon les plus petits attendent
 NIVEAU_VISE = 71
-NIVEAU_MAX_SAISIE = 71     # niveau maximum d'une tour (comme le module tours) : impossible de viser plus haut (14/11)
+# niveau maximum d'une tour dans chaque monde (17/11 ; = dernier niveau des donnees du jeu) : vert, sables, glacier, feu
+NIVEAUX_MAX = {0: 81, 1: 61, 2: 51, 3: 71}
+NIVEAU_MAX_SAISIE = max(NIVEAUX_MAX.values())
 ESPACEMENT = 4.2           # s minimum entre deux arrivees (= entre deux departs)
 ESPACEMENT_MAX = 10        # attaque arrivee pendant le blocage : l'ecart grandit de 2 s, jusqu'a 10 s
 TOLERANCE = 30             # blocage restant accepte sans passe-temps (attendre 30 s plutot que gacher 10 min)
@@ -74,7 +84,9 @@ def config_valide(cfg):
                 and tours.commandants_valides(cfg.get("commandants"))
                 and isinstance(cfg.get("passes"), list) and cfg["passes"] and all(p in PASSES for p in cfg["passes"])
                 and len(set(cfg["passes"])) == len(cfg["passes"])
-                and entier(cfg.get("niveau_vise", NIVEAU_VISE)) is not None and 1 <= cfg.get("niveau_vise", NIVEAU_VISE) <= NIVEAU_MAX_SAISIE)
+                and entier(cfg.get("niveau_vise", NIVEAU_VISE)) is not None
+                and 1 <= cfg.get("niveau_vise", NIVEAU_VISE) <= NIVEAU_MAX_SAISIE   # au-dessus du max du monde : ramene a ce max (objectif)
+                and cfg.get("ordre_passes", "forts") in ORDRES_PASSES)
     except (AttributeError, TypeError):
         return False
 
@@ -108,13 +120,63 @@ def max_victoires_par_royaume(chemin=None):
 
 def objectif(kid, niveau_vise, max_v=None):
     """-> (niveau vise effectif, victoires a atteindre) : le niveau demande, sans depasser le dernier niveau du royaume."""
-    niveau_vise = min(niveau_vise, NIVEAU_MAX_SAISIE)
+    niveau_vise = min(niveau_vise, NIVEAUX_MAX.get(kid, NIVEAU_MAX_SAISIE))
     if max_v is not None:
         niveau_vise = min(niveau_vise, niveau(kid, max_v))
     v = victoires_pour(kid, niveau_vise)
     if max_v is not None and (v is None or v > max_v):
         v = max_v
     return niveau_vise, v
+
+
+def plan_passes(restant, durees, ordre="forts", stock=None, max_n=None):
+    """Passe-temps pour couvrir `restant` secondes de blocage, dans l'ordre d'utilisation (17/11).
+    durees : {code: secondes} (ceux choisis et pas vides) ; stock : {code: nombre vu dans le jeu} (absent = inconnu, pas limite).
+    "forts" : le plus long d'abord, autant de fois qu'il tient dans le blocage, puis le suivant (3 h -> 3 x 1 h ; 23 h -> 4 x 5 h
+    + 3 x 1 h) ; "faibles" : le plus petit d'abord, tant qu'il y en a en stock (1 min, puis 5 min...). Le dernier bout (plus court
+    que les passe-temps restants) : le plus petit passe-temps qui le couvre, sinon le plus long qui reste.
+    max_n : au plus tant de passe-temps pour ce blocage (le temps de les envoyer entre deux arrivees, ~0,27 s chacun) : sinon les
+    plus petits sont laisses de cote pour cette fois (ex. 3 h en "faibles" : 36 x 5 min plutot que 180 x 1 min)."""
+    if restant <= 0 or not durees:
+        return []
+    if max_n:
+        essais = []
+        for i in range(len(durees)):
+            garde = dict(sorted(durees.items(), key=lambda x: x[1])[i:])
+            essai = plan_passes(restant, garde, ordre, stock)
+            if essai and len(essai) <= max_n:
+                return essai
+            if essai:
+                essais.append(essai)
+        return min(essais, key=len) if essais else []
+    stock = stock or {}
+    reste = {c: stock.get(c) for c in durees}            # None = stock inconnu
+    plan, r = [], int(restant)
+    dispo = [durees[c] for c in durees if reste[c] is None or reste[c] > 0]
+    petit = min(dispo) if dispo else 0
+    for c in sorted(durees, key=durees.get, reverse=ordre != "faibles"):
+        n = r // durees[c]
+        if reste[c] is not None:
+            n = min(n, max(reste[c], 0))
+        # un de plus s'il finit le blocage en gachant moins que le plus petit passe-temps (3 h - 25 s -> 3 x 1 h, pas
+        # 2 x 1 h + 30 min + 3 x 10 min)
+        if r - n * durees[c] > 0 and (n + 1) * durees[c] - r < petit and (reste[c] is None or reste[c] > n):
+            n += 1
+        if reste[c] is not None:
+            reste[c] -= n
+        plan += [c] * n
+        r -= n * durees[c]
+    while r > 0:
+        ok = [c for c in durees if reste[c] is None or reste[c] > 0]
+        if not ok:
+            break
+        assez = [c for c in ok if durees[c] >= r]
+        c = min(assez, key=durees.get) if assez else max(ok, key=durees.get)
+        plan.append(c)
+        r -= durees[c]
+        if reste[c] is not None:
+            reste[c] -= 1
+    return plan
 
 
 def texte_passes(liste):
@@ -131,8 +193,8 @@ def resume_config(cfg, max_v=None):
     return ["tour %s (%d,%d), montee jusqu'au niveau %d (%s victoires)" % (ROYAUMES[kid], cfg["x"], cfg["y"], niv, v if v is not None else "?"),
             "commandants dedies : %s (le module tours ne les prend pas ; les forteresses peuvent en garder avant une forteresse)"
             % ";".join(str(p) for p in cfg["commandants"]),
-            "salves : tous les commandants revenus partent a 4,2 s d'ecart ; blocage saute a chaque combat avec %s (jamais de rubis)"
-            % texte_passes(cfg["passes"]),
+            "salves : tous les commandants revenus partent a 4,2 s d'ecart ; blocage saute a chaque combat avec %s, %s (jamais de rubis)"
+            % (texte_passes(cfg["passes"]), "les plus petits d'abord" if cfg.get("ordre_passes") == "faibles" else "les plus longs d'abord"),
             "armee : reglages du module tours pour ce royaume, calculee sur le vrai niveau de la tour"]
 
 
@@ -449,8 +511,9 @@ class ModuleMontee(tours.ModuleTours):
         return await self.jeu.attendre("msd", 5)
 
     async def _sauter(self):
-        """Passe-temps sur le blocage de la tour, combines pour gacher le moins de temps, jusqu'a ce qu'elle soit attaquable a
-        temps pour la prochaine arrivee."""
+        """Passe-temps sur le blocage de la tour (les plus longs ou les plus petits d'abord, reglage ordre_passes), jusqu'a ce
+        qu'elle soit attaquable a temps pour la prochaine arrivee."""
+        ordre = self.cfg.get("ordre_passes", "forts")
         dispo = {c: PASSES[c] for c in self.cfg["passes"] if c in PASSES and c not in self.passes_vides and self.stock.get(c, 1) > 0}
         utilises, debut = [], self.horloge()
         b0 = self._blocage()
@@ -464,11 +527,11 @@ class ModuleMontee(tours.ModuleTours):
                 break
             if self.simulation:
                 self._noter("[SIMULATION] blocage de %s : les passe-temps %s seraient utilises."
-                            % (duree(b), ", ".join(NOMS_PASSES[c] for c in transferts.combinaison(b - tol, dispo)) or "aucun"))
+                            % (duree(b), texte_utilises({c: n for c, n in Counter(plan_passes(b - tol, dispo, ordre, self.stock, PASSES_PAR_BLOCAGE)).items()})))
                 self._noter_etat(self._victoires(), 0)
                 return
             dispo = {c: v for c, v in dispo.items() if self.stock.get(c, 1) > 0}     # stock vu a 0 (message sce) : pas d'essai
-            plan = transferts.combinaison(b - tol, dispo)
+            plan = plan_passes(b - tol, dispo, ordre, self.stock, PASSES_PAR_BLOCAGE)
             if not plan:
                 self._pause(PAUSE_PROBLEME, "plus aucun des passe-temps choisis (%s) en stock : encore %s de blocage sur %s."
                             % (texte_passes(self.cfg["passes"]), duree(b), self.LA_CIBLE))
@@ -725,7 +788,8 @@ def config_module(tout):
     cfg = {"commandants": list(c["commandants"]), "royaumes": [kid], "reglages": {str(kid): dict(regl)},
            "chateaux": dict(ct.get("chateaux") or {}), "vagues_base": ct.get("vagues_base", tours.NB_VAGUES_BASE),
            "avec_bonus": bool(ct.get("avec_bonus", False)), "niveau_min": 0, "achat_echelles": bool(ct.get("achat_echelles", False)),
-           "kid": kid, "x": c["x"], "y": c["y"], "passes": list(c["passes"]), "niveau_vise": c.get("niveau_vise", NIVEAU_VISE)}
+           "kid": kid, "x": c["x"], "y": c["y"], "passes": list(c["passes"]), "niveau_vise": c.get("niveau_vise", NIVEAU_VISE),
+           "ordre_passes": c.get("ordre_passes", "forts")}
     if "chateaux_manuels" in ct:
         cfg["chateaux_manuels"] = ct["chateaux_manuels"]
     return cfg

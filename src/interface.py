@@ -52,7 +52,7 @@ DOSSIER_IMAGES = os.path.join(ICI, "images")
 NOMS_UNITES = {215: "Vierge à bouclier", 2069: "Guerrier à arc court relique", 2029: "Guerrier à hache relique",
                6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-17-reliques1"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-17-levmax1"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -308,12 +308,17 @@ def normaliser_montee(data, ancienne=None):
     cmds = _commandants(data.get("commandants", ""), erreurs)
     p = data.get("passes")
     if not isinstance(p, list) or not p or not all(c in montee.PASSES for c in p):
-        erreurs.append("Passe-temps : coche au moins un passe-temps (24 h, 5 h, 1 h, 30 min ou 10 min).")
-    nv = _entier(data.get("niveau_vise", montee.NIVEAU_VISE), "Niveau visé", 1, montee.NIVEAU_MAX_SAISIE, erreurs)
+        erreurs.append("Passe-temps : coche au moins un passe-temps (24 h, 5 h, 1 h, 30 min, 10 min, 5 min ou 1 min).")
+    ordre = data.get("ordre_passes", "forts")
+    if ordre not in montee.ORDRES_PASSES:
+        erreurs.append("Passe-temps : choisis « les plus forts d'abord » ou « les plus faibles d'abord ».")
+    mx = montee.NIVEAUX_MAX.get(kid, montee.NIVEAU_MAX_SAISIE) if isinstance(kid, int) else montee.NIVEAU_MAX_SAISIE
+    nv = _entier(data.get("niveau_vise", montee.NIVEAU_VISE), "Niveau visé (%d au plus pour une tour %s)"
+                 % (mx, montee.DU_MONDE.get(kid, "de ce monde")), 1, mx, erreurs)
     if erreurs:
         raise ErreurSaisie(erreurs)
     cfg.update({"kid": kid, "x": x, "y": y, "commandants": cmds,
-                "passes": [c for c in montee.PASSES if c in p], "niveau_vise": nv})
+                "passes": [c for c in montee.PASSES if c in p], "niveau_vise": nv, "ordre_passes": ordre})
     if not montee.config_valide(cfg):
         raise ErreurSaisie(["Réglages incomplets."])
     return cfg
@@ -829,6 +834,7 @@ def tout_etat():
                            "engins_defaut": evenements.ENGINS_DEFAUT, "quantite_max": evenements.QUANTITE_MAX,
                            "place_engins": evenements.PLACE_ENGINS},
             "montee": {"niveaux_max": niveaux_max_montee(), "niveau_vise": montee.NIVEAU_VISE, "niveau_max": montee.NIVEAU_MAX_SAISIE,
+                       "niveaux_max_mondes": {str(k): v for k, v in montee.NIVEAUX_MAX.items()},
                        "passes": [[c, montee.NOMS_PASSES[c]] for c in montee.PASSES]},
             "materiaux": catalogue_materiaux(),
             "recrutement": dict(catalogue_recrutement(), avant_postes=avant_postes_connus()),

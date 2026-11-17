@@ -9,7 +9,7 @@ Les événements qui s'enchaînent. Pour l'instant : **les nomades**. Fichier `s
   le module Tours lev max (départs à 4,2 s d'écart, arrivées espacées).
 - Tant que le camp n'a pas de délai (en Maître+ : niveaux 101 à 109), les salves s'enchaînent. À son dernier niveau (110), le
   jeu bloque le camp après chaque victoire (1 h 30, moins avec le bonus d'alliance) : le bot lit le délai exact et le saute
-  avec les passe-temps cochés (1 h, 30 min, 10 min). Jamais de rubis.
+  avec les passe-temps cochés (24 h, 5 h, 1 h, 30 min, 10 min, 5 min, 1 min), les plus longs d'abord. Jamais de rubis.
 - Armée : remplissage automatique (soldats choisis sur les côtés choisis à toutes les vagues, engins nomades choisis à la
   vague 1, coffres de tablettes aux vagues suivantes, option : soldats dans la cour) ou présélections du jeu. Soldats à niveaux
   (Valkyrie pisteuse, Vierge à bouclier, Guerriers à arc court et à hache reliques) : le plus haut niveau en stock d'abord,
