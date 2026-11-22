@@ -400,6 +400,7 @@ async def demarrer(jeu, prets, args, sortie=print, lire=None):
     if not entrees:
         raise ArretModule("Aucun module n'a pu demarrer (voir les messages ci-dessus) : arret.")
     partage.routeur = routeur_cat(entrees)
+    await verifier_armees(entrees, sortie)
     communs = {}
     for e in entrees:
         for p in e.module.cfg["commandants"]:
@@ -414,6 +415,27 @@ async def demarrer(jeu, prets, args, sortie=print, lire=None):
     for p in sorted(partages):
         sortie("  - commandant %d utilise par : %s (un seul a la fois, jamais deux attaques avec lui)" % (p, " et ".join(partages[p])))
     return entrees
+
+
+async def verifier_armees(entrees, sortie=print):
+    """Au lancement (18/11) : les armees que le lancement precedent avait notees en route le sont-elles encore ? Une attaque
+    annulee dans le jeu pendant que le bot etait arrete laissait son commandant bloque (et sa cible de cote) jusqu'a l'heure
+    prevue. Une seule lecture des mouvements du jeu, donnee a chaque module qui avait des armees en route."""
+    mods = [e for e in entrees if hasattr(e.module, "verifier_en_route") and e.module.a_verifier()]
+    if not mods:
+        return
+    try:
+        armees = await mods[0].module.lire_armees_en_cours()
+    except Exception as ex:                                       # (lecture seulement : jamais bloquant)
+        armees, raison = None, "%s: %s" % (type(ex).__name__, ex)
+    else:
+        raison = "pas de reponse du jeu"
+    if armees is None:
+        sortie("  - armees en route du lancement precedent : liste des mouvements du jeu illisible (%s), gardees telles quelles."
+               % raison)
+        return
+    for e in mods:
+        e.module.verifier_en_route(armees)
 
 
 def ecrire_console(texte, fichier=None):

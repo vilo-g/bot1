@@ -47,7 +47,8 @@ CODE_SANS_BATIMENT = 87                    # "Le batiment requis pour ceci n'exi
                                            # (ex. niveau 11 pas debloque), pas forcement pour la caserne -> niveau en dessous
 MEMOIRE_NIVEAU = 7 * 86400                 # un niveau appris est reessaye plus haut au bout de 7 jours
 FICHIER_MEMOIRE = os.path.join(tours.DOSSIER_CAPTURES, "recrutement.json")
-PAUSE = 300                     # verification de chaque chateau toutes les 5 min
+PAUSE = 3600                    # verification de chaque chateau au lancement puis toutes les heures (19/11 : toutes les 5 min,
+                                # c'etait inutile, aucune place ne se libere en 5 min)
 PAUSE_REFUS = 900               # file refusee (ressources, pieces...) : laissee de cote 15 min
 TYPE_AIDE = 6                   # ahr T=6 : aide au recrutement
 TYPES_PRINCIPAUX = (1, 12)      # chateau principal (grand empire) / chateau d'un royaume

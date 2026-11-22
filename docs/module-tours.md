@@ -131,6 +131,12 @@ une attaque partie moins de 4 s après la précédente : le bot attend juste ce 
 d'unités vide dans tous les royaumes choisis.
 Journal : `captures/journal_tours.txt`.
 
+Armées encore en route au lancement précédent (gardées dans `captures/etat_<module>.json`, pour tous les modules d'attaque) :
+au lancement, le bot les vérifie dans la liste des mouvements du jeu (`jca` pour l'identifiant du joueur, `gli` pour les
+commandants, `gam` pour les mouvements ; 18/11). Attaque annulée pendant que le bot était arrêté : la cible redevient libre
+et le commandant est libre dès son retour (tout de suite s'il est déjà au château). Commandant parti ailleurs à la main : sa
+cible redevient libre, lui reste pris jusqu'à son retour. Sans réponse du jeu, les armées notées sont gardées telles quelles.
+
 ## Présélections (mode P)
 
 Les présélections sont enregistrées **côté serveur**. Le bot les lit au lancement avec `gas {}` (la requête du jeu à l'ouverture

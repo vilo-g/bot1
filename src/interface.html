@@ -200,9 +200,13 @@ input.faux{border-color:var(--err)}
 .recrue b{flex:1;font-weight:500}
 .recrue img{width:40px;height:40px;object-fit:contain;flex:none;background:#fff;border-radius:8px;padding:2px}
 .choix-passes{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-.engins-ev{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
+.engins-ev{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr));gap:12px}
 .bloc-engins{border:1px solid var(--line2);border-radius:12px;padding:12px 14px;background:var(--panel2);display:grid;gap:8px;align-content:start}
 .bloc-engins .tete{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.vague-engins{border:1px solid var(--line2);border-radius:14px;padding:12px;margin-top:10px;display:grid;gap:10px}
+.vague-engins>.tete{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.vague-engins>.tete .bouton{padding:5px 12px;font-size:12.5px}
+@media (max-width:520px){.vague-engins{padding:10px 0 0;border-width:1px 0 0;border-radius:0}.bloc-engins{padding:10px}.bloc-engins .engin{grid-template-columns:minmax(0,1fr) 60px}}
 .bloc-engins .tete b{font-size:14px}.bloc-engins .tete small{color:var(--muted);font-variant-numeric:tabular-nums}
 .bloc-engins .tete small.trop{color:#ff8e7e;font-weight:600}
 .bloc-engins .engin{display:grid;grid-template-columns:1fr 72px;gap:8px;align-items:center;position:relative}
@@ -220,6 +224,12 @@ input.faux{border-color:var(--err)}
 .pave-ev{display:flex;align-items:center;gap:14px;width:100%;padding:0;border:0;background:none;color:var(--text);font:inherit;cursor:pointer;text-align:left}
 .pave-ev img{width:54px;height:54px;object-fit:contain;flex:none}.pave-ev h2{margin:0}
 .pave-ev small{display:block;color:var(--muted);margin-top:3px}
+.choix-sous{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.choix-sous button{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line2);border-radius:12px;background:var(--panel2);color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.choix-sous button img{width:44px;height:44px;object-fit:contain;flex:none;border-radius:8px}
+.choix-sous button b{display:block;font-size:14px}.choix-sous button small{color:var(--muted)}
+.choix-sous button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--panel3)}
+.choix-sous button.on small{color:var(--accent);font-weight:600}
 .pave-ev .fleche{margin-left:auto;color:var(--muted);font-size:13px;transition:transform .15s}.pave-ev[aria-expanded=true] .fleche{transform:rotate(180deg)}
 .corps-ev{margin-top:14px}.corps-ev[hidden]{display:none}
 .passe{display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line2);border-radius:9px;cursor:pointer;font-weight:500;user-select:none}
@@ -529,6 +539,12 @@ body.sans-defilement{overflow:hidden}
       <!-- ===================== TOURS LEV MAX -->
       <section class="page" id="page-evenements">
         <div class="carte">
+          <h2>Sous-module actif</h2>
+          <p class="aide" style="margin:0 0 12px">Un seul tourne à la fois : active celui de l'événement en cours, règle-le, enregistre. Si tu te trompes,
+            le bot le voit au lancement (pas de camp de cet événement) et arrête le module Événements.</p>
+          <div class="choix-sous" id="ev-sous"></div>
+        </div>
+        <div class="carte" id="ev-carte-nomades">
           <button type="button" class="pave-ev" id="ev-pave-nomades" aria-expanded="false" aria-controls="ev-corps-nomades">
             <img id="ev-logo-nomades" alt="" hidden><span><h2>Nomades</h2><small id="ev-resume-nomades"></small></span><span class="fleche">▼</span></button>
           <div class="corps-ev" id="ev-corps-nomades" hidden>
@@ -541,9 +557,31 @@ body.sans-defilement{overflow:hidden}
           </div>
           <div id="ev-progres"></div>
         </div>
-        <div class="carte">
-          <h2>Samouraïs, Étrangers, Corbeaux de sang</h2>
-          <p class="aide" style="margin:0">Pas encore disponibles : ils seront ajoutés ici, chacun avec ses réglages.</p>
+        <div class="carte" id="ev-carte-corbeaux">
+          <button type="button" class="pave-ev" id="ev-pave-corbeaux" aria-expanded="true" aria-controls="ev-corps-corbeaux">
+            <img id="ev-logo-corbeaux" alt="" hidden><span><h2>Corbeaux de sang</h2><small id="ev-resume-corbeaux"></small></span><span class="fleche">▼</span></button>
+          <div class="corps-ev" id="ev-corps-corbeaux" hidden>
+          <p class="aide">Le bot attaque les camps des Corbeaux de sang autour de ton château du vert avec les commandants choisis ici, le plus proche libre
+            d'abord (un seul commandant par camp). Un camp vaincu disparaît de la carte et revient quelques minutes plus tard : le bot le reprend.
+            Pas de délai à sauter, pas de passe-temps, jamais de rubis.</p>
+          <p class="aide">Soldats par vague : le maximum du jeu. Tes compétences de légende sont lues au lancement ; le reste du bonus de chaque commandant
+            (général, équipement), le bot l'apprend du jeu à ses premières attaques : quand le jeu répond « trop de soldats », rien ne part et il réessaie aussitôt avec un peu moins.</p>
+          <div id="ev-corbeaux" style="margin-top:14px;display:grid;gap:14px"></div>
+          </div>
+          <div id="ev-progres-corbeaux"></div>
+        </div>
+        <div class="carte" id="ev-carte-samourais">
+          <button type="button" class="pave-ev" id="ev-pave-samourais" aria-expanded="false" aria-controls="ev-corps-samourais">
+            <img id="ev-logo-samourais" alt="" hidden><span><h2>Samouraïs</h2><small id="ev-resume-samourais"></small></span><span class="fleche">▼</span></button>
+          <div class="corps-ev" id="ev-corps-samourais" hidden>
+          <p class="aide">Comme les nomades : le bot attaque en boucle un camp samouraï, par salves avec les commandants choisis ici (4,2 s d'écart entre deux départs).
+            Tant que le camp n'a pas de délai (niveaux 101 à 109), les salves s'enchaînent ; à son dernier niveau (110), le bot saute le délai du camp avec les passe-temps
+            cochés juste après chaque victoire, puis relance. Engins des samouraïs en vague 1, coffres de jetons ensuite. Jamais de rubis.</p>
+          <p class="aide">Coche <b>Événements</b> dans le tableau de bord. Le module tours ne prend jamais ces commandants tant que ce module tourne ;
+            le module forteresses peut en garder un avant une forteresse, il revient ensuite dans la boucle.</p>
+          <div id="ev-samourais" style="margin-top:14px;display:grid;gap:14px"></div>
+          </div>
+          <div id="ev-progres-samourais"></div>
         </div>
         <div class="barre"><div class="msg" id="ev-msg">Aucune modification.</div>
           <button class="bouton" id="ev-annuler">Annuler</button><button class="bouton principal" id="ev-enregistrer">Enregistrer</button></div>
@@ -714,7 +752,7 @@ body.sans-defilement{overflow:hidden}
       <section class="page" id="page-recrutement">
         <div class="carte">
           <h2>Royaumes</h2>
-          <p class="aide">Toutes les 5 minutes, le bot remplit au maximum les emplacements libres de la caserne et de l'atelier de siège du château principal de chaque royaume coché et de chaque avant-poste coché, au plus haut niveau débloqué, puis demande l'aide de l'alliance. Les types se choisissent château par château.</p>
+          <p class="aide">Au lancement du bot puis toutes les heures, le bot remplit au maximum les emplacements libres de la caserne et de l'atelier de siège du château principal de chaque royaume coché et de chaque avant-poste coché, au plus haut niveau débloqué, puis demande l'aide de l'alliance. Les types se choisissent château par château.</p>
           <div class="royaumes" id="rc-royaumes"></div>
           <h3 class="sous-titre">Avant-postes du vert</h3>
           <p class="aide" id="rc-ap-aide"></p>
@@ -790,7 +828,7 @@ function choixCotes(valeur, choisir){
   return el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"}, boite, aide);
 }
 const CHEVAL = [["C","Pièces"],["F","Plumes"],["CF","Pièces puis plumes"]];
-const VERSION = "2026-11-17-levmax1";     // doit etre egale a VERSION dans interface.py
+const VERSION = "2026-11-20-samourais1";     // doit etre egale a VERSION dans interface.py
 let serveur = null;            // dernier /api/etat
 const etat = {tours:null, forteresses:null, achats:null, defense:null, transferts:null, recrutement:null, materiaux:null, montee:null, evenements:null};      // formulaires en cours
 const sale = {tours:false, forteresses:false, achats:false, defense:false, transferts:false, recrutement:false, materiaux:false, montee:false, evenements:false, khan:false};
@@ -820,7 +858,7 @@ function cmdListe(t){ return String(t||"").split(";").map(x=>x.trim()).filter(x=
 /* ------------------------------------------------------------------ navigation */
 const TITRES = {accueil:["Tableau de bord","Lancer le bot et suivre ce qu'il fait"], compte:["Compte","Nom du compte et mot de passe, gardés sur ce PC"], tours:["Module tours","Réglages enregistrés dans config.json (rubrique tours)"],
   montee:["Module Tours lev max","Monter une tour au niveau max (rubrique montee)"],
-  evenements:["Module Événements","Les événements qui s'enchaînent : nomades (rubrique evenements)"],
+  evenements:["Module Événements","Les événements qui s'enchaînent : nomades, corbeaux de sang ou samouraïs, un seul à la fois (rubrique evenements)"],
   khan:["Module Khan","Attaque du camp du Khan, déclenchement et défense de ton château principal (rubrique evenements.khan)"],
   forteresses:["Module forteresses","Réglages enregistrés dans config.json (rubrique forteresses)"],
   achats:["Module achats","Dépenser le surplus de pièces en engins (rubrique achats)"],
@@ -1444,19 +1482,135 @@ $("#m-enregistrer").addEventListener("click", async () => {
   }
 });
 /* ------------------------------------------------------------------ evenements : nomades */
-function etatEvenements(c){ return {nomades: etatCamp((c && c.nomades) || {}), khan: etatCamp((c && c.khan) || {})}; }
+function etatEvenements(c){ return {nomades: etatCamp((c && c.nomades) || {}), khan: etatCamp((c && c.khan) || {}),
+  samourais: etatCamp((c && c.samourais) || {}, "samourais"), corbeaux: etatCorbeaux((c && c.corbeaux) || {}), actif: actifEv(c)}; }
+// 20/11 : samouraïs = même sous-module que les nomades (mêmes réglages), avec ses engins, ses coffres de jetons et son logo
+const actifEv = c => ["corbeaux", "samourais"].includes(c && c.actif) ? c.actif : "nomades";
+const NOMS_CAMPS = {nomades:"Nomades", khan:"Khan", samourais:"Samouraïs"}, GAINS = {nomades:"tablettes", khan:"tablettes", samourais:"jetons"};
+const MAX_GAIN = {nomades:"max_tablettes", khan:"max_tablettes", samourais:"max_jetons"};
+function infoCamp(genre){ const i = (serveur && serveur.evenements) || {}; return genre === "samourais" ? Object.assign({}, i, i.samourais || {}) : i; }
+function logoCamp(g){ const i = (serveur && serveur.evenements) || {}; return g === "nomades" || g === "khan" ? i["logo_" + g] : (i[g] || {}).logo; }
+/* ------------------------------------------------------------------ evenements : corbeaux de sang (18/11) */
+const SOUS_MODULES = [["nomades", "Nomades"], ["corbeaux", "Corbeaux de sang"], ["samourais", "Samouraïs"]];
+const corbeauxRempli = n => !!(n && n.commandants);
+function infoCorbeaux(){ return (((serveur && serveur.evenements) || {}).corbeaux) || {}; }
+function etatCorbeaux(n){
+  const info = infoCorbeaux(), d = info.engins_defaut || {flanc:[], centre:[]};
+  const eng = (l, cases) => { const r = (l || []).map(p => [p[0], String(p[1])]); while(r.length < cases) r.push([0, ""]); return r.slice(0, cases); };
+  const k = n.bannieres || {types:[], ordre:"forts"}, vmax = info.vagues_max || 3;
+  // une grille par vague d'engins (18/11) ; l'ancien format (une seule grille pour toutes les vagues) est recopie dans chaque vague
+  const g = Array.isArray(n.engins) ? n.engins : n.engins ? [n.engins] : [d];
+  const ve = Math.min(vmax, Math.max(1, Math.round(+(n.vagues_engins ?? 1)) || 1));
+  const engins = Array.from({length: vmax}, (_, i) => { const e = g[i] || g[0] || d; return {flanc: eng(e.flanc, 2), centre: eng(e.centre, 3)}; });
+  return {commandants: cmdTexte(n.commandants), mode: "auto", cotes: codeCotes(n.cotes || "LMR") || "LMR", cheval: n.cheval || "F", distance_plumes: n.distance_plumes ?? 20,
+    soldats: (n.soldats || [216]).slice(), soldats_suite: (n.soldats_suite || []).slice(), vagues_engins: String(ve), ouvertes: ve,
+    engins, bannieres: {types: (k.types || []).slice(), ordre: k.ordre === "faibles" ? "faibles" : "forts"},
+    rayon: String(n.rayon ?? (info.rayon || 30)), max_attaques: String(n.max_attaques ?? 0), cour: n.remplir_cour ?? true};
+}
+function erreursCorbeaux(n){
+  const e = [], nb = v => /^\d+$/.test(String(v).trim()), info = infoCorbeaux(), place = info.place || 50, vmax = info.vagues_max || 3;
+  if(!cmdListe(n.commandants).length) e.push("Corbeaux de sang : au moins un commandant (ex. 1;2;3).");
+  if(!n.soldats.length) e.push("Corbeaux de sang : choisis au moins une unité de soldats pour les vagues d'engins.");
+  const ve = +n.vagues_engins;
+  if(!(nb(n.vagues_engins) && ve >= 1 && ve <= vmax)) e.push("Corbeaux de sang : de 1 à " + vmax + " vagues d'engins.");
+  for(let i = 0; i < Math.min(ve, vmax) || 0; i++){
+    const grille = n.engins[i], v = "Corbeaux de sang, vague d'engins " + (i + 1);
+    for(const g of ["flanc","centre"]){
+      const pris = grille[g].filter(p => p[0]), total = pris.reduce((a, p) => a + (+p[1] || 0), 0), nom = g === "flanc" ? "chaque flanc" : "centre";
+      if(pris.some(p => !nb(p[1]) || +p[1] < 1 || +p[1] > place)) e.push(v + " (" + nom + ") : quantité de 1 à " + place + " pour chaque engin choisi.");
+      if(total > place) e.push(v + " (" + nom + ") : " + place + " engins au plus en tout, " + total + " choisis.");
+      if(new Set(pris.map(p => p[0])).size !== pris.length) e.push(v + " (" + nom + ") : le même engin est choisi deux fois.");
+      if(g === "flanc" && pris.some(p => (info.engins || []).some(x => x[0] === p[0] && x[4] === "beliers"))) e.push(v + " (chaque flanc) : pas de bélier sur un flanc, les béliers vont au centre.");
+    }
+    if(!grille.flanc.some(p => p[0]) && !grille.centre.some(p => p[0])) e.push(v + " : choisis au moins un engin.");
+    // tours de gloire : au plus N par vague, tous côtés confondus (la grille du flanc vaut pour chaque flanc choisi)
+    const cotes = n.cotes || "LMR", flancs = [..."LR"].filter(c => cotes.includes(c)).length, centre = cotes.includes("M") ? 1 : 0, compte = {};
+    for(const [g, fois] of [["flanc", flancs], ["centre", centre]]) for(const p of grille[g]) if(p[0] && nb(p[1])) compte[p[0]] = (compte[p[0]] || 0) + fois * +p[1];
+    for(const [w, q] of Object.entries(compte)){
+      const x = (info.engins || []).find(y => y[0] === +w);
+      if(x && x[5] && q > x[5]) e.push(v + " : " + x[1] + ", " + x[5] + " au plus par vague (chaque flanc + centre), " + q + " choisis.");
+    }
+  }
+  if(n.cheval === "CF" && !(+n.distance_plumes > 0)) e.push("Corbeaux de sang : distance à partir de laquelle utiliser les plumes.");
+  if(!(nb(n.rayon) && +n.rayon >= 5 && +n.rayon <= 100)) e.push("Corbeaux de sang : rayon de recherche des camps, de 5 à 100 cases.");
+  if(!nb(n.max_attaques)) e.push("Corbeaux de sang, arrêt : nombre d'attaques entier (0 = aucune limite).");
+  return e;
+}
+function corpsCorbeaux(n){
+  const eng = l => l.filter(p => p[0]).map(p => [p[0], +p[1]]);
+  return {commandants:n.commandants, cotes:n.cotes, cheval:n.cheval, distance_plumes:+n.distance_plumes, soldats:n.soldats, soldats_suite:n.soldats_suite,
+    vagues_engins:+n.vagues_engins, engins:n.engins.slice(0, +n.vagues_engins).map(g => ({flanc:eng(g.flanc), centre:eng(g.centre)})), bannieres:n.bannieres, rayon:+n.rayon, max_attaques:+n.max_attaques, remplir_cour:n.cour};
+}
+function dessinerSous(){
+  const ev = etat.evenements, info = (serveur && serveur.evenements) || {};
+  $("#ev-sous").replaceChildren(...SOUS_MODULES.map(([g, nom]) => {
+    const on = ev.actif === g, logo = logoCamp(g);
+    return el("button",{type:"button", class: on ? "on" : "", "aria-pressed":String(on), onclick:() => { if(ev.actif !== g){ ev.actif = g; changer("evenements"); } }},
+      logo ? el("img",{src:logo, alt:""}) : null, el("span",{}, el("b",{}, nom), el("small",{}, on ? "✓ activé" : "Activer")));
+  }));
+  $("#ev-carte-nomades").hidden = ev.actif !== "nomades";
+  $("#ev-carte-corbeaux").hidden = ev.actif !== "corbeaux";
+  $("#ev-carte-samourais").hidden = ev.actif !== "samourais";
+}
+function dessinerCorbeaux(){
+  const n = etat.evenements.corbeaux, info = infoCorbeaux(), M = "evenements", place = info.place || 50;
+  const champ = (titre, k, attrs) => el("label",{class:"champ"}, titre, el("input", Object.assign({value:n[k], oninput:e => { n[k] = e.target.value.trim(); changer(M, false); }}, attrs)));
+  const lignes = [el("div",{class:"grille g3"}, champ("Commandants", "commandants", {type:"text", placeholder:"ex. 1;2;3"}),
+    champ("Chercher les camps à moins de (cases)", "rayon", {type:"number", min:5, max:100}))];
+  lignes.push(...lignesCommunes(M, n, false).slice(1));
+  const ve = +n.vagues_engins || 1;
+  lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues d'engins : soldats"), choixSoldats(n, M)));
+  lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues de bannières : soldats"), el("div",{},
+    n.soldats_suite.length ? choixSoldats({mode:"auto", soldats:n.soldats_suite, vide_ok:true}, M)
+      : el("button",{type:"button", class:"ajouter-soldat", onclick:() => ouvrirGalerie({mode:"auto", soldats:n.soldats_suite}, false, M)}, el("span",{class:"plus"}, "+"), "Choisir d'autres soldats"),
+    n.soldats_suite.length ? el("button",{type:"button", class:"bouton", style:"margin-top:8px", onclick:() => { n.soldats_suite.length = 0; changer(M); }}, "Reprendre les soldats des vagues d'engins") : null,
+    el("p",{class:"aide", style:"margin:8px 0 0"}, n.soldats_suite.length ? "Ces soldats partent avec les bannières, après les vagues d'engins." : "Rien de choisi : les mêmes soldats que les vagues d'engins."))));
+  const bloc = (grille, g, titre) => {
+    const somme = () => grille[g].reduce((a, p) => a + (p[0] ? (+p[1] || 0) : 0), 0);
+    const compteur = el("small",{class: somme() > place ? "trop" : ""}, somme() + " / " + place + " engins");
+    const maj = () => { compteur.textContent = somme() + " / " + place + " engins"; compteur.className = somme() > place ? "trop" : ""; };
+    return el("div",{class:"bloc-engins"}, el("div",{class:"tete"}, el("b",{}, titre), compteur), grille[g].map(p => el("div",{class:"engin"},
+      choixEngin(p, grille[g], (info.engins || []).filter(e => g === "centre" || e[4] !== "beliers"), () => changer(M), {bonus: e => e[2]}),
+      p[0] ? el("input",{type:"number", min:1, max:place, value:p[1], title:"quantité", oninput:e => { p[1] = e.target.value.trim(); maj(); changer(M, false); }}) : el("span",{}))));
+  };
+  const copie = g => ({flanc: g.flanc.map(p => p.slice()), centre: g.centre.map(p => p.slice())});
+  // une vague ouverte pour la premiere fois reprend les engins de la vague 1 ; ensuite elle garde les siens
+  const nombre = v => { const k = +v; for(let i = n.ouvertes || 1; i < k; i++) n.engins[i] = copie(n.engins[0]); n.ouvertes = Math.max(n.ouvertes || 1, k); n.vagues_engins = v; changer(M); };
+  const vmax = info.vagues_max || 3;
+  const vague = i => el("div",{class:"vague-engins"},
+    el("div",{class:"tete"}, el("b",{}, "Vague " + (i + 1)),
+      i ? el("button",{type:"button", class:"bouton", onclick:() => { n.engins[i] = copie(n.engins[0]); changer(M); }}, "Reprendre les engins de la vague 1") : null),
+    el("div",{class:"engins-ev"}, bloc(n.engins[i], "flanc", "Chaque flanc"), bloc(n.engins[i], "centre", "Centre")));
+  lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues d'engins"), el("div",{},
+    el("div",{class:"en-ligne"}, "Nombre de vagues d'engins", segment(Array.from({length: vmax}, (_, i) => [String(i + 1), String(i + 1)]), String(ve), nombre)),
+    ...Array.from({length: Math.min(ve, vmax)}, (_, i) => vague(i)),
+    el("p",{class:"aide", style:"margin:8px 0 0"}, "Chaque vague d'engins part avec ses propres engins, " + place + " au plus par côté ; tour de gloire : le niveau le plus haut en stock, 30 au plus par vague (chaque flanc + centre). S'il manque un engin ou des soldats pour la vague 1, le bot n'attaque pas et le dit ; les vagues d'engins suivantes partent avec ce qui reste."))));
+  const k = n.bannieres;
+  lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues suivantes : bannières"), el("div",{},
+    el("div",{class:"choix-passes", style:"margin-top:0"}, (info.bannieres || []).map(([w, nom, b, image]) => el("label",{class:"passe" + (k.types.includes(w) ? " on" : ""), title:nom},
+      el("input",{type:"checkbox", checked:k.types.includes(w), onchange:e => { k.types = e.target.checked ? [...k.types, w] : k.types.filter(x => x !== w); changer(M); }}),
+      image ? el("img",{src:image, alt:nom, style:"width:28px;height:28px;object-fit:contain;vertical-align:middle;margin-right:6px"}) : nom + " ", "+" + b + " % gloire"))),
+    el("div",{style:"margin-top:8px"}, segment([["forts","Les plus forts d'abord"],["faibles","Les plus faibles d'abord"]], k.ordre, v => { k.ordre = v; changer(M); })),
+    el("p",{class:"aide", style:"margin:8px 0 0"}, "Les vagues après les vagues d'engins partent remplies des bannières cochées (" + place + " par côté). Quand une bannière est épuisée, le bot passe à la suivante ; sans bannière cochée, ces vagues partent sans outils."))));
+  lignes.push(el("div",{class:"ligne"}, el("span",{},"Cour (ligne ★)"),
+    el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:n.cour, onchange:e => { n.cour = e.target.checked; changer(M); }}), el("i"), "Remplir la cour au maximum à chaque attaque (soldats des vagues d'engins d'abord)")));
+  lignes.push(el("div",{class:"ligne"}, el("span",{},"Arrêt"), el("div",{style:"display:flex;gap:14px;flex-wrap:wrap"},
+    el("label",{class:"en-ligne"}, "après", el("input",{type:"number", min:0, value:n.max_attaques, oninput:e => { n.max_attaques = e.target.value.trim(); changer(M, false); }}), "attaques"),
+    el("small",{class:"aide-cotes"}, "0 = pas de limite"))));
+  $("#ev-corbeaux").replaceChildren(...lignes);
+}
 // une partie commencée (commandants, coordonnées, ou Khan à déclencher) est envoyée et vérifiée : avant (16/11), le Khan sans
 // commandant était retiré en silence à l'enregistrement, et l'interrupteur « Déclencher le Khan » se décochait
-const campRempli = (n, genre) => !!(n.commandants || (genre === "nomades" && (n.x || n.y)) || (genre === "khan" && n.declencher));
-function etatCamp(n){
-  const info = (serveur && serveur.evenements) || {}, d = info.engins_defaut || {flanc:[], centre:[]};
+const campRempli = (n, genre) => !!(n.commandants || (genre !== "khan" && (n.x || n.y)) || (genre === "khan" && n.declencher));
+function etatCamp(n, genre="nomades"){
+  const info = infoCamp(genre), d = info.engins_defaut || {flanc:[], centre:[]};
   const eng = (l, cases) => { const r = (l || []).map(p => [p[0], String(p[1])]); while(r.length < cases) r.push([0, ""]); return r.slice(0, cases); };
   const e = n.engins || d, k = n.coffres || {actif:true, types:[], ordre:"forts"};
   return {x: String(n.x ?? ""), y: String(n.y ?? ""), commandants: cmdTexte(n.commandants), mode: n.mode || "auto", cotes: codeCotes(n.cotes || "LMR") || "LMR",
     soldats: (n.soldats || [216]).slice(), soldats_suite: (n.soldats_suite || []).slice(), presets: (n.presets || [1,1,1,1]).slice(), cheval: n.cheval || "F", distance_plumes: n.distance_plumes ?? 20,
     engins: {flanc: eng(e.flanc, 2), centre: eng(e.centre, 3)}, coffres: {actif: !!k.actif, types: (k.types || []).slice(), ordre: k.ordre || "forts"},
     cour: !!(n.remplir_cour || n.soldats_cour), passes: (n.passes || ["MS5","MS4","MS3"]).slice(),
-    max_attaques: String(n.max_attaques ?? 0), max_tablettes: String(n.max_tablettes ?? 0),
+    max_attaques: String(n.max_attaques ?? 0), max_tablettes: String(n[MAX_GAIN[genre]] ?? 0),   // samouraïs : jetons
     bannieres: (n.bannieres || [106]).slice(), declencher: !!n.declencher,
     en_cours: String(n.en_cours ?? 3), objectif_declenchements: String(n.objectif_declenchements ?? n.objectif_defenses ?? 0), objectif_points: String(n.objectif_points ?? 0),
     defense: etatDefenseKhan(n.defense)};
@@ -1505,29 +1659,30 @@ function corpsDefenseKhan(d){
     defenseurs: d.defenseurs.slice(), abri: {x: +d.abri.x, y: +d.abri.y}, achat_malles: +d.achat_malles, achat_engins: d.achat_engins};
 }
 function erreursEvenements(ev){
-  return ["nomades","khan"].filter(g => campRempli(ev[g], g)).flatMap(g => erreursCamp(ev[g], g));
+  return ["nomades","khan","samourais"].filter(g => campRempli(ev[g], g)).flatMap(g => erreursCamp(ev[g], g));
 }
 function erreursCamp(n, genre){
-  const e = [], nb = v => /^\d+$/.test(String(v).trim()), N = genre === "khan" ? "Khan" : "Nomades";
-  if(genre === "nomades" && (!nb(n.x) || +n.x > 2000 || !nb(n.y) || +n.y > 2000)) e.push("Nomades : coordonnées du camp (X et Y, de 0 à 2000).");
+  const e = [], nb = v => /^\d+$/.test(String(v).trim()), N = NOMS_CAMPS[genre], C = genre === "samourais" ? N : "Nomades", info = infoCamp(genre);
+  if(genre !== "khan" && (!nb(n.x) || +n.x > 2000 || !nb(n.y) || +n.y > 2000)) e.push(C + " : coordonnées du camp (X et Y, de 0 à 2000).");
   if(!cmdListe(n.commandants).length) e.push(N + " : au moins un commandant (ex. " + (genre === "khan" ? "4;5" : "1;2;3") + ").");
   if(n.mode === "auto"){
-    if(!n.soldats.length) e.push("Nomades : choisis au moins une unité de soldats.");
-    const qmax = ((serveur && serveur.evenements) || {}).quantite_max || 50;
+    if(!n.soldats.length) e.push(C + " : choisis au moins une unité de soldats.");
+    const qmax = info.quantite_max || 50;
     for(const g of ["flanc","centre"]){
       const pris = n.engins[g].filter(p => p[0]);
-      if(pris.some(p => !nb(p[1]) || +p[1] < 1 || +p[1] > qmax)) e.push("Nomades, engins de la vague 1 (" + g + ") : quantité de 1 à " + qmax + " pour chaque engin choisi.");
-      const place = (((serveur && serveur.evenements) || {}).place_engins || {flanc:40, centre:50})[g], total = pris.reduce((a, p) => a + (+p[1] || 0), 0);
-      if(total > place) e.push("Nomades, engins de la vague 1 (" + (g === "flanc" ? "chaque flanc" : "centre") + ") : " + place + " engins au plus en tout, " + total + " choisis.");
-      if(g === "flanc" && pris.some(p => (((serveur && serveur.evenements) || {}).engins || []).some(x => x[0] === p[0] && x[4] === "beliers"))) e.push("Nomades, engins de la vague 1 (chaque flanc) : pas de bélier sur un flanc, les béliers vont au centre.");
-      if(new Set(pris.map(p => p[0])).size !== pris.length) e.push("Nomades, engins de la vague 1 (" + g + ") : le même engin est choisi deux fois.");
+      if(pris.some(p => !nb(p[1]) || +p[1] < 1 || +p[1] > qmax)) e.push(C + ", engins de la vague 1 (" + g + ") : quantité de 1 à " + qmax + " pour chaque engin choisi.");
+      const place = (info.place_engins || {flanc:40, centre:50})[g], total = pris.reduce((a, p) => a + (+p[1] || 0), 0);
+      if(total > place) e.push(C + ", engins de la vague 1 (" + (g === "flanc" ? "chaque flanc" : "centre") + ") : " + place + " engins au plus en tout, " + total + " choisis.");
+      if(g === "flanc" && pris.some(p => (info.engins || []).some(x => x[0] === p[0] && x[4] === "beliers"))) e.push(C + ", engins de la vague 1 (chaque flanc) : pas de bélier sur un flanc, les béliers vont au centre.");
+      if(pris.some(p => !(info.engins || []).some(x => x[0] === p[0]))) e.push(C + ", engins de la vague 1 (" + g + ") : engin d'un autre événement, choisis-en un de la liste.");
+      if(new Set(pris.map(p => p[0])).size !== pris.length) e.push(C + ", engins de la vague 1 (" + g + ") : le même engin est choisi deux fois.");
     }
-    if(genre === "nomades" && n.coffres.actif && !n.coffres.types.length) e.push("Nomades : coche au moins un coffre, ou désactive les coffres.");
-  } else if(n.presets.some(p => !nb(p) || +p < 1 || +p > 30)) e.push("Nomades : numéros de présélection de 1 à 30.");
-  if(n.cheval === "CF" && !(+n.distance_plumes > 0)) e.push("Nomades : distance à partir de laquelle utiliser les plumes.");
-  if(!n.passes.length) e.push("Nomades : coche au moins un passe-temps.");
-  if(genre === "nomades") for(const [k, t] of [["max_attaques","nombre d'attaques"],["max_tablettes","nombre de tablettes"]])
-    if(!nb(n[k])) e.push("Nomades, " + t + " : nombre entier (0 = aucun).");
+    if(genre !== "khan" && n.coffres.actif && !n.coffres.types.length) e.push(C + " : coche au moins un coffre, ou désactive les coffres.");
+  } else if(n.presets.some(p => !nb(p) || +p < 1 || +p > 30)) e.push(C + " : numéros de présélection de 1 à 30.");
+  if(n.cheval === "CF" && !(+n.distance_plumes > 0)) e.push(C + " : distance à partir de laquelle utiliser les plumes.");
+  if(!n.passes.length) e.push(C + " : coche au moins un passe-temps.");
+  if(genre !== "khan") for(const [k, t] of [["max_attaques","nombre d'attaques"],["max_tablettes","nombre de " + GAINS[genre]]])
+    if(!nb(n[k])) e.push(C + ", " + t + " : nombre entier (0 = aucun).");
   if(genre === "khan"){
     if(!n.bannieres.length) e.push("Khan : coche au moins un outil de rage (bannière ou coffre du pilleur).");
     if(n.declencher){
@@ -1541,14 +1696,14 @@ function erreursCamp(n, genre){
 }
 function corpsEvenements(ev){
   const c = {};
-  for(const g of ["nomades","khan"]) if(campRempli(ev[g], g)) c[g] = corpsCamp(ev[g], g);
+  for(const g of ["nomades","khan","samourais"]) if(campRempli(ev[g], g)) c[g] = corpsCamp(ev[g], g);
   return c;
 }
 function corpsCamp(n, genre){
   const eng = l => l.filter(p => p[0]).map(p => [p[0], +p[1]]);
   const c = {x:+n.x, y:+n.y, commandants:n.commandants, mode:n.mode, cotes:n.cotes, soldats:n.soldats, soldats_suite:n.soldats_suite, presets:n.presets.map(Number),
     cheval:n.cheval, distance_plumes:+n.distance_plumes, engins:{flanc:eng(n.engins.flanc), centre:eng(n.engins.centre)}, coffres:n.coffres,
-    remplir_cour: n.cour, passes:n.passes, max_attaques:+n.max_attaques, max_tablettes:+n.max_tablettes};
+    remplir_cour: n.cour, passes:n.passes, max_attaques:+n.max_attaques, [MAX_GAIN[genre]]:+n.max_tablettes};
   if(genre === "khan"){
     Object.assign(c, {bannieres:n.bannieres, declencher:n.declencher});
     if(n.declencher) Object.assign(c, {en_cours:+n.en_cours, objectif_declenchements:+n.objectif_declenchements, objectif_points:+n.objectif_points, defense:corpsDefenseKhan(n.defense)});
@@ -1558,12 +1713,12 @@ function corpsCamp(n, genre){
 }
 function dessinerEvenements(){
   if(!etat.evenements || !serveur) return;
-  dessinerCamp("nomades"); dessinerCamp("khan");
+  dessinerSous(); dessinerCamp("nomades"); dessinerCamp("khan"); dessinerCamp("samourais"); dessinerCorbeaux();
   progresEvenements();
 }
 function dessinerCamp(genre){
   const ev = etat.evenements, khan = genre === "khan";
-  const n = ev[genre], info = serveur.evenements || {}, M = genre === "khan" ? "khan" : "evenements";
+  const n = ev[genre], info = infoCamp(genre), M = genre === "khan" ? "khan" : "evenements", gain = GAINS[genre];
   const champ = (titre, k, attrs) => el("label",{class:"champ"}, titre, el("input", Object.assign({value:n[k], oninput:e => { n[k] = e.target.value.trim(); changer(M, false); }}, attrs)));
   const lignes = [khan ? el("div",{class:"grille g3"}, champ("Commandants", "commandants", {type:"text", placeholder:"ex. 4;5"}))
     : el("div",{class:"grille g3"}, champ("Camp : coordonnée X", "x", {type:"number", min:0, max:2000}), champ("Camp : coordonnée Y", "y", {type:"number", min:0, max:2000}),
@@ -1596,11 +1751,12 @@ function dessinerCamp(genre){
         image ? el("img",{src:image, alt:nom, style:"width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-right:6px"}) : nom + " ", "+" + b + " % de rage"))),
       el("p",{class:"aide", style:"margin:8px 0 0"}, "Le bot lit ta barre de rage avant chaque attaque et met juste ce qu'il faut pour la remplir (40 par flanc, 50 au centre, à partir de la vague 2). Si un commandant ne suffit pas, il part plein et le suivant complète."))));
     else lignes.push(el("div",{class:"ligne haut"}, el("span",{},"Vagues suivantes : coffres"), el("div",{},
-      el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:k.actif, onchange:e => { k.actif = e.target.checked; changer(M); }}), el("i"), "Remplir de coffres de tablettes (40 par flanc, 50 au centre)"),
-      k.actif ? el("div",{class:"choix-passes"}, (info.coffres || []).map(([w, b]) => el("label",{class:"passe" + (k.types.includes(w) ? " on" : "")},
-        el("input",{type:"checkbox", checked:k.types.includes(w), onchange:e => { k.types = e.target.checked ? [...k.types, w] : k.types.filter(x => x !== w); changer(M); }}), "+" + b + " %"))) : null,
+      el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:k.actif, onchange:e => { k.actif = e.target.checked; changer(M); }}), el("i"), "Remplir de coffres de " + gain + " (40 par flanc, 50 au centre)"),
+      k.actif ? el("div",{class:"choix-passes"}, (info.coffres || []).map(([w, b, nom, image]) => el("label",{class:"passe" + (k.types.includes(w) ? " on" : ""), title:nom || ""},
+        el("input",{type:"checkbox", checked:k.types.includes(w), onchange:e => { k.types = e.target.checked ? [...k.types, w] : k.types.filter(x => x !== w); changer(M); }}),
+        image ? el("img",{src:image, alt:nom, style:"width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-right:6px"}) : null, "+" + b + " %"))) : null,
       k.actif ? el("div",{style:"margin-top:8px"}, segment([["forts","Les plus forts d'abord"],["faibles","Les plus faibles d'abord"]], k.ordre, v => { k.ordre = v; changer(M); })) : null,
-      k.actif ? el("p",{class:"aide", style:"margin:8px 0 0"}, "Coche les coffres que le bot a le droit d'utiliser (bonus de tablettes de chaque coffre). Quand un coffre est épuisé, il passe au suivant ; sans coffre, l'attaque part quand même.") : null)));
+      k.actif ? el("p",{class:"aide", style:"margin:8px 0 0"}, "Coche les coffres que le bot a le droit d'utiliser (bonus de " + gain + " de chaque coffre). Quand un coffre est épuisé, il passe au suivant ; sans coffre, l'attaque part quand même.") : null)));
   }
   lignes.push(el("div",{class:"ligne"}, el("span",{},"Cour (ligne ★)"),
     el("label",{class:"interrupteur"}, el("input",{type:"checkbox", checked:n.cour, onchange:e => { n.cour = e.target.checked; changer(M); }}), el("i"), "Remplir la cour au maximum à chaque attaque")));
@@ -1632,7 +1788,7 @@ function dessinerCamp(genre){
   }
   if(!khan) lignes.push(el("div",{class:"ligne"}, el("span",{},"Arrêt"), el("div",{style:"display:flex;gap:14px;flex-wrap:wrap"},
     el("label",{class:"en-ligne"}, "après", el("input",{type:"number", min:0, value:n.max_attaques, oninput:e => { n.max_attaques = e.target.value.trim(); changer(M, false); }}), "attaques"),
-    el("label",{class:"en-ligne"}, "ou après", el("input",{type:"number", min:0, value:n.max_tablettes, oninput:e => { n.max_tablettes = e.target.value.trim(); changer(M, false); }}), "tablettes gagnées"),
+    el("label",{class:"en-ligne"}, "ou après", el("input",{type:"number", min:0, value:n.max_tablettes, oninput:e => { n.max_tablettes = e.target.value.trim(); changer(M, false); }}), gain + " gagné" + (genre === "samourais" ? "s" : "es")),
     el("small",{class:"aide-cotes"}, "0 = pas de limite"))));
   $("#ev-" + genre).replaceChildren(...lignes);
   if(khan && fenetreDef){ if(n.declencher) fenetreDef.rendre(n, M); else fenetreDef.fermer(); }
@@ -1834,14 +1990,14 @@ function defenseursKhan(d, M){
 function resumeCamps(){
   if(!etat.evenements) return;
   const tous = Object.values(((serveur.bot || {}).etat === "en_marche" && serveur.bot.evenements) || {});
-  for(const g of ["nomades","khan"]){
+  for(const g of ["nomades","khan","samourais"]){
     const n = etat.evenements[g], p = tous.find(x => x.evenement === g);
-    $("#ev-resume-" + g).textContent = (g === "nomades" ? (n.x && n.y ? "Camp (" + n.x + "," + n.y + ")" : "Pas encore réglé") : (n.commandants ? "Camp du Khan de l'alliance" : "Pas encore réglé"))
+    $("#ev-resume-" + g).textContent = (g !== "khan" ? (n.x && n.y ? "Camp (" + n.x + "," + n.y + ")" : "Pas encore réglé") : (n.commandants ? "Camp du Khan de l'alliance" : "Pas encore réglé"))
       + (n.commandants ? " · commandants " + n.commandants : "")
-      + (p ? " · en cours : " + p.attaques + " attaque(s)" + (g === "khan" ? ", rage " + (p.rage ?? "?") + " / " + (p.rage_max ?? "?") + (p.declencher ? ", " + (p.defenses || 0) + " défense(s), " + (p.points || 0) + " point(s)" : "") : ", " + p.tablettes + " tablette(s)") : "");
-    const logo = (serveur.evenements || {})["logo_" + g], img = $("#ev-logo-" + g);
+      + (p ? " · en cours : " + p.attaques + " attaque(s)" + (g === "khan" ? ", rage " + (p.rage ?? "?") + " / " + (p.rage_max ?? "?") + (p.declencher ? ", " + (p.defenses || 0) + " défense(s), " + (p.points || 0) + " point(s)" : "") : ", " + p.tablettes + " " + (g === "samourais" ? "jeton(s)" : "tablette(s)")) : "");
+    const logo = logoCamp(g), img = $("#ev-logo-" + g);
     if(logo && img.hidden){ img.src = logo; img.hidden = false; }
-    const zone = $(g === "nomades" ? "#ev-progres" : "#ev-progres-khan");
+    const zone = $(g === "nomades" ? "#ev-progres" : "#ev-progres-" + g);
     if(g === "khan") zone.replaceChildren(...(p ? [el("p",{class:"aide", style:"margin:8px 0 0;color:var(--text)"},
       "En cours : camp du Khan (" + p.x + "," + p.y + ")" + (p.niveau ? " niveau " + p.niveau : "") + ", rage " + (p.rage ?? "?") + " sur " + (p.rage_max ?? "?") + ", " + p.attaques + " attaque(s) envoyée(s)"
       + (p.en_route ? " dont " + p.en_route + " en route" : "")
@@ -1852,10 +2008,10 @@ function resumeCamps(){
       + (Object.keys(p.passes || {}).length ? ", passe-temps : " + Object.entries(p.passes).map(([c, q]) => q + " × " + nomPasse(c)).join(", ") : "") + (p.pause ? ". En pause : " + p.pause : "."))] : []));
   }
 }
-for(const g of ["nomades","khan"]){
+for(const g of ["nomades","khan","corbeaux","samourais"]){
   const pave = $("#ev-pave-" + g), corps = $("#ev-corps-" + g);
   const ouvrir = o => { pave.setAttribute("aria-expanded", o ? "true" : "false"); corps.hidden = !o; };
-  let o = g === "khan"; try{ const v = localStorage.getItem("ev-" + g + "-ouvert"); if(v !== null && g !== "khan") o = v === "1"; }catch(e){}
+  let o = g !== "nomades" && g !== "samourais"; try{ const v = localStorage.getItem("ev-" + g + "-ouvert"); if(v !== null && g !== "khan") o = v === "1"; }catch(e){}
   ouvrir(o);
   pave.addEventListener("click", () => { const v = corps.hidden; ouvrir(v); try{ localStorage.setItem("ev-" + g + "-ouvert", v ? "1" : "0"); }catch(e){} });
 }
@@ -1919,34 +2075,57 @@ function dessinerKhanDirect(){
 }
 function progresEvenements(){
   resumeCamps();
-  const p = Object.values(((serveur.bot || {}).etat === "en_marche" && serveur.bot.evenements) || {}).find(x => x.evenement === "nomades");
-  $("#ev-progres").replaceChildren(...(p ? [el("p",{class:"aide", style:"margin:8px 0 0;color:var(--text)"},
-    "En cours : camp (" + p.x + "," + p.y + ")" + (p.niveau ? " niveau " + p.niveau : "") + ", " + p.attaques + " attaque(s) envoyée(s)" + (p.en_route ? " dont " + p.en_route + " en route" : "") + ", " + p.victoires_gagnees + " victoire(s), "
-    + p.tablettes + " tablette(s) gagnée(s)" + (p.stock_tablettes != null ? " (stock " + p.stock_tablettes + ")" : "")
-    + (Object.keys(p.passes || {}).length ? ", passe-temps : " + Object.entries(p.passes).map(([c, q]) => q + " × " + nomPasse(c)).join(", ") : "")
-    + (p.pause ? ". En pause : " + p.pause : "."))] : []));
+  const pc = Object.values(((serveur.bot || {}).etat === "en_marche" && serveur.bot.evenements) || {}).find(x => x.evenement === "corbeaux");
+  const nc = etat.evenements.corbeaux, logo = infoCorbeaux().logo, img = $("#ev-logo-corbeaux");
+  if(logo && img.hidden){ img.src = logo; img.hidden = false; }
+  $("#ev-resume-corbeaux").textContent = (nc.commandants ? "Camps autour du château du vert · commandants " + nc.commandants : "Pas encore réglé")
+    + (pc ? " · en cours : " + pc.attaques + " attaque(s)" : "");
+  $("#ev-progres-corbeaux").replaceChildren(...(pc ? [el("p",{class:"aide", style:"margin:8px 0 0;color:var(--text)"},
+    "En cours : " + pc.attaques + " attaque(s) envoyée(s)" + (pc.max_attaques ? " sur " + pc.max_attaques : "") + ", " + pc.en_route + " en route, "
+    + pc.arrivees + " arrivée(s) ; " + pc.camps + " camp(s) vu(s) sur la carte" + (pc.pause ? ". En pause : " + pc.pause : "."))] : []));
+  for(const g of ["nomades", "samourais"]){
+    const p = Object.values(((serveur.bot || {}).etat === "en_marche" && serveur.bot.evenements) || {}).find(x => x.evenement === g);
+    $(g === "nomades" ? "#ev-progres" : "#ev-progres-" + g).replaceChildren(...(p ? [el("p",{class:"aide", style:"margin:8px 0 0;color:var(--text)"},
+      "En cours : camp (" + p.x + "," + p.y + ")" + (p.niveau ? " niveau " + p.niveau : "") + ", " + p.attaques + " attaque(s) envoyée(s)" + (p.en_route ? " dont " + p.en_route + " en route" : "") + ", " + p.victoires_gagnees + " victoire(s), "
+      + p.tablettes + (g === "samourais" ? " jeton(s) gagné(s)" : " tablette(s) gagnée(s)") + (p.stock_tablettes != null ? " (stock " + p.stock_tablettes + ")" : "")
+      + (Object.keys(p.passes || {}).length ? ", passe-temps : " + Object.entries(p.passes).map(([c, q]) => q + " × " + nomPasse(c)).join(", ") : "")
+      + (p.pause ? ". En pause : " + p.pause : "."))] : []));
+  }
 }
-// 17/11 : chaque page enregistre seulement sa partie (nomades ou Khan) ; l'autre est renvoyée telle qu'elle est enregistrée,
-// et ce qui y est en cours de modification reste à l'écran, pas enregistré
-for(const [pre, genre, mod] of [["ev", "nomades", "evenements"], ["kh", "khan", "khan"]]){
-const autre = genre === "khan" ? "nomades" : "khan";
+// 17/11 : chaque page enregistre seulement ses parties (page Événements : nomades, corbeaux de sang et le sous-module actif ;
+// page Khan : le Khan) ; les autres sont renvoyées telles qu'elles sont enregistrées, et ce qui y est en cours de modification
+// reste à l'écran, pas enregistré
+const PARTIES_EV = {evenements: ["nomades", "corbeaux", "samourais", "actif"], khan: ["khan"]};
+function remettrePartie(g, c){
+  if(g === "actif") etat.evenements.actif = actifEv(c);
+  else etat.evenements[g] = g === "corbeaux" ? etatCorbeaux((c || {})[g] || {}) : etatCamp((c || {})[g] || {}, g);
+}
+for(const [pre, mod] of [["ev", "evenements"], ["kh", "khan"]]){
+const autre = mod === "khan" ? "evenements" : "khan";
 $("#" + pre + "-annuler").addEventListener("click", () => {
-  etat.evenements[genre] = etatCamp(((serveur.config.evenements || {})[genre]) || {}); sale[mod] = false;
+  for(const g of PARTIES_EV[mod]) remettrePartie(g, serveur.config.evenements); sale[mod] = false;
   dessinerEvenements(); marquer(mod); $("#" + pre + "-erreurs").replaceChildren(); pastilles(); });
 $("#" + pre + "-enregistrer").addEventListener("click", async () => {
   const liste = $("#" + pre + "-erreurs"); liste.replaceChildren();
-  const n = etat.evenements[genre];
-  const err = campRempli(n, genre) ? erreursCamp(n, genre) : [];
+  const ev = etat.evenements, err = [];
+  for(const g of PARTIES_EV[mod]){
+    if(g === "corbeaux"){ if(corbeauxRempli(ev.corbeaux)) err.push(...erreursCorbeaux(ev.corbeaux)); }
+    else if(g !== "actif" && campRempli(ev[g], g)) err.push(...erreursCamp(ev[g], g));
+  }
   if(err.length){ marquer(mod, "Pas enregistré : corrige les points ci-dessous.", "err"); liste.replaceChildren(...err.map(x => el("li",{}, x)));
     liste.scrollIntoView({block:"center", behavior:"smooth"}); return; }
-  const corps = {};
-  if(campRempli(n, genre)) corps[genre] = corpsCamp(n, genre);
-  const enreg = (serveur.config.evenements || {})[autre];
-  if(enreg) corps[autre] = enreg;                                     // l'autre partie : telle qu'elle est enregistrée
+  const enreg = serveur.config.evenements || {}, corps = {};
+  for(const g of PARTIES_EV[autre]) if(enreg[g] !== undefined) corps[g] = enreg[g];   // l'autre page : telle qu'elle est enregistrée
+  for(const g of PARTIES_EV[mod]){
+    if(g === "actif") corps.actif = ev.actif;
+    else if(g === "corbeaux"){ if(corbeauxRempli(ev.corbeaux)) corps.corbeaux = corpsCorbeaux(ev.corbeaux); }
+    else if(campRempli(ev[g], g)) corps[g] = corpsCamp(ev[g], g);
+  }
   try{
     const rep = await api("/api/config/evenements", corps);
-    serveur.config.evenements = rep.config; etat.evenements[genre] = etatCamp(rep.config[genre] || {}); sale[mod] = false;
-    if(!sale[autre === "khan" ? "khan" : "evenements"]) etat.evenements[autre] = etatCamp(rep.config[autre] || {});
+    serveur.config.evenements = rep.config; sale[mod] = false;
+    for(const g of PARTIES_EV[mod]) remettrePartie(g, rep.config);
+    if(!sale[autre]) for(const g of PARTIES_EV[autre]) remettrePartie(g, rep.config);
     marquer(mod, "Enregistré dans config.json.", "ok"); dessinerEvenements(); pastilles(); dessinerModules();
   }catch(e){
     marquer(mod, "Pas enregistré : corrige les points ci-dessous.", "err");
@@ -2029,7 +2208,11 @@ function configOk(nom){
   const c = serveur && serveur.config[nom];
   if(nom === "materiaux") return !!(c && !erreursMateriaux(etatMateriaux(c)).length);
   if(nom === "montee") return !!(c && !erreursMontee(etatMontee(c)).length && armeeMontee(c.kid));
-  if(nom === "evenements") return !!(c && c.nomades && c.nomades.commandants && c.nomades.commandants.length && !erreursCamp(etatCamp(c.nomades), "nomades").length);
+  if(nom === "evenements"){
+    if(c && c.actif === "corbeaux") return !!(c.corbeaux && c.corbeaux.commandants && c.corbeaux.commandants.length && !erreursCorbeaux(etatCorbeaux(c.corbeaux)).length);
+    if(c && c.actif === "samourais") return !!(c.samourais && c.samourais.commandants && c.samourais.commandants.length && !erreursCamp(etatCamp(c.samourais, "samourais"), "samourais").length);
+    return !!(c && c.nomades && c.nomades.commandants && c.nomades.commandants.length && !erreursCamp(etatCamp(c.nomades), "nomades").length);
+  }
   if(nom === "khan"){ const k = (serveur.config.evenements || {}).khan; return !!(k && k.commandants && k.commandants.length && !erreursCamp(etatCamp(k), "khan").length); }
   if(nom === "recrutement") return !!(c && !erreursRecrutement(etatRecrutement(c)).length);
   if(nom === "transferts") return !!(c && !erreursTransferts(etatTransferts(c)).length);
@@ -2055,7 +2238,7 @@ function dessinerModules(){
     recrutement:"Caserne et atelier de siège remplis en continu, aide de l'alliance demandée.",
     materiaux:"Raffinerie, outilleur et butin du dragon : fabrications lancées en continu.",
     montee:"Une tour montée au niveau max : salves d'attaques, blocage sauté avec des passe-temps (réglages : page Tours lev max).",
-    evenements:"Nomades : un camp attaqué en boucle par salves, délai sauté avec des passe-temps (réglages : page Événements).",
+    evenements:"Le sous-module activé dans la page Événements : Nomades ou Samouraïs (un camp attaqué en boucle par salves, délai sauté avec des passe-temps) ou Corbeaux de sang (les camps autour du château, engins puis bannières).",
     khan:"Camp du Khan : attaques avec bannières de rage, déclenchement du Khan et défense de ton château principal jusqu'à l'objectif (réglages : page Khan). Seul avec défense, recrutement, matériaux, achats et transferts, qui ne passent que quand il n'a rien à faire."};
   // 16/11 : un module peut en exclure d'autres (le Khan garde le compte pour lui : pas de tours, forteresses, tours lev max ni nomades)
   const nomM = n => NOMS_MODULES[n] || (n[0].toUpperCase() + n.slice(1));
@@ -2106,7 +2289,12 @@ function dessinerEtat(){
         p.fin ? el("small",{style:"color:#ffcf7a"}, "objectif atteint : fin des défenses en cours") : null,
         p.pause ? el("small",{style:"color:#ffcf7a"}, "en pause : " + p.pause) : null,
         (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null)
-      : el("div",{class:"chiffre"}, el("small",{}, "Nomades : tablettes gagnées"),
+      : p.evenement === "corbeaux" ? el("div",{class:"chiffre"}, el("small",{}, "Corbeaux de sang : attaques"),
+        el("b",{}, String(p.attaques) + (p.max_attaques ? " / " + p.max_attaques : "")),
+        el("small",{}, p.en_route + " en route · " + p.arrivees + " arrivée(s) · " + p.camps + " camp(s) sur la carte"),
+        p.pause ? el("small",{style:"color:#ffcf7a"}, "en pause : " + p.pause) : null,
+        (b.arretes||{})[nom] ? el("small",{style:"color:#ff8e7e"}, "arrêté : " + b.arretes[nom]) : null)
+      : el("div",{class:"chiffre"}, el("small",{}, p.evenement === "samourais" ? "Samouraïs : jetons gagnés" : "Nomades : tablettes gagnées"),
         el("b",{}, String(p.tablettes).replace(/\B(?=(\d{3})+(?!\d))/g, " ")),
         el("small",{}, p.attaques + " attaque(s), " + p.victoires_gagnees + " victoire(s)" + (p.niveau ? " · camp niveau " + p.niveau : "") + " · " + p.en_route + " en route"),
         p.pause ? el("small",{style:"color:#ffcf7a"}, "en pause : " + p.pause) : null,
@@ -2284,7 +2472,7 @@ async function majEtat(){
   try{ const d = await api("/api/etat"); serveur.bot = d.bot; serveur.config.lanceur = d.config.lanceur; serveur.sessions = d.sessions;
     if(!sale.montee && JSON.stringify(d.config.montee) !== JSON.stringify(serveur.config.montee)){ serveur.config.montee = d.config.montee; etat.montee = etatMontee(d.config.montee); }
     if(JSON.stringify(d.config.evenements) !== JSON.stringify(serveur.config.evenements)){ serveur.config.evenements = d.config.evenements;
-      if(!sale.evenements) etat.evenements.nomades = etatCamp((d.config.evenements || {}).nomades || {});
+      if(!sale.evenements) for(const g of PARTIES_EV.evenements) remettrePartie(g, d.config.evenements);
       if(!sale.khan) etat.evenements.khan = etatCamp((d.config.evenements || {}).khan || {});
       dessinerEvenements(); }
     dessinerEtat(); dessinerSessions(); dessinerMontee(); progresEvenements(); dessinerKhanDirect(); }catch(e){}

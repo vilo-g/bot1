@@ -902,6 +902,34 @@ def positions_commandants(adi):
     return sorted(adi.get("gli", {}).get("C", []), key=lambda c: (c.get("VIS", 10 ** 6), c.get("ID", 0)))
 
 
+def armees_du_joueur(jaa, gli, gam):
+    """Reponses du jeu jaa (compte : notre identifiant), gli (commandants), gam (tous les mouvements visibles) -> nos armees
+    en mouvement, par numero de commandant : {numero: [{"d", "kid", "ta", "sa", "reste"}]} ; None si une reponse est illisible.
+    d = 1 : l'armee rentre au chateau (apres le combat, ou attaque annulee) ; reste = secondes avant la fin de ce trajet."""
+    o = ((jaa or {}).get("gca") or {}).get("O") if isinstance(jaa, dict) else None
+    oid = o.get("OID") if isinstance(o, dict) else None
+    if (not isinstance(oid, int) or not isinstance(gli, dict) or not isinstance(gli.get("C"), list)
+            or not isinstance(gam, dict) or not isinstance(gam.get("M"), list)):
+        return None
+    numero = {c.get("ID"): i + 1 for i, c in enumerate(positions_commandants({"gli": gli})) if isinstance(c, dict)}
+    res = {}
+    for e in gam["M"]:
+        m = e.get("M") if isinstance(e, dict) else None
+        if not isinstance(m, dict) or m.get("OID") != oid:
+            continue                                      # mouvement d'un autre joueur (alliance, attaque recue...)
+        um = e.get("UM")
+        lord = um.get("L") if isinstance(um, dict) else None
+        lid = lord.get("ID") if isinstance(lord, dict) else None
+        if isinstance(lid, bool) or lid not in numero:
+            continue
+        tt, pt = m.get("TT"), m.get("PT") or 0
+        ok = isinstance(tt, (int, float)) and isinstance(pt, (int, float))
+        res.setdefault(numero[lid], []).append({
+            "d": m.get("D"), "kid": m.get("KID"), "ta": m.get("TA") if isinstance(m.get("TA"), list) else [],
+            "sa": m.get("SA") if isinstance(m.get("SA"), list) else [], "reste": max(0, tt - pt) if ok else 0})
+    return res
+
+
 def construire_attaque(cfg, adi, pos, tour, kid, chateau, effets, appris, cheval_inconnu_ok=False, presets=None, fiches_outils=None,
                        zone=combat.ZONE_TOUR, unites=None):
     """Prepare le paquet cra du commandant numero `pos` sur la tour `tour` (entree de carte [2,x,y,-1,niv,minuteur,kid]).
@@ -1185,6 +1213,67 @@ class ModuleTours:
             os.replace(tmp, self.fichier_etat)
         except OSError:
             pass
+
+    # ---------------------------------------------------------------- armees en route : verifiees dans le jeu au lancement (18/11)
+    def a_verifier(self):
+        """True si le lancement precedent a laisse des commandants de ce module en route (a verifier dans le jeu)."""
+        t = self.horloge()
+        return bool(self.en_route) or any(self.libre_a.get(p, 0) > t for p in self.cfg.get("commandants", []))
+
+    async def lire_armees_en_cours(self):
+        """Nos armees en mouvement d'apres le jeu (voir armees_du_joueur) ; None si une reponse manque."""
+        reps = {}
+        for cmd, params, attendu in (("jca", {"CID": -1, "KID": 0}, "jaa"), ("gli", {}, "gli"), ("gam", {}, "gam")):
+            await self._vider()
+            await self.jeu.envoyer(cmd, params)
+            r = await self.jeu.attendre(attendu, 15)
+            if not r or r[1] != 0:
+                return None
+            reps[cmd] = T.json_ou_none(r[2])
+        return armees_du_joueur(reps["jca"], reps["gli"], reps["gam"])
+
+    def verifier_en_route(self, armees):
+        """Au lancement : les armees que le lancement precedent avait notees en route le sont-elles encore ? Le joueur a pu
+        annuler une attaque pendant que le bot etait arrete (18/11) : avant, le commandant restait bloque jusqu'a l'heure
+        prevue et sa cible laissee de cote. armees : {numero: [mouvements]} (armees_du_joueur).
+        -> nombre de commandants dont l'etat a change."""
+        t = self.horloge()
+        changes = 0
+        for p in sorted(set(self.cfg.get("commandants", []))):
+            v = self.libre_a.get(p, 0)
+            cibles = [k for k, (pos, _) in self.en_route.items() if pos == p]
+            if v <= t and not cibles:
+                continue
+            ms = armees.get(p, [])
+            aller = [m for m in ms if m["d"] != 1 and len(m["ta"]) >= 3]
+            if aller and (not cibles or any(m["ta"][1:3] == [k[1], k[2]] and m["kid"] in (None, k[0]) for k in cibles for m in aller)):
+                continue                                      # toujours en route (vers sa cible) : rien a changer
+            annulees = []
+            for k in cibles:
+                if self.en_route.pop(k)[1] > t:               # pas arrivee : attaque annulee, la cible redevient libre
+                    self.engagees.pop(k, None)
+                    annulees.append(k)
+            fin = max((m["reste"] for m in ms), default=0)
+            if not ms:
+                self.libre_a.pop(p, None)
+                etat = "au chateau d'apres le jeu, de nouveau libre"
+            elif not aller:
+                self.libre_a[p] = t + fin + 1
+                etat = "il rentre au chateau, libre dans %s" % duree(fin + 1)
+            else:
+                self.libre_a[p] = max(v, t + 2 * fin + 15)    # parti ailleurs (a la main) : pris jusqu'a son retour
+                etat = "parti ailleurs (en dehors du bot), pris jusqu'a son retour"
+            changes += 1
+            if v <= t and not annulees:
+                continue                                      # deja note libre (le retour etait passe) : rien a dire
+            if annulees:
+                self._noter("   commandant %d : attaque annulee (%s) ; %s." % (
+                    p, ", ".join("%s (%d,%d) de nouveau attaquable" % (self.NOM_CIBLE, k[1], k[2]) for k in annulees), etat))
+            else:
+                self._noter("   commandant %d : %s." % (p, etat))
+        if changes:
+            self._sauver_etat()
+        return changes
 
     @property
     def dernier_envoi(self):

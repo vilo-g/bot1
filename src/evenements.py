@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
-evenements.py : module "Evenements" (les evenements qui s'enchainent). Pour l'instant : les NOMADES.
+evenements.py : module "Evenements" (les evenements qui s'enchainent) : trois sous-modules, un seul actif a la fois
+("actif" de la rubrique, choisi dans la page Evenements) : les NOMADES, les CORBEAUX DE SANG (18/11, voir plus bas) et les
+SAMOURAIS (20/11 : comme les nomades, "samourais" de la rubrique, memes reglages avec "max_jetons" a la place de "max_tablettes").
 
 Reglages (interface, page Evenements) : rubrique "evenements" de config.json
   {"nomades": {"x": 83, "y": 1160, "commandants": [1, 2, 3], "mode": "auto", "cotes": "LMR", "soldats": [216],
                "engins": {"flanc": [[740, 5], [739, 9]], "centre": [[740, 5], [738, 4], [739, 10]]},
                "coffres": {"actif": true, "types": [405], "ordre": "forts"}, "soldats_cour": 0,
-               "presets": [1, 2, 2, 2], "cheval": "F", "passes": ["MS5", "MS4", "MS3"], "max_attaques": 0, "max_tablettes": 0}}
+               "presets": [1, 2, 2, 2], "cheval": "F", "passes": ["MS5", "MS4", "MS3"], "max_attaques": 0, "max_tablettes": 0},
+   "corbeaux": {"commandants": [1, 2], "cotes": "LMR", "soldats": [216], "soldats_suite": [215], "vagues_engins": 1,
+                "engins": [{"flanc": [[649, 13], [651, 24]], "centre": [[649, 9], [770, 10], [651, 31]]}],   # une grille par vague
+                "bannieres": {"types": [153, 152], "ordre": "forts"}, "cheval": "F", "rayon": 30, "max_attaques": 0},
+   "samourais": {...comme "nomades"...},
+   "actif": "nomades"}                       # sous-module qui tourne : "nomades", "corbeaux" ou "samourais"
 
 NOMADES (demande du joueur, 15/11) : un camp nomade donne par ses coordonnees (royaume vert), attaque en boucle par les
 commandants choisis, par SALVES comme le module Tours lev max (departs a 4,2 s d'ecart, arrivees espacees) :
@@ -26,8 +33,14 @@ Messages du jeu (capture du 15/11, 3 attaques) :
     au-dessus du niveau 69) x (1 + bonus du commandant + bonus du chateau). Les bonus du chateau sont dans adi "AE" :
     effets de type 28 (flanc) et 34 (centre). Verifie : 190 % / 123 % -> 186 / 429 ; +40 % du commandant -> 212 / 505.
   sce [["KT", n]] : stock de tablettes (arrive quelques secondes apres le combat).
-  PAS ENCORE VU : le saut du blocage du camp. Le bot envoie le meme message que pour une tour (msd) ; si le jeu le refuse, le
-    module se met en pause et le dit.
+  Saut du blocage : le meme message que pour une tour (msd {"X","Y","MID":-1,"NID":-1,"MST":"MS4","KID":"0"} -> msd {"AI":
+    camp avec le blocage restant}) ; vu le 20/11 sur le camp samourai au niveau 110, avec chaque passe-temps : MS5 1 h, MS4 30 min,
+    MS3 10 min, MS2 5 min, MS1 1 min.
+
+SAMOURAIS (capture du 20/11, camp (83,1160), Maitre+) : camp [29, x, y, -1, victoires, blocage, 0, -651, palier, ...] ; paliers
+291 a 300 = niveaux 101 a 110 (items.json eventAutoScalingCamps, evenement 80, addSamuraiToken) ; blocage de 1 h 30 au 110 (59 min
+avec le bonus d'alliance) ; cour verifiee (camp 108, joueur 70 + 950 : 2849) ; plafonds des vagues comme les nomades ; jetons :
+sce [["ST", n]].
 """
 import json
 import math
@@ -57,12 +70,39 @@ ENGINS_FLANC = {w: v for w, v in ENGINS.items() if w not in FAMILLES_ENGINS["bel
 # Coffres de tablettes (vagues 2 et suivantes) : identifiant -> bonus de tablettes en %.
 COFFRES = {1: 3, 162: 4, 163: 5, 164: 6, 243: 7, 244: 8, 404: 9, 405: 10, 490: 11, 491: 12, 492: 13}
 ENGINS_DEFAUT = {"flanc": [[740, 5], [739, 9]], "centre": [[740, 5], [738, 4], [739, 10]]}
+# SAMOURAIS (20/11) : meme mecanique que les nomades, autres engins, coffres et monnaie (jetons de samourais, sce "ST").
+# Donnees du jeu (items.json : samuraiTokenBooster, allowedToAttack 0+29 ; noms : fichier de langue francais) et capture du
+# 20/11 (3 attaques, rapports, sauts du blocage au niveau 110 avec chaque passe-temps).
+ZONE_SAMOURAIS = 29        # camp samourai : [29, x, y, -1, victoires, blocage restant, 0, -651, identifiant du palier, ...]
+EVENEMENT_SAMOURAIS = 80
+# 20/11 (demande du joueur) : seulement les engins dont il a envoye l'image (pas les versions a 6 % : 559, 557, 558), plus le
+# mur de boucliers sans bonus comme pour les nomades (651 : "Eliteshields" = Mur de boucliers dans le fichier de langue)
+ENGINS_SAMOURAIS = {26: ("echelle pliante", 3), 171: ("echelle du shogun", 5),
+                    25: ("briseur de portes", 3), 170: ("belier du shogun", 5),
+                    27: ("bouclier orientable", 3), 172: ("bouclier du shogun", 5), 651: ("mur de boucliers", 0)}
+FAMILLES_SAMOURAIS = {"echelles": (26, 171), "beliers": (25, 170), "boucliers": (27, 172, 651)}
+ENGINS_SAMOURAIS_FLANC = {w: v for w, v in ENGINS_SAMOURAIS.items() if w not in FAMILLES_SAMOURAIS["beliers"]}
+# coffres de jetons (vagues 2 et suivantes) : identifiant -> bonus de jetons en % ; 30, 31, 165, 166, 406, 407, 511, 512 vus
+# dans la capture (1 de chaque) ; 510 (+9 %) d'apres items.json
+COFFRES_SAMOURAIS = {30: 3, 31: 4, 165: 5, 166: 6, 406: 7, 407: 8, 510: 9, 511: 10, 512: 11}
+ENGINS_SAMOURAIS_DEFAUT = {"flanc": [[26, 4]], "centre": [[26, 4], [25, 2]]}    # 1re attaque de la capture du 20/11
 CASES_ENGINS = {"flanc": 2, "centre": 3}
 PLACE_ENGINS = {"flanc": 40, "centre": 50}     # engins au plus sur un flanc / au centre d'une vague (tous engins confondus)
 QUANTITE_MAX = 50
 COUR_MAX = 20000
+CASES_COUR = 8             # cases de la cour (RW du paquet cra)
 EFFET_COUR_BONUS = 179     # attackUnitAmountReinforcementBonus : soldats en plus dans la cour (nombre)
 EFFET_COUR_BOOST = 180     # attackUnitAmountReinforcementBoost : soldats en plus dans la cour (%)
+
+
+# Les deux evenements a camp (meme module, memes reglages) : ce qui change de l'un a l'autre
+CAMPS = {"nomades": {"titre": "NOMADES", "nom": "Nomades", "zone": ZONE_CAMP, "engins": ENGINS, "flanc": ENGINS_FLANC,
+                     "familles": FAMILLES_ENGINS, "coffres": COFFRES, "defaut": ENGINS_DEFAUT, "monnaie": "KT", "gain": "tablettes", "gagnes": "gagnees",
+                     "cle_max": "max_tablettes", "camp": "camp nomade"},
+         "samourais": {"titre": "SAMOURAIS", "nom": "Samourais", "zone": ZONE_SAMOURAIS, "engins": ENGINS_SAMOURAIS,
+                       "flanc": ENGINS_SAMOURAIS_FLANC, "familles": FAMILLES_SAMOURAIS, "coffres": COFFRES_SAMOURAIS,
+                       "defaut": ENGINS_SAMOURAIS_DEFAUT, "monnaie": "ST", "gain": "jetons", "gagnes": "gagnes", "cle_max": "max_jetons",
+                       "camp": "camp samourai"}}
 
 
 def places_cour(niveau_joueur, niveau_cible, bonus=0, boost=0):
@@ -78,7 +118,9 @@ def _paires(liste, cases, connus, place=QUANTITE_MAX):
             and sum(p[1] for p in liste) <= place)
 
 
-def nomades_valides(c):
+def nomades_valides(c, genre="nomades"):
+    """Reglages d'un camp d'evenement (nomades, ou samourais avec genre="samourais")."""
+    d = CAMPS[genre]
     try:
         if not (isinstance(c, dict) and entier(c.get("x")) is not None and 0 <= c["x"] <= 2000 and entier(c.get("y")) is not None
                 and 0 <= c["y"] <= 2000 and tours.commandants_valides(c.get("commandants"))):
@@ -93,11 +135,11 @@ def nomades_valides(c):
             if not (isinstance(s2, list) and len(s2) <= tours.NB_SOLDATS_MAX and all(entier(u) is not None and u > 0 for u in s2) and len(set(s2)) == len(s2)):
                 return False
             e = c.get("engins")
-            if not (isinstance(e, dict) and _paires(e.get("flanc"), 2, ENGINS_FLANC, PLACE_ENGINS["flanc"]) and _paires(e.get("centre"), 3, ENGINS, PLACE_ENGINS["centre"])):
+            if not (isinstance(e, dict) and _paires(e.get("flanc"), 2, d["flanc"], PLACE_ENGINS["flanc"]) and _paires(e.get("centre"), 3, d["engins"], PLACE_ENGINS["centre"])):
                 return False
             k = c.get("coffres")
             if not (isinstance(k, dict) and isinstance(k.get("actif"), bool) and isinstance(k.get("types"), list)
-                    and all(w in COFFRES for w in k["types"]) and len(set(k["types"])) == len(k["types"])
+                    and all(w in d["coffres"] for w in k["types"]) and len(set(k["types"])) == len(k["types"])
                     and k.get("ordre") in ("forts", "faibles") and (k["types"] or not k["actif"])):
                 return False
         else:
@@ -110,14 +152,19 @@ def nomades_valides(c):
         if not isinstance(c.get("remplir_cour", False), bool):
             return False
         return all(entier(c.get(k, 0)) is not None and 0 <= c.get(k, 0) <= m
-                   for k, m in (("soldats_cour", COUR_MAX), ("max_attaques", 10 ** 6), ("max_tablettes", 10 ** 9)))
+                   for k, m in (("soldats_cour", COUR_MAX), ("max_attaques", 10 ** 6), (d["cle_max"], 10 ** 9)))
     except (AttributeError, TypeError, KeyError):
         return False
 
 
+def samourais_valides(c):
+    return nomades_valides(c, "samourais")
+
+
 # ============================================================================== donnees du jeu
 def charger_camps(chemin=None, zone=None):
-    """Paliers des camps nomades (items.json, eventAutoScalingCamps, zone 27) : {identifiant: {"niveau", "blocage", "tablettes"}}."""
+    """Paliers des camps d'evenement (items.json, eventAutoScalingCamps ; zone 27 nomades, 29 samourais) :
+    {identifiant: {"niveau", "blocage", "tablettes"}} (tablettes : tablettes ou jetons de samourais gagnes)."""
     try:
         with open(chemin or tours.FICHIER_ITEMS, encoding="utf-8") as f:
             d = json.load(f)
@@ -125,7 +172,7 @@ def charger_camps(chemin=None, zone=None):
         for e in d.get("eventAutoScalingCamps") or []:
             if str(e.get("areaType")) == str(zone or ZONE_CAMP):
                 res[int(e["eventAutoScalingCampID"])] = {"niveau": int(e.get("camplevel") or 0), "blocage": int(e.get("coolDown") or 0),
-                                                         "tablettes": int(e.get("addKhanTablet") or 0)}
+                                                         "tablettes": int(e.get("addKhanTablet") or e.get("addSamuraiToken") or 0)}
                 if e.get("generatedRagePerAttack"):          # camp du Khan : rage par attaque, seuil, rage rendue par une defense
                     res[int(e["eventAutoScalingCampID"])].update(rage_attaque=int(e["generatedRagePerAttack"]),
                                                                   rage_max=int(e.get("playerRageCap") or 0),
@@ -184,9 +231,11 @@ def _poser_outils(vague, cote, liste, cases, place, stock):
 
 
 def construire_attaque(cfg, adi, pos, camp, chateau, effets, appris, camps=None, types_effets=None, presets=None, cheval_inconnu_ok=False,
-                       niveau_joueur=None, zone=ZONE_CAMP, indice_palier=8, outils_suite=None):
+                       niveau_joueur=None, zone=ZONE_CAMP, indice_palier=8, outils_suite=None, genre="nomades"):
     """Paquet cra du commandant numero `pos` sur le camp nomade `camp` (entree de carte [27,x,y,...]). -> (cra, infos).
-    Leve ValueError (commandant absent), PlusDeSoldats (plus assez de soldats ou d'engins), ArretModule."""
+    Leve ValueError (commandant absent), PlusDeSoldats (plus assez de soldats ou d'engins), ArretModule.
+    genre : "nomades" ou "samourais" (engins, coffres et textes de l'evenement, CAMPS)."""
+    ev = CAMPS[genre]
     b = tours.cfg_royaume(cfg, KID)
     cmds = tours.positions_commandants(adi)
     if not 1 <= pos <= len(cmds):
@@ -235,7 +284,7 @@ def construire_attaque(cfg, adi, pos, camp, chateau, effets, appris, camps=None,
                     vague[c]["T"] = []
             vagues.append(vague)
         if not any(vagues[0][c]["U"] for c in "LRM"):
-            raise PlusDeSoldats("Nomades : plus aucun soldat disponible pour la vague 1 (preselection %d)." % tours.preselection_pour_vague(b, 0))
+            raise PlusDeSoldats("%s : plus aucun soldat disponible pour la vague 1 (preselection %d)." % (ev["nom"], tours.preselection_pour_vague(b, 0)))
         soldat_affiche, mode = "preselections", "P (preselections)"
     else:
         code = combat.normaliser_cotes(b["cotes"])
@@ -253,16 +302,16 @@ def construire_attaque(cfg, adi, pos, camp, chateau, effets, appris, camps=None,
         for c in cotes:                               # vague 1 complete, sinon pas d'attaque (une armee incomplete perd)
             n = sum(q for _, q in vagues[0][c]["U"])
             if n < places[c]:
-                raise PlusDeSoldats("Nomades : plus assez de soldats pour remplir la vague 1 (%s : %d sur %d, unites %s)."
-                                    % (combat.NOMS_COTES[c], n, places[c], ";".join(map(str, b["soldats"]))))
+                raise PlusDeSoldats("%s : plus assez de soldats pour remplir la vague 1 (%s : %d sur %d, unites %s)."
+                                    % (ev["nom"], combat.NOMS_COTES[c], n, places[c], ";".join(map(str, b["soldats"]))))
         engins = cfg.get("engins") or {}
         for c in cotes:
             genre = "centre" if c == "M" else "flanc"
             m = _poser_outils(vagues[0], c, engins.get(genre) or [], CASES_ENGINS[genre], place_outils[c], reste)
             if m:
                 wid, voulu, a = m[0]
-                raise PlusDeSoldats("Nomades : plus assez d'engins pour la vague 1 (%s : %d x %s voulus, %d en stock)."
-                                    % (combat.NOMS_COTES[c], voulu, ENGINS.get(wid, ("engin %d" % wid,))[0], a))
+                raise PlusDeSoldats("%s : plus assez d'engins pour la vague 1 (%s : %d x %s voulus, %d en stock)."
+                                    % (ev["nom"], combat.NOMS_COTES[c], voulu, ev["engins"].get(wid, ("engin %d" % wid,))[0], a))
         k = cfg.get("coffres") or {}
         bonus_suite = 0
         if outils_suite is not None:
@@ -282,7 +331,7 @@ def construire_attaque(cfg, adi, pos, camp, chateau, effets, appris, camps=None,
                             bonus_suite += q * outils_suite["bonus"][w]
                             vague[c]["T"].append([w, q])
         elif k.get("actif") and k.get("types"):
-            ordre = sorted(k["types"], key=lambda w: COFFRES.get(w, 0), reverse=k.get("ordre") != "faibles")
+            ordre = sorted(k["types"], key=lambda w: ev["coffres"].get(w, 0), reverse=k.get("ordre") != "faibles")
             sans = 0
             for vague in vagues[1:]:
                 for c in cotes:
@@ -328,15 +377,16 @@ def construire_attaque(cfg, adi, pos, camp, chateau, effets, appris, camps=None,
              "victoires": camp[4], "distance": distance, "cheval": opt, "cheval_inconnu": cheval_inconnu, "soldat": soldat_affiche,
              "vagues_remplies": len(vagues), "mode": mode, "vagues": len(vagues), "vagues_en_plus": extra, "manques": manques,
              "plafond_flanc": places["L"], "plafond_front": places["M"], "cour": cour[0][1] if cour[0][0] != -1 else 0,
-             "coffres": sum(q for v in vagues for c in "LRM" for w, q in v[c]["T"] if w in COFFRES),
+             "coffres": sum(q for v in vagues for c in "LRM" for w, q in v[c]["T"] if w in ev["coffres"]),
              "bonus_suite": bonus_suite if b.get("mode") != "presets" else 0}
     return cra, infos
 
 
 def resume_config(cfg):
+    ev = CAMPS["samourais" if cfg.get("sous_module") == "samourais" else "nomades"]
     b = tours.cfg_royaume(cfg, KID)
-    l = ["NOMADES : camp (%d,%d), commandants %s (le module tours ne les prend pas ; les forteresses peuvent en garder)"
-         % (cfg["x"], cfg["y"], ";".join(str(p) for p in cfg["commandants"]))]
+    l = ["%s : camp (%d,%d), commandants %s (le module tours ne les prend pas ; les forteresses peuvent en garder)"
+         % (ev["titre"], cfg["x"], cfg["y"], ";".join(str(p) for p in cfg["commandants"]))]
     if b["mode"] == "presets":
         l.append("armee : PRESELECTIONS (vague 1 : %d, vague 2 : %d, vague 3 : %d, vague 4 et suivantes : %d)" % tuple(b["presets"][:4]))
     else:
@@ -344,16 +394,16 @@ def resume_config(cfg):
         l.append("armee : REMPLISSAGE AUTOMATIQUE, cotes : %s, soldats vague 1 : %s, vagues suivantes : %s" % (
             combat.texte_cotes(b["cotes"]), ";".join(map(str, b["soldats"])), ";".join(map(str, cfg.get("soldats_suite") or [])) or "les memes"))
         l.append("vague 1, engins : flanc %s ; centre %s" % tuple(
-            " + ".join("%d x %s" % (q, ENGINS[w][0]) for w, q in e[g]) or "aucun" for g in ("flanc", "centre")))
+            " + ".join("%d x %s" % (q, ev["engins"][w][0]) for w, q in e[g]) or "aucun" for g in ("flanc", "centre")))
         k = cfg["coffres"]
         l.append("vagues suivantes, coffres : %s" % ("%s, les plus %s d'abord" % (
-            ", ".join("+%d %%" % COFFRES[w] for w in sorted(k["types"], key=COFFRES.get)), "forts" if k["ordre"] == "forts" else "faibles")
+            ", ".join("+%d %%" % ev["coffres"][w] for w in sorted(k["types"], key=ev["coffres"].get)), "forts" if k["ordre"] == "forts" else "faibles")
             if k["actif"] else "aucun"))
     if cfg.get("remplir_cour"):
         l.append("cour : remplie au maximum a chaque attaque")
     l.append("delai du camp saute avec %s (jamais de rubis)" % texte_passes(cfg["passes"]))
     l.append("arret : %s" % (" ou ".join(x for x in ("apres %d attaques" % cfg["max_attaques"] if cfg.get("max_attaques") else "",
-                                                     "apres %d tablettes gagnees" % cfg["max_tablettes"] if cfg.get("max_tablettes") else "") if x)
+                                                     "apres %d %s %s" % (cfg[ev["cle_max"]], ev["gain"], ev["gagnes"]) if cfg.get(ev["cle_max"]) else "") if x)
                              or "aucune limite (jusqu'a l'arret du bot)"))
     return l
 
@@ -365,14 +415,18 @@ class ModuleNomades(montee.ModuleMontee):
     TYPE_CIBLE = ZONE_CAMP
     LA_CIBLE = "le camp"
     NOM_PAUSE = "nomades"
+    GENRE = "nomades"                    # evenement a camp (CAMPS) : "nomades" ou "samourais" (sous-classe ModuleSamourais)
 
     def __init__(self, jeu, cfg, sources, effets=None, camps=None, types_effets=None, **kw):
-        kw.setdefault("journal", os.path.join(tours.DOSSIER_CAPTURES, "journal_nomades.txt"))
+        kw.setdefault("journal", os.path.join(tours.DOSSIER_CAPTURES, "journal_%s.txt" % self.GENRE))
+        if self.GENRE != "nomades":      # (etat_<NOM_MODULE>.json sinon : celui des nomades)
+            kw.setdefault("fichier_etat", os.path.join(tours.DOSSIER_CAPTURES, "etat_%s.json" % self.GENRE) if kw["journal"] else None)
         super().__init__(jeu, cfg, sources, effets, **kw)
+        self.ev = CAMPS[self.GENRE]
         self.camps = camps or {}
         self.types_effets = types_effets or {}
         self.camp_id = None
-        self.tablettes = None            # stock de tablettes (message sce "KT")
+        self.tablettes = None            # stock de tablettes (message sce "KT" ; samourais : jetons, "ST")
         self.tablettes_gagnees = 0
         self.cible_v = 10 ** 9           # pas d'objectif de niveau : les arrets sont le nombre d'attaques / de tablettes
         self.fin_blocage = None          # instant de fin du blocage connu du camp
@@ -392,17 +446,18 @@ class ModuleNomades(montee.ModuleMontee):
             d = T.json_ou_none(payload)
             if isinstance(d, dict) and entier(d.get("LVL")) is not None:
                 self.niveau_joueur = d["LVL"] + (entier(d.get("LL")) or 0)
-        if cmd == "sce" and code == 0 and isinstance(payload, str) and '"KT"' in payload:
+        monnaie = self.ev["monnaie"]
+        if cmd == "sce" and code == 0 and isinstance(payload, str) and '"%s"' % monnaie in payload:
             d = T.json_ou_none(payload)
             for e in d if isinstance(d, list) else []:
-                if isinstance(e, list) and len(e) == 2 and e[0] == "KT" and entier(e[1]) is not None:
+                if isinstance(e, list) and len(e) == 2 and e[0] == monnaie and entier(e[1]) is not None:
                     if self.tablettes is not None and e[1] > self.tablettes:
                         self.tablettes_gagnees += e[1] - self.tablettes
                     self.tablettes = e[1]
         super()._ecouter(msg)
 
     def _est_la_tour(self, e):
-        return (isinstance(e, list) and len(e) >= 6 and e[0] == ZONE_CAMP and e[1] == self.x and e[2] == self.y
+        return (isinstance(e, list) and len(e) >= 6 and e[0] == self.TYPE_CIBLE and e[1] == self.x and e[2] == self.y
                 and entier(e[4]) is not None and isinstance(e[5], (int, float)) and not isinstance(e[5], bool))
 
     def _noter_entree(self, e):
@@ -456,29 +511,29 @@ class ModuleNomades(montee.ModuleMontee):
 
     def progres(self):
         """Pour l'interface (bot_etat.json)."""
-        return {"evenement": "nomades", "x": self.x, "y": self.y, "niveau": self.niveau_camp(), "victoires": self._victoires(),
+        return {"evenement": self.GENRE, "x": self.x, "y": self.y, "niveau": self.niveau_camp(), "victoires": self._victoires(),
                 "attaques": self.nb_attaques, "victoires_gagnees": self.victoires_gagnees, "en_route": len(self.vol),
-                "tablettes": self.tablettes_gagnees, "stock_tablettes": self.tablettes,
-                "max_attaques": self.cfg.get("max_attaques") or 0, "max_tablettes": self.cfg.get("max_tablettes") or 0,
+                "tablettes": self.tablettes_gagnees, "stock_tablettes": self.tablettes, "gain": self.ev["gain"],
+                "max_attaques": self.cfg.get("max_attaques") or 0, "max_tablettes": self.cfg.get(self.ev["cle_max"]) or 0,
                 "passes": {c: n for c, n in self.utilises.items() if n}, "fini": self.fini,
                 "pause": self.raison_pause if self.horloge() < self.pause_jusqua else ""}
 
     # ------------------------------------------------------------------ arrets
     def _attaques_utiles(self):
-        """Departs encore permis par les limites choisies (nombre d'attaques, tablettes gagnees)."""
+        """Departs encore permis par les limites choisies (nombre d'attaques, tablettes ou jetons gagnes)."""
         reste = 10 ** 9
         n = self.cfg.get("max_attaques") or 0
         if n:
             reste = min(reste, n - self.nb_attaques)
-        g = self.cfg.get("max_tablettes") or 0
+        g = self.cfg.get(self.ev["cle_max"]) or 0
         if g and self.tablettes_gagnees >= g:
             reste = 0
         return reste
 
     def _raison_fin(self, utiles):
-        g = self.cfg.get("max_tablettes") or 0
+        g = self.cfg.get(self.ev["cle_max"]) or 0
         if g and self.tablettes_gagnees >= g:
-            return "%d tablettes gagnees (limite : %d)" % (self.tablettes_gagnees, g)
+            return "%d %s %s (limite : %d)" % (self.tablettes_gagnees, self.ev["gain"], self.ev["gagnes"], g)
         return "%d attaques envoyees (limite : %d)" % (self.nb_attaques, self.cfg.get("max_attaques") or 0)
 
     def _texte_assez(self):
@@ -494,30 +549,33 @@ class ModuleNomades(montee.ModuleMontee):
         return list(ai)
 
     def _nom_cible(self, article=False):
-        return "%scamp nomade (%d,%d)" % ("le " if article else "", self.x, self.y)
+        return "%s%s (%d,%d)" % ("le " if article else "", self.ev["camp"], self.x, self.y)
 
     def _terminer(self, raison):
         self.fini = True
-        self._noter("NOMADES : %s. Termine (%d attaque(s), %d victoire(s), %d tablette(s) gagnee(s), passe-temps utilises : %s) ; les "
+        self._noter("%s : %s. Termine (%d attaque(s), %d victoire(s), %d %s %s, passe-temps utilises : %s) ; les "
                     "commandants %s sont rendus aux autres modules." % (
-                        raison, self.nb_attaques, self.victoires_gagnees, self.tablettes_gagnees, texte_utilises(self.utilises),
-                        ";".join(str(p) for p in self.cfg["commandants"])))
-        raise ArretModule("NOMADES : %s : le module Evenements s'arrete (les autres modules continuent)." % raison)
+                        self.ev["titre"], raison, self.nb_attaques, self.victoires_gagnees, self.tablettes_gagnees, self.ev["gain"],
+                        self.ev["gagnes"], texte_utilises(self.utilises), ";".join(str(p) for p in self.cfg["commandants"])))
+        raise ArretModule("%s : %s : le module Evenements s'arrete (les autres modules continuent)." % (self.ev["titre"], raison))
 
     # ------------------------------------------------------------------ demarrage
     async def preparer(self):
         e = await self._lire_tour()
+        camp, autre = self.ev["camp"], {ZONE_CAMP: "un camp nomade", ZONE_SAMOURAIS: "un camp samourai"}
         if e is False:
-            raise ArretModule("le jeu ne donne pas la carte autour du camp nomade (%d,%d) : relance le bot." % (self.x, self.y))
+            raise ArretModule("le jeu ne donne pas la carte autour du %s (%d,%d) : relance le bot." % (camp, self.x, self.y))
         if e is None or not self._est_la_tour(e):
-            raise ArretModule("NOMADES : il n'y a pas de camp nomade en (%d,%d) (%s). L'evenement des nomades est-il en cours ? "
-                              "Verifie les coordonnees dans l'interface (page Evenements)."
-                              % (self.x, self.y, "rien a cet endroit" if e is None else "autre chose : type %s" % e[0]))
+            vu = (autre.get(e[0]) if isinstance(e, list) and e else None)
+            raise ArretModule("%s : il n'y a pas de %s en (%d,%d) (%s). L'evenement des %s est-il en cours ? Verifie les coordonnees "
+                              "dans l'interface (page Evenements) ; si c'est un autre evenement, active son sous-module dans la page "
+                              "Evenements." % (self.ev["titre"], camp, self.x, self.y, "rien a cet endroit" if e is None else
+                                               vu or "autre chose : type %s" % e[0], self.ev["nom"].lower()))
         self.v_combat = e[4]
         b = self._blocage() or 0
         palier = self.camps.get(self.camp_id) or {}
-        self._noter("CAMP NOMADE (%d,%d) : %s, %s%s." % (
-            self.x, self.y, self.texte_niveau(e[4]), "attaquable" if b <= 0 else "bloque encore %s" % duree(b),
+        self._noter("%s (%d,%d) : %s, %s%s." % (
+            camp.upper(), self.x, self.y, self.texte_niveau(e[4]), "attaquable" if b <= 0 else "bloque encore %s" % duree(b),
             " ; delai apres une victoire a ce niveau : %s" % (duree(palier["blocage"]) if palier.get("blocage") else "aucun") if palier else ""))
 
     # ------------------------------------------------------------------ combats
@@ -541,8 +599,9 @@ class ModuleNomades(montee.ModuleMontee):
             elif gagne > 0 or c.get("nouveau_blocage"):
                 self.victoires_gagnees += 1
                 self.pertes = self.sans_hausse = 0
-                self._noter("COMBAT (%s) : victoire -> camp %s ; %s. Tablettes gagnees depuis le lancement : %d%s." % (
+                self._noter("COMBAT (%s) : victoire -> camp %s ; %s. %s %s depuis le lancement : %d%s." % (
                     qui, self.texte_niveau(c["v"]), "blocage %s" % duree(c["T"]) if c["T"] > 0 else "pas de blocage",
+                    self.ev["gain"].capitalize(), self.ev["gagnes"],
                     self.tablettes_gagnees, " (stock %d)" % self.tablettes if self.tablettes is not None else ""))
             else:
                 self.pertes += 1
@@ -555,7 +614,17 @@ class ModuleNomades(montee.ModuleMontee):
 
     def _construire(self, adi, pos, tour, kid, chateau):
         return construire_attaque(self.cfg, adi, pos, tour, chateau, self.effets, self.appris, self.camps, self.types_effets,
-                                  presets=self.presets, cheval_inconnu_ok=self.simulation, niveau_joueur=self.niveau_joueur)
+                                  presets=self.presets, cheval_inconnu_ok=self.simulation, niveau_joueur=self.niveau_joueur,
+                                  zone=self.TYPE_CIBLE, genre=self.GENRE)
+
+
+class ModuleSamourais(ModuleNomades):
+    """Sous-module SAMOURAIS (20/11) : le camp samourai attaque comme le camp nomade (meme mecanique : salves, niveaux 101 a
+    110 en Maitre+, blocage de 1 h 30 au niveau 110 saute avec les passe-temps), avec ses engins, ses coffres et ses jetons.
+    NOM_MODULE reste "NOMADES" : c'est la cle du module Evenements pour les reservations et priorites du lanceur."""
+    TYPE_CIBLE = ZONE_SAMOURAIS
+    NOM_PAUSE = "samourais"
+    GENRE = "samourais"
 
 
 # ============================================================================== le Khan (2e partie de l'evenement des nomades)
@@ -941,6 +1010,717 @@ def resume_khan(cfg):
     return l
 
 
+# ============================================================================== corbeaux de sang (18/11)
+# Demande du joueur : un 2e sous-module du module Evenements (un seul actif a la fois, page Evenements). Les camps des Corbeaux
+# de sang (et des Etrangers) sont sur la carte du royaume vert, autour du chateau : le bot les attaque avec les commandants
+# choisis, le plus proche libre d'abord ; un camp vaincu disparait de la carte et revient quelques minutes plus tard (pas de
+# delai a sauter, pas de passe-temps). Trajets longs (19 a 25 min vus le 18/11). Armee : les N premieres vagues avec des engins
+# choisis case par case, les vagues suivantes remplies de bannieres de gloire (les "coffres" de cet evenement).
+# Capture du 18/11 (2 attaques a la main) :
+#   carte (gaa) : un camp = [21, x, y, 70, ?, 0, 248, 188, 84, 0, 10] (type 21 ; 34 = l'autre camp de cet evenement : les engins
+#     de l'evenement ont allowedToAttack "0+21#0+34") ; adi : infos d'attaque comme une tour ; cra : comme une tour, RW vide.
+#   50 engins / bannieres acceptes par cote et par vague, flancs compris (camp niveau 70) ; reponse cra "FA" = armee envoyee.
+ZONES_CORBEAUX = (21, 34)
+NIVEAU_CORBEAUX = 70
+RAYON_CORBEAUX = 30            # cases autour du chateau ou chercher les camps (reglable)
+VAGUES_ENGINS_MAX = 3         # 18/11 : 1 a 3 vagues d'engins, chacune avec ses engins
+# Engins des vagues d'engins : identifiant -> (nom du jeu, famille, effet, gloire en %). Noms : fichier de langue francais du jeu
+# (lu le 18/11, cle "<type>_name") ; effets, gloire et limite par vague : items.json (gateBonus, wallBonus, moatBonus,
+# defRangeBonus, fameBonus, amountPerWave). Pas de belier sur un flanc (slotTypes du jeu). 18/11 : seulement les engins dont le
+# joueur a donne l'image ; les autres (engins des envahisseurs, premium, mantelet en fonte) sont remplaces (REMPLACES_CORBEAUX).
+ENGINS_CORBEAUX = {
+    154: ("belier royal", "beliers", "porte -20 %", 6), 648: ("belier lourd", "beliers", "porte -20 %", 0),
+    611: ("belier", "beliers", "porte -10 %", 0),
+    156: ("echelle royale", "echelles", "mur -20 %", 6), 649: ("beffroi", "echelles", "mur -20 %", 0),
+    614: ("echelle de siege", "echelles", "mur -10 %", 0),
+    158: ("pont royal", "ponts", "douves -15 %", 6), 650: ("pierres", "ponts", "douves -15 %", 0),
+    160: ("bouclier royal", "boucliers", "tirs -15 %", 6), 651: ("mur de boucliers", "boucliers", "tirs -15 %", 0),
+    620: ("mantelet", "boucliers", "tirs -5 %", 0),
+    256: ("tour de gloire", "tours", "tirs -30 %", 3)}
+# Tour de gloire (SceatFameShield) : 11 niveaux, identifiants 256 a 266 (tirs -20 a -30 %, gloire +1 a +3 %). Un seul choix
+# (256) : le bot prend le niveau le plus haut en stock, comme pour les soldats a niveaux. Le jeu en limite le nombre par vague,
+# tous cotes confondus (amountPerWave, 20 a 30 selon le niveau ; AttackDialog.isMaxAmountPerWaveReached) : 30 au plus.
+TOUR_GLOIRE = 256
+TOURS_GLOIRE = {255 + n: n for n in range(1, 12)}                # identifiant -> niveau
+NIVEAUX_TOUR_GLOIRE = tuple(sorted(TOURS_GLOIRE, reverse=True))   # du plus haut au plus bas
+LIMITE_NIVEAU = {w: 19 + n for w, n in TOURS_GLOIRE.items()}      # au plus N de ce niveau par vague
+LIMITE_PAR_VAGUE = {TOUR_GLOIRE: max(LIMITE_NIVEAU.values())}
+# anciens choix (avant le 18/11 a 11 h) -> engin garde de la meme famille
+REMPLACES_CORBEAUX = {770: 648, 641: 648, 771: 649, 640: 649, 772: 650, 642: 650, 617: 650, 773: 651, 635: 651,
+                      **{w: TOUR_GLOIRE for w in TOURS_GLOIRE if w != TOUR_GLOIRE}}
+ENGINS_CORBEAUX_FLANC = {w: v for w, v in ENGINS_CORBEAUX.items() if v[1] != "beliers"}
+# bannieres de gloire (items.json, fameBonus) : identifiant -> bonus de gloire
+BANNIERES_CORBEAUX = {660: 1, 661: 2, 77: 3, 24: 4, 774: 4, 734: 5, 152: 6, 153: 8, 239: 9, 240: 10, 474: 11, 475: 12, 476: 13}
+NOMS_BANNIERES_CORBEAUX = {660: "banniere", 661: "oriflamme de guerre", 77: "banniere du heros", 24: "banniere du triomphe",
+                           774: "banniere des envahisseurs", 734: "etendard a queue de cheval", 152: "banniere royale",
+                           153: "banniere du roi", 239: "banniere du baron", 240: "banniere de l'empereur",
+                           474: "banniere de la grande reine", 475: "banniere du haut roi", 476: "etendard du roi supreme"}
+GLOIRE_CORBEAUX = {**BANNIERES_CORBEAUX, **{w: v[3] for w, v in ENGINS_CORBEAUX.items() if v[3] and w != TOUR_GLOIRE},
+                   **{w: 1 + (n > 5) + (n > 10) for w, n in TOURS_GLOIRE.items()}}   # gloire en % par objet (tours : par niveau)
+
+
+def nom_engin_corbeaux(w):
+    if w in TOURS_GLOIRE and w != TOUR_GLOIRE:
+        return "tour de gloire niv. %d" % TOURS_GLOIRE[w]
+    return ENGINS_CORBEAUX.get(w, ("engin %d" % w,))[0]
+
+
+def migrer_engins_corbeaux(e):
+    """Grille(s) d'engins d'un ancien reglage -> engins gardes (REMPLACES_CORBEAUX), quantites d'un meme engin additionnees
+    (50 au plus par cote). Grille unique (ancien format) ou liste de grilles ; le reste rendu tel quel."""
+    if isinstance(e, list):
+        return [migrer_engins_corbeaux(g) for g in e]
+    if not isinstance(e, dict):
+        return e
+    res = {}
+    for genre, liste in e.items():
+        if not isinstance(liste, list):
+            res[genre] = liste
+            continue
+        out = []
+        for p in liste:
+            if isinstance(p, list) and len(p) == 2 and isinstance(p[0], int) and not isinstance(p[0], bool):
+                w = REMPLACES_CORBEAUX.get(p[0], p[0])
+                deja = next((x for x in out if x[0] == w), None)
+                if deja is not None:                          # (un reglage valide n'a pas de doublon : vient d'un remplacement)
+                    q = tuple(v if entier(v) is not None else int(v) if isinstance(v, str) and v.strip().isdigit() else None
+                              for v in (deja[1], p[1]))
+                    if None not in q:
+                        deja[1] = min(PLACE_CORBEAUX, q[0] + q[1])
+                        continue
+                out.append([w, p[1]])
+            else:
+                out.append(p)
+        res[genre] = out
+    return res
+PLACE_CORBEAUX = 50            # engins (ou bannieres) au plus par cote et par vague
+ENGINS_CORBEAUX_DEFAUT = {"flanc": [[649, 13], [651, 24]], "centre": [[649, 9], [648, 10], [651, 31]]}   # 1re attaque du 18/11
+SOUS_MODULES = ("nomades", "corbeaux", "samourais")
+# Soldats par vague (code du jeu lu le 18/11 : CombatConst, CastleEffectsHelper, CastleAttackArmyVO) : un camp de niveau 70 est
+# un "combat legendaire" -> les competences de legende comptent (soldats en plus sur les flancs / au front, outils en plus sur
+# les flancs : 40 + jusqu'a 10, vagues en plus), lues avec la demande "skl". Le reste du bonus (general du commandant, effets
+# entre joueurs de l'equipement...) n'est pas calcule : le bot l'APPREND du jeu, qui refuse une armee trop grande (code 313,
+# ATTACK_TOO_MANY_UNITS) sans rien envoyer : essai plus haut, refus -> un peu moins, aussitot, jusqu'au maximum de chaque
+# commandant (garde dans captures/corbeaux_bonus.json). Capture du 18/11 : 299 / 926 et 329 / 1041 soldats par flanc / au
+# centre, la ou le chateau seul donne 175 / 563.
+CODE_TROP_DE_SOLDATS = 313
+LEGENDE_EFFETS = {"additionalUnitAmountOnFlank": "flanc", "additionalUnitAmountOnFront": "front",
+                  "additionalAttackToolAmountFlank": "outils", "additionalWave": "vagues"}
+NIVEAU_LEGENDAIRE = 70         # PlayerConst.LEVEL_CAP : camp a partir de ce niveau = combat legendaire
+EXTRA_PAS = 100                # % essayes en plus du dernier accepte, tant qu'aucun refus n'est connu
+EXTRA_MAX = 600
+EXTRA_PRECISION = 2            # % : ecart entre accepte et refuse en dessous duquel le maximum est trouve
+ESSAIS_TROP = 6                # essais (refus 313) au plus pour une meme attaque
+
+
+def charger_legendes(chemin=None):
+    """Competences de legende (items.json, legendskills) -> {identifiant: (effet, valeur totale)} pour celles qui comptent ici."""
+    try:
+        with open(chemin or tours.FICHIER_ITEMS, encoding="utf-8") as f:
+            d = json.load(f)
+        return {int(x["skillID"]): (LEGENDE_EFFETS[x["effectType"]], float(x.get("totalEffectValue") or 0))
+                for x in d.get("legendskills") or [] if x.get("effectType") in LEGENDE_EFFETS}
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return {}
+
+
+def totaux_legende(skl, table):
+    """Reponse skl du jeu ({"SID": [competences du joueur], ...}) -> {"flanc", "front", "outils", "vagues"} (comme le jeu :
+    somme des valeurs totales des competences du joueur, par effet)."""
+    res = {"flanc": 0.0, "front": 0.0, "outils": 0.0, "vagues": 0.0}
+    for sid in (skl.get("SID") or []) if isinstance(skl, dict) else []:
+        if sid in table:
+            res[table[sid][0]] += table[sid][1]
+    return res
+
+
+def _poser_engins_corbeaux(vague, cote, liste, cases, place, stock):
+    """Comme _poser_outils ; la tour de gloire (une case, comme les autres engins) : le niveau le plus haut qui a assez de stock
+    et de place dans la limite par vague de son niveau (tous cotes de la vague confondus) ; sinon celui qui en a le plus."""
+    manques = []
+    for wid, voulu in liste:
+        if wid == TOUR_GLOIRE:
+            dispo = {w: max(0, min(stock.get(w, 0), LIMITE_NIVEAU[w] - sum(q for c in "LRM" for x, q in vague.get(c, {}).get("T", []) if x == w)))
+                     for w in NIVEAUX_TOUR_GLOIRE}
+            q = min(voulu, place)
+            wid = next((w for w in NIVEAUX_TOUR_GLOIRE if dispo[w] >= q), max(NIVEAUX_TOUR_GLOIRE, key=lambda w: (dispo[w], w)))
+            if dispo[wid] < q:
+                manques.append((TOUR_GLOIRE, q, dispo[wid]))
+                voulu = dispo[wid]
+            if voulu <= 0:
+                continue
+        avant = sum(q for w, q in vague[cote]["T"])
+        manques += _poser_outils(vague, cote, [[wid, voulu]], cases, place, stock)
+        place -= sum(q for w, q in vague[cote]["T"]) - avant
+    return manques
+
+
+def depasse_limite(grille, cotes):
+    """Engins limites par vague (tours de gloire) : [(identifiant, nombre dans la vague, limite)] de ceux qui depassent. La grille
+    du flanc vaut pour chaque flanc rempli : nombre = (flancs choisis) x flanc + centre."""
+    flancs = sum(1 for c in "LR" if c in (cotes or ""))
+    centre = 1 if "M" in (cotes or "") else 0
+    q = {}
+    for genre, fois in (("flanc", flancs), ("centre", centre)):
+        for w, n in grille.get(genre) or []:
+            if w in LIMITE_PAR_VAGUE:
+                q[w] = q.get(w, 0) + fois * n
+    return [(w, n, LIMITE_PAR_VAGUE[w]) for w, n in q.items() if n > LIMITE_PAR_VAGUE[w]]
+
+
+def corbeaux_valides(c):
+    try:
+        if not (isinstance(c, dict) and tours.commandants_valides(c.get("commandants")) and combat.normaliser_cotes(c.get("cotes")) is not None):
+            return False
+        s = c.get("soldats")
+        if not (isinstance(s, list) and 1 <= len(s) <= tours.NB_SOLDATS_MAX and all(entier(u) is not None and u > 0 for u in s) and len(set(s)) == len(s)):
+            return False
+        s2 = c.get("soldats_suite", [])
+        if not (isinstance(s2, list) and len(s2) <= tours.NB_SOLDATS_MAX and all(entier(u) is not None and u > 0 for u in s2) and len(set(s2)) == len(s2)):
+            return False
+        n = c.get("vagues_engins")
+        if not (entier(n) is not None and 1 <= n <= VAGUES_ENGINS_MAX):
+            return False
+        cotes = combat.normaliser_cotes(c.get("cotes"))
+        for e in engins_par_vague(migrer_engins_corbeaux(c.get("engins")), n) or [None]:
+            if not (isinstance(e, dict) and _paires(e.get("flanc"), 2, ENGINS_CORBEAUX_FLANC, PLACE_CORBEAUX)
+                    and _paires(e.get("centre"), 3, ENGINS_CORBEAUX, PLACE_CORBEAUX) and (e["flanc"] or e["centre"])):
+                return False
+            if depasse_limite(e, cotes):
+                return False
+        b = c.get("bannieres")
+        if not (isinstance(b, dict) and isinstance(b.get("types"), list) and all(w in BANNIERES_CORBEAUX for w in b["types"])
+                and len(set(b["types"])) == len(b["types"]) and b.get("ordre") in ("forts", "faibles")):
+            return False
+        if c.get("cheval") not in ("C", "F", "CF") or (c["cheval"] == "CF" and not (entier(c.get("distance_plumes")) or 0) > 0):
+            return False
+        if not isinstance(c.get("remplir_cour", True), bool):
+            return False
+        return all(entier(c.get(k, d)) is not None and lo <= c.get(k, d) <= hi
+                   for k, d, lo, hi in (("rayon", RAYON_CORBEAUX, 5, 100), ("max_attaques", 0, 0, 10 ** 6)))
+    except (AttributeError, TypeError, KeyError):
+        return False
+
+
+def engins_par_vague(e, n):
+    """Engins des vagues d'engins -> une grille {"flanc", "centre"} par vague (n grilles), ou None. Ancienne forme (une seule
+    grille pour toutes les vagues, 18/11 matin) : la meme pour chaque vague."""
+    if isinstance(e, dict):
+        return [e] * n
+    if isinstance(e, list) and len(e) == n:
+        return e
+    return None
+
+
+def sous_module(ev):
+    """Sous-module actif de la rubrique evenements ("nomades" par defaut : reglages d'avant le 18/11)."""
+    a = ev.get("actif") if isinstance(ev, dict) else None
+    return a if a in SOUS_MODULES else "nomades"
+
+
+def construire_corbeaux(cfg, adi, pos, camp, chateau, effets, appris, types_effets=None, cheval_inconnu_ok=False, legende=None,
+                        extra=0, extra_sur=None, niveau_joueur=None, cour=True):
+    """Paquet cra du commandant numero `pos` sur un camp des Corbeaux de sang (entree de carte [21,x,y,niveau,...]) -> (cra, infos).
+    legende : totaux des competences de legende (combat legendaire, camp de niveau 70 et plus) ; extra : % de soldats en plus
+    essayes (appris du jeu) ; extra_sur : % deja acceptes par le jeu (la vague 1 est jugee complete avec ce plafond-la).
+    niveau_joueur : niveau + niveau legendaire (pour les places de la cour) ; cour=False : cour vide (refusee par le jeu).
+    Leve ValueError (commandant absent), PlusDeSoldats (vague 1 incomplete : soldats ou engins), ArretModule (cheval)."""
+    b = tours.cfg_royaume(cfg, KID)
+    cmds = tours.positions_commandants(adi)
+    if not 1 <= pos <= len(cmds):
+        raise ValueError("commandant numero %d absent de la liste (%d commandants)" % (pos, len(cmds)))
+    cmd = cmds[pos - 1]
+    tx, ty = camp[1], camp[2]
+    zone = camp[0] if camp[0] in ZONES_CORBEAUX else ZONES_CORBEAUX[0]
+    niv = camp[3] if len(camp) > 3 and entier(camp[3]) is not None and 1 <= camp[3] <= 200 else NIVEAU_CORBEAUX
+    distance = math.hypot(tx - chateau[0], ty - chateau[1])
+    leg = (legende or {}) if niv >= NIVEAU_LEGENDAIRE else {}
+    base_f = ((combat.bonus_commandant(cmd, effets, zone, combat.EFFET_FLANC) if effets else 0)
+              + bonus_chateau(adi, types_effets, combat.EFFET_FLANC, zone) + int(leg.get("flanc", 0)))
+    base_a = ((combat.bonus_commandant(cmd, effets, zone, combat.EFFET_FRONT) if effets else 0)
+              + bonus_chateau(adi, types_effets, combat.EFFET_FRONT, zone) + int(leg.get("front", 0)))
+    bonus_f, bonus_a = base_f + extra, base_a + extra
+    sur = extra if extra_sur is None else min(extra, extra_sur)
+    en_plus = (combat.vagues_supplementaires(cmd, effets, zone) if effets else 0) + int(leg.get("vagues", 0))
+    nb_vagues = int(cfg.get("vagues_base", tours.NB_VAGUES_BASE)) + en_plus
+    places = {"L": combat.soldats_flanc(niv, bonus_f), "R": combat.soldats_flanc(niv, bonus_f), "M": combat.soldats_centre(niv, bonus_a)}
+    surs = {"L": combat.soldats_flanc(niv, base_f + sur), "R": combat.soldats_flanc(niv, base_f + sur), "M": combat.soldats_centre(niv, base_a + sur)}
+    place_outils = {"L": combat.outils_flanc(niv, leg.get("outils", 0)), "R": combat.outils_flanc(niv, leg.get("outils", 0)),
+                    "M": combat.outils_front(niv)}
+    stock = combat.inventaire_depuis_adi((adi.get("gui") or {}).get("I", []))
+    code = combat.normaliser_cotes(b["cotes"])
+    cotes = combat.COTES[code]
+    n_eng = min(int(cfg.get("vagues_engins", 1)), nb_vagues)
+    # vagues d'engins : les soldats choisis pour elles ; vagues de bannieres : les leurs s'ils sont choisis, sinon les memes
+    suite = tours.deplier(cfg.get("soldats_suite") or b["soldats"])
+    vagues, reste, utilisees = [], dict(stock), []
+    for n, unites in ((n_eng, tours.deplier(b["soldats"])), (nb_vagues - n_eng, suite)):
+        if n > 0:
+            v, reste, _, u = combat.remplir_cotes_complets(reste, unites, cotes, niv, n, bonus_f, bonus_a, 0, tours.ID_ECHELLE)
+            vagues += v
+            utilisees += [w for w in u if w not in utilisees]
+    for c in cotes:                                   # vague 1 complete, sinon pas d'attaque (une armee incomplete perd)
+        q = sum(x for _, x in vagues[0][c]["U"])
+        if q < surs[c]:
+            raise PlusDeSoldats("Corbeaux de sang : plus assez de soldats pour remplir la vague 1 (%s : %d sur %d, unites %s)."
+                                % (combat.NOMS_COTES[c], q, surs[c], ";".join(map(str, b["soldats"]))))
+    manques = []
+    grilles = engins_par_vague(cfg.get("engins"), int(cfg.get("vagues_engins", 1))) or []
+    for i in range(n_eng):
+        engins = grilles[i] if i < len(grilles) else {}
+        for c in cotes:
+            if not vagues[i][c]["U"]:
+                continue
+            genre = "centre" if c == "M" else "flanc"
+            m = _poser_engins_corbeaux(vagues[i], c, engins.get(genre) or [], CASES_ENGINS[genre], place_outils[c], reste)
+            if m:
+                wid, voulu, a = m[0]
+                nom = nom_engin_corbeaux(wid)
+                if i == 0:
+                    raise PlusDeSoldats("Corbeaux de sang : plus assez d'engins pour la vague 1 (%s : %d x %s voulus, %d en stock)."
+                                        % (combat.NOMS_COTES[c], voulu, nom, a))
+                manques.append("vague %d, %s : %d x %s voulus, %d en stock" % (i + 1, combat.NOMS_COTES[c], voulu, nom, a))
+    k = cfg.get("bannieres") or {}
+    ordre = sorted(k.get("types") or [], key=lambda w: BANNIERES_CORBEAUX.get(w, 0), reverse=k.get("ordre") != "faibles")
+    sans = 0
+    for vague in vagues[n_eng:]:
+        for c in cotes:
+            if not vague[c]["U"] or not ordre:
+                continue
+            _poser_outils(vague, c, [[w, place_outils[c]] for w in ordre if reste.get(w, 0) > 0], CASES_ENGINS["centre" if c == "M" else "flanc"],
+                          place_outils[c], reste)
+            if sum(q for _, q in vague[c]["T"]) < place_outils[c]:
+                sans += 1
+    if sans:
+        manques.append("plus assez de bannieres choisies en stock : %d cote(s) de vague sans bannieres ou incomplets" % sans)
+    while len(vagues) > 1 and not any(vagues[-1][c]["U"] for c in "LRM"):
+        vagues.pop()                                  # vagues finales sans aucun soldat (stock epuise) : inutiles
+    # cour (ligne etoile, 19/11) : remplie au maximum comme pour les nomades, avec les soldats qui restent apres les vagues
+    # (ceux des vagues d'engins d'abord) ; places : formule du jeu (places_cour), niveau de la cible = niveau du camp
+    dans_cour = []
+    if cour and cfg.get("remplir_cour", True):
+        if niveau_joueur:
+            n_cour = places_cour(niveau_joueur, niv,
+                                 combat.bonus_commandant(cmd, effets, zone, EFFET_COUR_BONUS, plafond=10 ** 6) if effets else 0,
+                                 combat.bonus_commandant(cmd, effets, zone, EFFET_COUR_BOOST, plafond=10 ** 6) if effets else 0)
+            for u in tours.deplier(b["soldats"]) + suite + [w for c in "MLR" for w, _ in vagues[0][c]["U"]]:
+                q = min(n_cour - sum(x for _, x in dans_cour), reste.get(u, 0))
+                if len(dans_cour) >= CASES_COUR or q <= 0 or u in (w for w, _ in dans_cour):
+                    continue
+                reste[u] -= q
+                dans_cour.append([u, q])
+            if not dans_cour:
+                manques.append("cour : plus de soldats en stock")
+        else:
+            manques.append("cour pas remplie : le jeu n'a pas donne ton niveau")
+    opt = tours.option_cheval(b, distance)
+    champs = tours.champs_pour_cheval(opt, appris)
+    cheval_inconnu = champs is None
+    if cheval_inconnu:
+        if not cheval_inconnu_ok:
+            raise ArretModule("Reglages du cheval '%s' inconnus. Lance : outils\\lancer_bot_tours.bat --apprendre-cheval %s" % (opt, opt))
+        champs = {}
+    cra = T.construire_cra(chateau[0], chateau[1], tx, ty, KID, cmd["ID"], 0, 0, 0)
+    cra["A"] = [combat.vers_paquet(v) for v in vagues]
+    cra["RW"] = dans_cour + [[-1, 0]] * (CASES_COUR - len(dans_cour))
+    cra.update({x: champs[x] for x in tours.CHAMPS_CHEVAL if x in champs})
+    gloire = sum(q * GLOIRE_CORBEAUX[w] for v in vagues for c in "LRM" for w, q in v[c]["T"] if w in GLOIRE_CORBEAUX)
+    infos = {"pos": pos, "kid": KID, "lid": cmd["ID"], "nom": cmd.get("N", ""), "niveau": niv, "distance": distance, "cheval": opt,
+             "cheval_inconnu": cheval_inconnu, "soldat": "+".join(str(u) for u in utilisees), "vagues_remplies": len(vagues),
+             "mode": "R %s" % code, "vagues": len(vagues), "vagues_en_plus": en_plus, "vagues_engins": min(n_eng, len(vagues)),
+             "manques": manques, "plafond_flanc": places["L"], "plafond_front": places["M"], "extra": extra, "outils_flanc": place_outils["L"],
+             "bannieres": sum(q for v in vagues for c in "LRM" for w, q in v[c]["T"] if w in BANNIERES_CORBEAUX), "gloire": gloire,
+             "cour": sum(q for _, q in dans_cour)}
+    return cra, infos
+
+
+def resume_corbeaux(cfg):
+    b = tours.cfg_royaume(cfg, KID)
+    e, k = cfg["engins"], cfg["bannieres"]
+    return ["CORBEAUX DE SANG : camps du royaume vert a moins de %d cases du chateau, le plus proche libre d'abord ; commandants %s "
+            "(le module tours ne les prend pas ; les forteresses peuvent en garder)" % (b["rayon"], ";".join(str(p) for p in cfg["commandants"])),
+            "armee : cotes %s, soldats des vagues d'engins : %s, des vagues de bannieres : %s" % (
+                combat.texte_cotes(b["cotes"]), ";".join(map(str, b["soldats"])), ";".join(map(str, cfg.get("soldats_suite") or [])) or "les memes"),
+            " ; ".join("vague %d d'engins : flanc %s, centre %s" % ((i + 1,) + tuple(
+                " + ".join("%d x %s" % (q, ENGINS_CORBEAUX[w][0]) for w, q in g[cote]) or "aucun" for cote in ("flanc", "centre")))
+                for i, g in enumerate(engins_par_vague(e, cfg["vagues_engins"]))),
+            "vagues suivantes : %s" % ("bannieres %s, les plus %s d'abord" % (
+                ", ".join("+%d" % BANNIERES_CORBEAUX[w] for w in sorted(k["types"], key=BANNIERES_CORBEAUX.get)), k["ordre"])
+                if k["types"] else "sans bannieres"),
+            "cour : %s" % ("remplie au maximum a chaque attaque" if cfg.get("remplir_cour", True) else "vide"),
+            "arret : %s" % ("apres %d attaques" % cfg["max_attaques"] if cfg.get("max_attaques") else "aucune limite (jusqu'a l'arret du bot)")]
+
+
+class ModuleCorbeaux(tours.ModuleTours):
+    """Attaques des camps des Corbeaux de sang : la mecanique du module tours (carte lue couronne par couronne autour du chateau,
+    cible la plus proche libre, verifiee juste avant le depart), sur les camps de type 21 / 34 au lieu des tours."""
+    NOM_MODULE = "NOMADES"         # = LANCEUR_CLE du module Evenements : priorite et reservations du lanceur commun
+    NOM_CIBLE = "camp"
+    ATTENTE_APRES_ATTAQUE = 60     # apres l'arrivee : le camp vaincu a disparu ; la carte est relue avant de le reprendre
+    TEXTES = (("Aucune tour libre", "Aucun camp libre"), ("tour(s) libre(s)", "camp(s) libre(s)"), ("tours relues", "camps relus"),
+              ("etaient en fait occupees", "n'etaient plus la"))
+
+    def __init__(self, jeu, cfg, sources, effets=None, types_effets=None, **kw):
+        kw.setdefault("journal", os.path.join(tours.DOSSIER_CAPTURES, "journal_corbeaux.txt"))
+        kw.setdefault("fichier_etat", os.path.join(tours.DOSSIER_CAPTURES, "etat_corbeaux.json") if kw["journal"] else None)
+        kw.setdefault("max_attaques", cfg.get("max_attaques") or None)    # le passage s'arrete pile a la limite
+        legendes = kw.pop("legendes", None)
+        super().__init__(jeu, cfg, sources, effets, **kw)
+        self.types_effets = types_effets or {}
+        self.arrivees = 0
+        self.fini = False
+        self.max_corbeaux = cfg.get("max_attaques") or 0
+        self.table_legende = legendes if legendes is not None else charger_legendes()
+        self.legende = None              # totaux des competences de legende du joueur (demande skl), None = pas lus
+        self.fichier_bonus = os.path.join(tours.DOSSIER_CAPTURES, "corbeaux_bonus.json") if self.journal else None
+        self.extras = self._charger_bonus()   # commandant -> [% accepte par le jeu, % refuse (ou None)]
+        self.niveau_joueur = None        # niveau + niveau legendaire (jaa au lancement, puis gxp) : places de la cour
+        self.sans_cour = set()           # commandants dont le jeu a refuse la cour remplie (ce lancement)
+        if isinstance(getattr(jeu, "ecouteurs", None), list):
+            jeu.ecouteurs.append(self._ecouter)
+
+    # ---- textes (la mecanique vient du module tours)
+    def _noter(self, texte):
+        for a, b in self.TEXTES:
+            texte = texte.replace(a, b)
+        super()._noter(texte)
+
+    def _attente_msg(self, cle, texte):
+        for a, b in self.TEXTES:
+            texte = texte.replace(a, b)
+        super()._attente_msg(cle, texte)
+
+    # ---- les camps sur la carte
+    def _est_camp(self, e):
+        return isinstance(e, list) and len(e) >= 4 and e[0] in ZONES_CORBEAUX and isinstance(e[1], int) and isinstance(e[2], int)
+
+    def _tours_connues(self):
+        res = {}
+        for kid in self._royaumes_actifs():
+            src, rayon = self.sources[kid], self._reglages(kid)["rayon"]
+            for lu, entrees in self.cache.get(kid, {}).values():
+                for e in entrees.values():
+                    if self._est_camp(e) and math.hypot(e[1] - src["x"], e[2] - src["y"]) <= rayon:
+                        cle = (kid, e[1], e[2])
+                        if cle not in res or lu > res[cle][0]:
+                            res[cle] = (lu, e)
+        return res
+
+    def _tours_libres(self):
+        res = []
+        gardees = getattr(self.partage, "cibles_gardees", None) or ()
+        for cle, (lu, e) in self._tours_connues().items():
+            if cle not in self.engagees and cle not in self.en_route and cle not in gardees:
+                src = self.sources[cle[0]]
+                res.append((math.hypot(e[1] - src["x"], e[2] - src["y"]), cle[0], e))
+        res.sort(key=lambda c: c[0])
+        return res
+
+    def _prochaine_tour(self):
+        return None                    # pas de minuteur : un camp vaincu revient quelques minutes plus tard (la carte est relue)
+
+    def texte_carte(self, kid, libres=None):
+        rayon = self._reglages(kid)["rayon"]
+        lu = min(rayon, self.cran.get(kid, 0) * tours.LARGEUR_CRAN)
+        n = sum(1 for k in self._tours_connues() if k[0] == kid)
+        return "%s : %s%d camp(s) connu(s), carte lue jusqu'a %d cases sur %d" % (
+            tours.ROYAUMES[kid], "%d libre(s) sur " % libres if libres is not None else "", n, lu, rayon)
+
+    async def _verifier_tour(self, cand):
+        """Relit la zone du camp juste avant l'attaque : il a pu etre vaincu (il disparait) depuis la lecture."""
+        d, kid, e = cand
+        z = next((z for z in self.cache.get(kid, {}) if z[0] <= e[1] <= z[2] and z[1] <= e[2] <= z[3]), None)
+        if z is None or not await self._lire_zone(kid, z):
+            self.engagees[(kid, e[1], e[2])] = self.horloge() + 60
+            self.zones_ratees += 1
+            self._noter("   camp (%d,%d) : la carte n'a pas pu etre relue (%s), camp saute 1 min."
+                        % (e[1], e[2], getattr(self, "raison_zone", "zone inconnue")))
+            return None
+        self.zones_ratees = 0
+        frais = self.cache[kid][z][1].get((e[1], e[2]))
+        if not self._est_camp(frais):
+            self.engagees[(kid, e[1], e[2])] = self.horloge() + 60      # plus de camp ici (vaincu) : il reviendra
+            return None
+        return frais
+
+    def _verifier_stock(self):
+        """Plus de soldats nulle part : pas d'arret (le module tours s'arrete) ; les corbeaux attendent le recrutement / les retours."""
+        if not self._royaumes_avec_stock():
+            t = self.horloge()
+            self._attente_msg("sans-soldats", "Corbeaux de sang : pas assez de soldats ou d'engins pour la vague 1 ; nouvel essai au "
+                              "retour d'un commandant ou dans %s." % duree(max(0, self.sans_stock.get(KID, t) - t)))
+
+    def _construire(self, adi, pos, tour, kid, chateau, extra=None):
+        bas = self.extras.get(pos, [0, None])[0]
+        return construire_corbeaux(self.cfg, adi, pos, tour, chateau, self.effets, self.appris, self.types_effets,
+                                   cheval_inconnu_ok=self.simulation, legende=self.legende,
+                                   extra=bas if extra is None else extra, extra_sur=bas, niveau_joueur=self.niveau_joueur,
+                                   cour=pos not in self.sans_cour)
+
+    async def _lire_niveau(self):
+        """Niveau + niveau legendaire du joueur (places de la cour) : reponse jaa a jca (gca.O : L, LL), comme le jeu au
+        lancement ; ensuite mis a jour par les messages gxp (LVL, LL)."""
+        await self._vider()
+        await self.jeu.envoyer("jca", {"CID": -1, "KID": 0})
+        rep = await self.jeu.attendre("jaa", 15)
+        d = T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None
+        o = ((d or {}).get("gca") or {}).get("O") if isinstance(d, dict) else None
+        if isinstance(o, dict) and entier(o.get("L")) is not None:
+            self.niveau_joueur = o["L"] + (entier(o.get("LL")) or 0)
+        return self.niveau_joueur
+
+    def _ecouter(self, msg):
+        try:
+            cmd, code, payload = msg[0], msg[1], msg[2]
+        except (TypeError, IndexError):
+            return
+        if cmd == "gxp" and code == 0 and isinstance(payload, str):
+            d = T.json_ou_none(payload)
+            if isinstance(d, dict) and entier(d.get("LVL")) is not None:
+                self.niveau_joueur = d["LVL"] + (entier(d.get("LL")) or 0)
+
+    # ---- soldats par vague : le bonus que le bot ne calcule pas est appris du jeu (refus 313)
+    def _charger_bonus(self):
+        try:
+            with open(self.fichier_bonus, encoding="utf-8") as f:
+                d = json.load(f)
+            return {int(p): [float(v[0]), None if v[1] is None else float(v[1])] for p, v in d.items()}
+        except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
+            return {}
+
+    def _sauver_bonus(self):
+        if not self.fichier_bonus:
+            return
+        try:
+            tmp = self.fichier_bonus + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({str(p): v for p, v in self.extras.items()}, f)
+            os.replace(tmp, self.fichier_bonus)
+        except OSError:
+            pass
+
+    def _extra_a_essayer(self, pos):
+        """% de soldats en plus a essayer pour ce commandant : le maximum deja trouve, sinon entre l'accepte et le refuse."""
+        bas, haut = self.extras.get(pos, [0, None])
+        if haut is None:
+            return min(EXTRA_MAX, bas + EXTRA_PAS)
+        if haut - bas <= EXTRA_PRECISION:
+            return bas
+        return math.floor((bas + haut) / 2)
+
+    def _accepte(self, pos, e):
+        bas, haut = self.extras.get(pos, [0, None])
+        bas = max(bas, e)
+        if haut is not None and haut <= bas:
+            haut = None                    # le maximum a monte (equipement, general...) : on cherche de nouveau
+        self.extras[pos] = [bas, haut]
+        self._sauver_bonus()
+
+    def _refuse(self, pos, e):
+        bas, haut = self.extras.get(pos, [0, None])
+        haut = e if haut is None else min(haut, e)
+        if bas >= haut:
+            bas = max(0, haut - EXTRA_PAS)  # le maximum a baisse : on repart plus bas
+        self.extras[pos] = [bas, haut]
+        self._sauver_bonus()
+
+    async def _lire_legende(self):
+        """Competences de legende du joueur (demande skl, comme le jeu) -> totaux ; pas de reponse : 0 (le reste est appris)."""
+        for essai in range(2):
+            await self._vider()
+            await self.jeu.envoyer("skl", {})
+            rep = await self.jeu.attendre("skl", 10)
+            d = T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None
+            if isinstance(d, dict):
+                self.legende = totaux_legende(d, self.table_legende)
+                return True
+        self.legende = {"flanc": 0.0, "front": 0.0, "outils": 0.0, "vagues": 0.0}
+        return False
+
+    async def attaquer(self, pos, tour, kid):
+        """Une attaque sur un camp (comme le module tours, en plus court) ; refus "trop de soldats" (313) : aussitot moins."""
+        cx, cy = self.sources[kid]["x"], self.sources[kid]["y"]
+        tx, ty = tour[1], tour[2]
+        cle = (kid, tx, ty)
+        nom = "camp (%d,%d)" % (tx, ty)
+        rep = await self._demander_infos(cx, cy, tx, ty, kid, set())
+        if not rep or rep[1] != 0:
+            n = self.sans_info[cle] = self.sans_info.get(cle, 0) + 1
+            pause = 60 if n < 3 else 600
+            self.engagees[cle] = self.horloge() + pause
+            self._noter("   %s : le jeu ne donne pas ses infos d'attaque (%s) ; camp saute %s." % (
+                nom, "code %s" % rep[1] if rep else "pas de reponse", duree(pause)))
+            return False
+        self.sans_info.pop(cle, None)
+        adi = T.json_ou_none(rep[2]) or {}
+        ai = (adi.get("gaa") or {}).get("AI")
+        if self._est_camp(ai):
+            tour = list(ai)
+            if len(tour) > 5 and tour[5] == 1:            # mode paix du camp : pas attaquable pour l'instant
+                self.engagees[cle] = self.horloge() + 300
+                self._noter("   %s : en mode paix, pas attaquable pour l'instant ; camp saute 5 min." % nom)
+                return False
+        for essai in range(ESSAIS_TROP):
+            e = self._extra_a_essayer(pos)
+            try:
+                cra, info = self._construire(adi, pos, tour, kid, (cx, cy), extra=e)
+            except PlusDeSoldats as ex:
+                self.sans_stock[kid] = self.horloge() + tours.PAUSE_SANS_STOCK
+                self._noter("   %s Les corbeaux attendent %s (ou le retour d'un commandant)." % (ex, duree(tours.PAUSE_SANS_STOCK)))
+                return False
+            except ValueError as ex:
+                self.absents.add(pos)
+                self._noter("   %s : ce numero est ignore." % ex)
+                return False
+            if essai == 0:
+                for m in info["manques"][:3]:
+                    self._noter("   ATTENTION : " + m)
+            if self.simulation:
+                self._noter("[SIMULATION] commandant %d (%s) -> %s, %s : paquet NON envoye" % (pos, info["nom"], nom, tours.texte_vagues(info)))
+                self.libre_a[pos] = self.horloge() + 120
+                self.engagees[cle] = self.horloge() + 3600
+                self.nb_attaques += 1
+                return True
+            reste = self.dernier_envoi + tours.DELAI_MIN_ATTAQUES - self.horloge()
+            if reste > 0:
+                await self.dormir(reste)
+                if self.partage.urgence_prioritaire(self.NOM_MODULE):
+                    return False
+            await self._vider()
+            await self.jeu.envoyer("cra", cra)
+            self.dernier_envoi = self.horloge()
+            rep = await self.jeu.attendre("cra", 15)
+            d = T.json_ou_none(rep[2]) if rep else None
+            if rep and rep[1] == 0 and isinstance(d, dict) and "AAM" in d:
+                tt = (d["AAM"].get("M") or {}).get("TT") or 60
+                self._accepte(pos, e)
+                self.echecs = 0
+                self.nb_attaques += 1
+                self._compter(kid, cle)
+                self.libre_a[pos] = self.horloge() + 2 * tt + 15
+                self.royaume_du_commandant[pos] = kid
+                self.en_route[cle] = (pos, self.horloge() + tt)
+                self.engagees[cle] = self.horloge() + tt + self.ATTENTE_APRES_ATTAQUE
+                self.refus_commandant.pop(pos, None)
+                self.deja_signale_pris.pop(pos, None)
+                self.refus_suite = []
+                self._noter("ATTAQUE %d : commandant %d (%s) -> %s, dist %.1f, soldats %d par flanc / %d au centre, soldat %s, %d vague(s) "
+                            "dont %d d'engins, %d banniere(s), %d soldat(s) dans la cour, cheval %s, trajet %s"
+                            % (self.nb_attaques, pos, info["nom"], nom, info["distance"], info["plafond_flanc"], info["plafond_front"],
+                               info["soldat"], info["vagues"], info["vagues_engins"], info["bannieres"], info["cour"], info["cheval"], duree(tt)))
+                self._sauver_etat()
+                return True
+            if rep and rep[1] == CODE_TROP_DE_SOLDATS and info.get("cour") and e == self.extras.get(pos, [0, None])[0] \
+                    and pos not in self.sans_cour:
+                # vagues deja acceptees telles quelles par le jeu : c'est la cour qui est de trop ; ce commandant part sans
+                self.sans_cour.add(pos)
+                self._noter("   commandant %d : le jeu refuse %d soldats dans la cour ; il attaquera sans cour." % (pos, info["cour"]))
+                continue
+            if rep and rep[1] == CODE_TROP_DE_SOLDATS:
+                self._refuse(pos, e)
+                self._noter("   commandant %d : %d / %d soldats par flanc / au centre, c'est trop pour le jeu ; nouvel essai avec moins."
+                            % (pos, info["plafond_flanc"], info["plafond_front"]))
+                continue
+            if rep and rep[1] == tours.CODE_COMMANDANT_PRIS:
+                self.engagees.pop(cle, None)
+                self.libre_a[pos] = self.horloge() + tours.COMMANDANT_PRIS
+                if not self.deja_signale_pris.get(pos):
+                    self._noter("   commandant %d : le jeu dit qu'il est deja utilise (parti en dehors du bot ?) ; mis de cote %s."
+                                % (pos, duree(tours.COMMANDANT_PRIS)))
+                self.deja_signale_pris[pos] = True
+                self._sauver_etat()
+                return False
+            break
+        else:
+            self._noter("   commandant %d : %d refus de suite pour trop de soldats ; il reessaie au prochain passage." % (pos, ESSAIS_TROP))
+            return False
+        self.echecs += 1
+        self.refus_suite.append(pos)
+        n = self.refus_cibles[cle] = self.refus_cibles.get(cle, 0) + 1
+        pause = tours.CIBLE_REFUSEE[min(n, len(tours.CIBLE_REFUSEE)) - 1]
+        self.engagees[cle] = self.horloge() + pause
+        self._noter("   REFUS : commandant %d -> %s : %s ; camp laisse de cote %s, le commandant reste disponible."
+                    % (pos, nom, "code %s, reponse %s" % (rep[1], rep[2][:200]) if rep else "pas de reponse du jeu", duree(pause)))
+        self._sauver_etat()
+        return self._arret_si_trop_de_refus()
+
+    def _retour(self, payload):
+        """Message cat : notre armee est arrivee sur le camp ; M.TT = duree du retour."""
+        d = T.json_ou_none(payload) or {}
+        m = (d.get("A") or {}).get("M") or {}
+        sa = m.get("SA") or []
+        tt = m.get("TT")
+        if m.get("D") != 1 or len(sa) < 3 or not isinstance(tt, (int, float)):
+            return
+        cle = (m.get("KID", KID), sa[1], sa[2])
+        if cle not in self.en_route:
+            return
+        pos, arrivee = self.en_route.pop(cle)
+        self.libre_a[pos] = arrivee + tt + 1
+        self.arrivees += 1
+        self.engagees[cle] = self.horloge() + self.ATTENTE_APRES_ATTAQUE
+        self._sauver_etat()
+        self._noter("   commandant %d : arrive sur le camp (%d,%d), retour en %d s -> libre dans %s"
+                    % (pos, sa[1], sa[2], tt, duree(self.libre_a[pos] - self.horloge())))
+
+    # ---- lanceur commun
+    def commandants_gardes(self):
+        """Commandants que les AUTRES modules ne prennent pas (sauf ceux gardes par les forteresses pour une forteresse)."""
+        if self.fini:
+            return set()
+        f = self.partage.reservations.get("FORTERESSES")
+        return set(self.cfg["commandants"]) - (set(f()) if f is not None else set())
+
+    def progres(self):
+        """Pour l'interface (bot_etat.json) : sans relire la carte ni rien noter."""
+        camps = {(e[1], e[2]) for lu, entrees in self.cache.get(KID, {}).values() for e in entrees.values() if self._est_camp(e)}
+        t = self.horloge()
+        return {"evenement": "corbeaux", "attaques": self.nb_attaques, "en_route": len(self.en_route), "arrivees": self.arrivees,
+                "camps": len(camps), "max_attaques": self.max_corbeaux, "fini": self.fini,
+                "pause": "plus assez de soldats ou d'engins pour la vague 1" if self.sans_stock.get(KID, 0) > t else ""}
+
+    async def preparer(self):
+        """Cherche les camps autour du chateau (couronne par couronne) : aucun dans le rayon = l'evenement n'est pas en cours, ou
+        ce n'est pas le bon sous-module (demande du joueur : le bot doit s'en rendre compte et arreter ce module)."""
+        lu = await self._lire_legende()
+        if self.cfg.get("remplir_cour", True) and not await self._lire_niveau():
+            self._noter("   niveau du joueur pas lu (le jeu n'a pas repondu) : la cour restera vide jusqu'au premier combat.")
+        n = len(self._couronnes(KID))
+        while not self._tours_connues() and self.cran.get(KID, 0) < n:
+            await self._lire_cran(KID)
+        camps = sorted(self._tours_connues(), key=lambda k: math.hypot(k[1] - self.sources[KID]["x"], k[2] - self.sources[KID]["y"]))
+        if not camps:
+            self.fini = True
+            raise ArretModule("CORBEAUX DE SANG : aucun camp des Corbeaux de sang a moins de %d cases de ton chateau du vert. "
+                              "L'evenement n'est pas en cours, ou ce n'est pas le bon sous-module : dans la page Evenements, active "
+                              "celui de l'evenement en cours (Nomades ou Corbeaux de sang)." % self._reglages(KID)["rayon"])
+        self._noter("CORBEAUX DE SANG : %d camp(s) vu(s) pres du chateau (le plus proche en (%d,%d)) ; carte lue jusqu'a %d cases."
+                    % (len(camps), camps[0][1], camps[0][2], min(self._reglages(KID)["rayon"], self.cran.get(KID, 0) * tours.LARGEUR_CRAN)))
+        g = self.legende
+        self._noter("   competences de legende%s : +%d %% de soldats sur les flancs, +%d %% au centre, +%d outils par flanc, +%d vague(s) ; "
+                    "le reste du bonus de chaque commandant est appris du jeu (%d commandant(s) deja connu(s))."
+                    % ("" if lu else " (pas lues : le jeu n'a pas repondu)", g["flanc"], g["front"], g["outils"], g["vagues"],
+                       sum(1 for p in self.cfg["commandants"] if p in self.extras)))
+
+    def _terminer(self, raison):
+        self.fini = True
+        self._noter("CORBEAUX DE SANG : %s. Termine (%d attaque(s), %d arrivee(s)) ; les commandants %s sont rendus aux autres modules."
+                    % (raison, self.nb_attaques, self.arrivees, ";".join(str(p) for p in self.cfg["commandants"])))
+        raise ArretModule("CORBEAUX DE SANG : %s : le module Evenements s'arrete (les autres modules continuent)." % raison)
+
+    async def cycle(self):
+        try:
+            if self.max_corbeaux and self.nb_attaques >= self.max_corbeaux:
+                await self._absorber()            # plus de depart : on attend les arrivees (retours des commandants), puis arret
+                if not self.en_route:
+                    self._terminer("%d attaques envoyees (limite : %d)" % (self.nb_attaques, self.max_corbeaux))
+                return 5
+            return await super().cycle()
+        except BaseException:
+            self.fini = True
+            raise
+
+
 # ============================================================================== branchement dans le lanceur commun (src/bot.py)
 LANCEUR_NOM = "evenements"
 LANCEUR_ETIQUETTE = "EVENEMENTS"
@@ -948,12 +1728,43 @@ LANCEUR_CLE = ModuleNomades.NOM_MODULE
 LANCEUR_PRIORITE = -5          # comme Tours lev max : apres la defense ; avant les forteresses seulement pour sauter le blocage
 
 
-def config_module(tout):
-    """Reglages de la rubrique evenements -> configuration du module (ArretModule sinon)."""
+def config_corbeaux(tout):
+    """Reglages evenements.corbeaux -> configuration du sous-module Corbeaux de sang (ArretModule sinon)."""
     ev = tout.get(RUBRIQUE) if isinstance(tout, dict) else None
-    c = ev.get("nomades") if isinstance(ev, dict) else None
-    if not nomades_valides(c):
-        raise ArretModule("Evenements : les reglages des nomades sont invalides ou absents. Regle-les dans l'interface (page Evenements).")
+    c = ev.get("corbeaux") if isinstance(ev, dict) else None
+    if not corbeaux_valides(c):
+        raise ArretModule("Evenements : les reglages des Corbeaux de sang sont invalides ou absents. Regle-les dans l'interface "
+                          "(page Evenements).")
+    ct = tout.get("tours") if isinstance(tout.get("tours"), dict) else {}
+    bloc = {"mode": "auto", "cheval": c["cheval"], "echelles": False, "rayon": c.get("rayon", RAYON_CORBEAUX),
+            "cotes": combat.normaliser_cotes(c["cotes"]), "soldats": list(c["soldats"]), "soldat": c["soldats"][0]}
+    if c["cheval"] == "CF":
+        bloc["distance_plumes"] = c["distance_plumes"]
+    cfg = {"sous_module": "corbeaux", "commandants": list(c["commandants"]), "royaumes": [KID], "reglages": {str(KID): bloc},
+           "chateaux": dict(ct.get("chateaux") or {}), "vagues_base": ct.get("vagues_base", tours.NB_VAGUES_BASE), "avec_bonus": True,
+           "niveau_min": 0, "achat_echelles": False, "vagues_engins": c["vagues_engins"],
+           "engins": [{g: [list(p) for p in e[g]] for g in ("flanc", "centre")}
+                      for e in engins_par_vague(migrer_engins_corbeaux(c["engins"]), c["vagues_engins"])],
+           "bannieres": {"types": list(c["bannieres"]["types"]), "ordre": c["bannieres"]["ordre"]},
+           "soldats_suite": list(c.get("soldats_suite") or []), "max_attaques": c.get("max_attaques", 0),
+           "remplir_cour": c.get("remplir_cour", True)}
+    if "chateaux_manuels" in ct:
+        cfg["chateaux_manuels"] = ct["chateaux_manuels"]
+    return cfg
+
+
+def config_module(tout):
+    """Reglages de la rubrique evenements -> configuration du sous-module actif (nomades, corbeaux de sang ou samourais ;
+    ArretModule sinon)."""
+    ev = tout.get(RUBRIQUE) if isinstance(tout, dict) else None
+    genre = sous_module(ev)
+    if genre == "corbeaux":
+        return config_corbeaux(tout)
+    d = CAMPS[genre]
+    c = ev.get(genre) if isinstance(ev, dict) else None
+    if not nomades_valides(c, genre):
+        raise ArretModule("Evenements : les reglages des %s sont invalides ou absents. Regle-les dans l'interface (page Evenements)."
+                          % d["nom"].lower())
     ct = tout.get("tours") if isinstance(tout.get("tours"), dict) else {}
     bloc = {"mode": c["mode"], "cheval": c["cheval"], "echelles": False, "rayon": 50}
     if c["cheval"] == "CF":
@@ -965,10 +1776,11 @@ def config_module(tout):
     cfg = {"commandants": list(c["commandants"]), "royaumes": [KID], "reglages": {str(KID): bloc},
            "chateaux": dict(ct.get("chateaux") or {}), "vagues_base": ct.get("vagues_base", tours.NB_VAGUES_BASE), "avec_bonus": True,
            "niveau_min": 0, "achat_echelles": False, "kid": KID, "x": c["x"], "y": c["y"], "passes": list(c["passes"]),
-           "engins": {g: [list(p) for p in (c.get("engins") or ENGINS_DEFAUT)[g]] for g in ("flanc", "centre")},
+           "engins": {g: [list(p) for p in (c.get("engins") or d["defaut"])[g]] for g in ("flanc", "centre")},
            "coffres": dict(c.get("coffres") or {"actif": False, "types": [], "ordre": "forts"}),
            "soldats_suite": list(c.get("soldats_suite") or []),
-           "remplir_cour": bool(c.get("remplir_cour") or c.get("soldats_cour")), "max_attaques": c.get("max_attaques", 0), "max_tablettes": c.get("max_tablettes", 0)}
+           "remplir_cour": bool(c.get("remplir_cour") or c.get("soldats_cour")), "max_attaques": c.get("max_attaques", 0),
+           d["cle_max"]: c.get(d["cle_max"], 0), "sous_module": genre}
     if "chateaux_manuels" in ct:
         cfg["chateaux_manuels"] = ct["chateaux_manuels"]
     return cfg
@@ -978,13 +1790,14 @@ def lanceur_config(args, lire=None, sortie=print):
     cfg = config_module(tours.lire_config())
     sortie("")
     sortie("CONFIGURATION ENREGISTREE :")
-    for ligne in resume_config(cfg):
+    for ligne in (resume_corbeaux(cfg) if cfg.get("sous_module") == "corbeaux" else resume_config(cfg)):
         sortie("  - " + ligne)
     return cfg
 
 
 def lanceur_ressources(cfg, sortie=print):
-    return {"effets": tours.charger_effets(sortie), "camps": charger_camps(), "types_effets": charger_types_effets()}
+    return {"effets": tours.charger_effets(sortie), "camps": charger_camps(), "camps_samourais": charger_camps(zone=ZONE_SAMOURAIS),
+            "types_effets": charger_types_effets()}
 
 
 async def lanceur_demarrer(jeu, cfg, ressources, args, partage, sortie=print, lire=None):
@@ -998,8 +1811,15 @@ async def lanceur_demarrer(jeu, cfg, ressources, args, partage, sortie=print, li
         if not presets:
             raise ArretModule("Mode preselections : les preselections du compte ne sont pas chargees.")
     await tours.assurer_chevaux(jeu, cfg, sortie, lire, args.simulation)
-    module = ModuleNomades(jeu, cfg, sources, ressources["effets"], camps=ressources.get("camps"), types_effets=ressources.get("types_effets"),
-                           sortie=sortie, lire=lire, simulation=args.simulation, confirmer=False, presets=presets, partage=partage)
+    if cfg.get("sous_module") == "corbeaux":
+        module = ModuleCorbeaux(jeu, cfg, sources, ressources["effets"], types_effets=ressources.get("types_effets"),
+                                sortie=sortie, lire=lire, simulation=args.simulation, confirmer=False, partage=partage)
+    else:
+        samourais = cfg.get("sous_module") == "samourais"
+        classe = ModuleSamourais if samourais else ModuleNomades
+        module = classe(jeu, cfg, sources, ressources["effets"], camps=ressources.get("camps_samourais" if samourais else "camps"),
+                        types_effets=ressources.get("types_effets"), sortie=sortie, lire=lire, simulation=args.simulation, confirmer=False,
+                        presets=presets, partage=partage)
     partage.reservations[ModuleNomades.NOM_MODULE] = module.commandants_gardes
     await module.preparer()
     return module

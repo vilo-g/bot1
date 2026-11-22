@@ -1,9 +1,12 @@
 {
-  "version": 13,
-  "date": "17/11/2026",
+  "version": 14,
+  "date": "22/11/2026",
   "nouveautes": [
-    "Tours lev max : niveau maximum selon le monde (vert 81, feu 71, sables 61, glacier 51).",
-    "Passe-temps 5 min et 1 min (Tours lev max, nomades, Khan).",
-    "Tours lev max : ordre des passe-temps au choix, les plus forts d'abord ou les plus faibles d'abord (30 passe-temps au plus par blocage)."
+    "Défense : le château attaqué est ouvert avant de demander les infos de soutien (corrige la porte ouverte alors que les soldats avaient le temps de partir, surtout pour les avant-postes).",
+    "Défense : au rappel, le vrai temps de retour des soldats est lu dans le jeu.",
+    "Au lancement, les attaques annulées pendant que le bot était arrêté ne bloquent plus leur commandant ni leur cible.",
+    "Événements : nouveau sous-module Samouraïs (comme les nomades, avec les engins et coffres de jetons des samouraïs) ; un seul sous-module actif à la fois.",
+    "Corbeaux de sang : 1 à 3 vagues d'engins, bons noms et images des engins, tours de gloire, cour remplie de soldats.",
+    "Recrutement : vérification au lancement puis toutes les heures."
   ]
 }

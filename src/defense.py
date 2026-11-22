@@ -23,7 +23,8 @@ Fonctionnement :
       * dans les 30 dernieres secondes : chaque armee qui rentre repart aussitot, une par une, avec son commandant.
     Porte (option) : seulement si un envoi echoue (commandant, refus du jeu), jamais pendant l'attente d'un retour.
 Messages du jeu (capture du 08/11) : gam (attaque annoncee), gdi/ain (joueurs, alliance, temps de protection RPT),
-sdi (infos de soutien : soldats du chateau, commandants), cds (envoi du soutien), mcm (rappel), mos (porte, 2 temps : prix
+sdi (infos de soutien : soldats du chateau, commandants ; apres jca du chateau attaque, car sdi se lit dans le monde du
+dernier chateau ouvert), cds (envoi du soutien), mcm (rappel), mos (porte, 2 temps : prix
 annonce puis confirmation). Armees du bot : cra (armee partie : AAM.M, SA = chateau de depart, TT = trajet aller,
 AAM.UM.L.ID = commandant), cat (armee sur la cible, retour : A.M avec D = 1, TA = chateau ou elle rentre, TT = duree du
 retour), mrm (mouvement termine : l'armee est rentree).
@@ -61,6 +62,22 @@ DELAI_ARRIVEE = 2                   # secondes apres le retour d'une armee avant
 RETOUR_ESTIME = 0.5                 # armee partie (cra) : retour estime = arrivee sur la cible + 50 % du trajet aller
                                     # (le retour reel, souvent 3 fois plus court, est donne par le message cat)
 REESSAI_PROCHE = 3                  # a moins d'1 min de l'attaque : envoi rate reessaye toutes les 3 s (20 s sinon)
+
+
+def retour_rappel(d):
+    """Reponse a mcm (rappel) -> (secondes avant le retour au chateau, MID, commandant (ID)) d'apres le mouvement de retour
+    du jeu (A.M : TT, PT ; A.UM.L.ID), ou None si la reponse ne les donne pas."""
+    a = d.get("A") if isinstance(d, dict) else None
+    m = a.get("M") if isinstance(a, dict) else None
+    if not isinstance(m, dict):
+        return None
+    tt, pt = m.get("TT"), m.get("PT")
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (tt, pt)):
+        return None
+    um = a.get("UM")
+    lord = um.get("L") if isinstance(um, dict) else None
+    lid = lord.get("ID") if isinstance(lord, dict) and isinstance(lord.get("ID"), int) else None
+    return max(0, tt - pt), m.get("MID"), lid
 
 
 def nom_monde(kid):
@@ -540,6 +557,13 @@ class ModuleDefense:
         libres.sort(key=lambda pc: (prefere is not None and pc[1]["ID"] != prefere, pc[0] != prioritaire, pc[0] in modules, pc[0]))
         return libres
 
+    async def _ouvrir_chateau(self, cid, kid):
+        """Ouvre le chateau attaque (jca), comme le jeu quand on le choisit, avant de demander les infos de soutien (sdi). sdi ne
+        donne pas le monde : le jeu lit ses coordonnees dans le monde du dernier chateau ouvert, et les autres modules (tours,
+        recrutement, achats) en ouvrent dans tous les mondes. Le 20/11 : avant-postes du feu, du glacier et des sables refuses
+        en boucle (codes 203 INVALID_AREA et 6 INVALID_POSITION, une fenetre d'erreur du jeu a chaque essai)."""
+        await self._demander("jca", {"CID": cid, "KID": kid}, attendu="jaa", delai=5)
+
     def _echec(self, cid, raison):
         """Envoi rate. Apres un envoi reussi, un nouvel envoi rate (commandant, refus du jeu) autorise la porte ; le jeu muet sur
         les infos de soutien, non (cas du 11/11 : envoi reussi puis infos refusees -> pas de porte pour rien)."""
@@ -558,6 +582,7 @@ class ModuleDefense:
             self._echec(cid, "aucun protege")
             return False
         dist, p = cible
+        await self._ouvrir_chateau(cid, c["kid"])
         # la reponse sdi est grosse (~86 Ko) et lente quand le jeu est charge : 20 s d'attente, moins si l'attaque est proche
         sp = self.cfg.get("secondes_porte", SECONDES_PORTE)
         reste = (premiere if premiere is not None else fin_attaque) - self.horloge()
@@ -667,19 +692,31 @@ class ModuleDefense:
         return REESSAI_PROCHE if reste <= 60 else VERIF_SOLDATS
 
     async def _rappeler(self, cid):
+        """Rappel des soldats (mcm). Le jeu repond avec le mouvement de retour : sa duree reelle (TT - PT, bonus de vitesse
+        compris) est gardee ; 20/11 : l'estimation (temps deja parcouru + 30 s) donnait 4 min pour un retour de 50 s. Le retour
+        est suivi comme celui d'une armee du bot : une nouvelle attaque sur ce chateau pendant le retour attend les soldats
+        (ils repartent ensemble a leur arrivee) au lieu de trouver le chateau vide."""
         t = self.horloge()
-        fin = t
+        fin, exact = t, True
         for e in self.envois.pop(cid, []):
+            reel = None
             if not self.simulation:
                 rep = await self._demander("mcm", {"MID": e["mid"]})
                 if not rep or rep[1] != 0:
                     self._noter("   rappel refuse par le jeu (%s) : les soldats rentreront seuls a la fin du stationnement."
                                 % ("code %s" % rep[1] if rep else "pas de reponse"))
-            retour = min(t - e["depart"], e["tt"]) + 30
+                reel = retour_rappel(T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None)
+            if reel is not None:
+                reste, mid, lid = reel
+                retour = reste + 2
+                self._noter_retour(cid, t + reste, lid, mid, True)
+            else:
+                retour, exact = min(t - e["depart"], e["tt"]) + 30, False
             fin = max(fin, t + retour)
             self.partage.libre_a[e["pos"]] = t + retour
         self.retours[cid] = fin
-        self._noter("RAPPEL : attaque passee sur %s, soldats rappeles (retour dans %s environ)." % (self._nom_chateau(cid), duree(fin - t)))
+        self._noter("RAPPEL : attaque passee sur %s, soldats rappeles (retour dans %s%s)."
+                    % (self._nom_chateau(cid), duree(fin - t), "" if exact else " environ"))
 
     async def _ouvrir_porte(self, cid):
         c = self.chateaux[cid]

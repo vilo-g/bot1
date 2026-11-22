@@ -52,7 +52,7 @@ DOSSIER_IMAGES = os.path.join(ICI, "images")
 NOMS_UNITES = {215: "Vierge à bouclier", 2069: "Guerrier à arc court relique", 2029: "Guerrier à hache relique",
                6: "Frondeur vétéran", 35: "Lanceur de kunai renégat",
                10: "Horreur mortelle vétéran", 9: "Horreur démoniaque vétéran"}     # noms avec accents pour la page
-VERSION = "2026-11-17-levmax1"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
+VERSION = "2026-11-20-samourais1"   # doit etre egale a VERSION dans interface.html (la page previent si l'interface n'a pas ete relancee)
 ETAT_PERIME = 30            # secondes : sans nouvelle du bot depuis plus longtemps, on le considere arrete
 JOURNAUX = {"bot": lambda: bot.FICHIER_CONSOLE, "tours": lambda: tours.FICHIER_JOURNAL,
             "forteresses": lambda: forteresses.FICHIER_JOURNAL}
@@ -593,25 +593,57 @@ def normaliser_materiaux(data, ancienne=None):
 NOMS_ENGINS_NOMADES = {740: "Échelle en tronc", 168: "Échelle en tronc améliorée", 142: "Échelle combinée d'élite",
                        738: "Bélier de feu", 167: "Bélier de feu amélioré", 141: "Bélier combiné d'élite",
                        739: "Boucliers roulants", 169: "Boucliers roulants améliorés", 143: "Bouclier combiné d'élite", 635: "Mur de boucliers"}
+# samouraïs (20/11) : noms du fichier de langue français du jeu
+NOMS_ENGINS_SAMOURAIS = {26: "Échelle pliante", 171: "Échelle du shogun", 25: "Briseur de portes", 170: "Bélier du shogun",
+                         27: "Bouclier orientable", 172: "Bouclier du shogun", 651: "Mur de boucliers"}
+NOMS_COFFRES_SAMOURAIS = {30: "Boîte de jetons de samouraïs", 31: "Coffre de jetons de samouraïs", 165: "Coffret du shogun",
+                          166: "Coffre du shogun", 406: "Grand coffre de jetons de samouraïs", 407: "Énorme coffre de jetons de samouraïs",
+                          510: "Coffre à médaillons de samouraïs géants", 511: "Énorme coffre à jetons du samouraï",
+                          512: "Coffre de samouraïs colossaux"}
+NOMS_CAMPS = {"nomades": ("Nomades", NOMS_ENGINS_NOMADES, "tablettes"), "samourais": ("Samouraïs", NOMS_ENGINS_SAMOURAIS, "jetons"),
+              "khan": ("Khan", NOMS_ENGINS_NOMADES, "tablettes")}
+
+
+# noms du jeu (fichier de langue francais, lu le 18/11) ; seulement les engins qui ont une image (choix du joueur, 18/11)
+NOMS_ENGINS_CORBEAUX = {154: "Bélier royal", 648: "Bélier lourd", 611: "Bélier", 156: "Échelle royale", 649: "Beffroi",
+                        614: "Échelle de siège", 158: "Pont royal", 650: "Pierres", 160: "Bouclier royal", 651: "Mur de boucliers",
+                        620: "Mantelet", 256: "Tour de gloire"}
+NOMS_BANNIERES_CORBEAUX = {660: "Bannière", 661: "Oriflamme de guerre", 77: "Bannière du héros", 24: "Bannière du triomphe",
+                           774: "Bannière des envahisseurs", 734: "Étendard à queue de cheval", 152: "Bannière royale",
+                           153: "Bannière du roi", 239: "Bannière du baron", 240: "Bannière de l'empereur",
+                           474: "Bannière de la grande reine", 475: "Bannière du Haut Roi", 476: "Étendard du roi suprême"}
+def _texte_engin_corbeaux(w):
+    """Effet de l'engin (et sa gloire) sous son image : 'tirs -15 %, gloire +6 %' (2 lignes dans la grille) ; la tour de gloire :
+    son niveau le plus haut (celui que le bot prend s'il en a)."""
+    _, _, effet, gloire = evenements.ENGINS_CORBEAUX[w]
+    return effet.replace(" ", "\u00a0") + (", gloire\u00a0+%d\u00a0%%" % gloire if gloire else "")
+
+
+def _config_evenements_page(c):
+    """Rubrique evenements de config.json pour la page : anciens engins des corbeaux remplaces (evenements.REMPLACES_CORBEAUX)."""
+    if not isinstance(c, dict) or not isinstance(c.get("corbeaux"), dict):
+        return c
+    return dict(c, corbeaux=dict(c["corbeaux"], engins=evenements.migrer_engins_corbeaux(c["corbeaux"].get("engins"))))
 
 
 def _image(dossier, nom):
     return "images/%s/%s.png" % (dossier, nom) if os.path.exists(os.path.join(DOSSIER_IMAGES, dossier, "%s.png" % nom)) else None
 
 
-def _engins_nomades(liste, nom, cases, erreurs):
-    """[[id, quantite], ...] de la page -> liste validee (cases vides ignorees)."""
+def _engins_nomades(liste, nom, cases, erreurs, genre="nomades"):
+    """[[id, quantite], ...] de la page -> liste validee (cases vides ignorees) ; genre : "nomades" ou "samourais"."""
+    d = evenements.CAMPS[genre]
     res = []
     for p in liste if isinstance(liste, list) else []:
         if not isinstance(p, list) or len(p) != 2 or p[0] in (None, "", 0):
             continue
-        if p[0] not in evenements.ENGINS:
+        if p[0] not in d["engins"]:
             erreurs.append("%s : engin inconnu." % nom)
             return None
-        if cases == 2 and p[0] not in evenements.ENGINS_FLANC:
+        if cases == 2 and p[0] not in d["flanc"]:
             erreurs.append("%s : pas de bélier sur un flanc (les béliers vont au centre)." % nom)
             return None
-        q = _entier(p[1], "%s, %s" % (nom, NOMS_ENGINS_NOMADES[p[0]]), 1, evenements.QUANTITE_MAX, erreurs)
+        q = _entier(p[1], "%s, %s" % (nom, NOMS_CAMPS[genre][1][p[0]]), 1, evenements.QUANTITE_MAX, erreurs)
         if q is None:
             return None
         res.append([p[0], q])
@@ -630,18 +662,96 @@ def normaliser_evenements(data, ancienne=None):
     Une partie absente de la page (pas remplie) est retiree des reglages."""
     erreurs = []
     cfg = dict(ancienne) if isinstance(ancienne, dict) else {}
-    for genre in ("nomades", "khan"):
+    for genre in ("nomades", "khan", "samourais"):
         if isinstance(data.get(genre), dict):
             cfg[genre] = _normaliser_camp(data[genre], genre, erreurs)
         else:
             cfg.pop(genre, None)
+    if isinstance(data.get("corbeaux"), dict):
+        cfg["corbeaux"] = _normaliser_corbeaux(data["corbeaux"], erreurs)
+    else:
+        cfg.pop("corbeaux", None)
+    if "actif" in data:                                  # 18/11 : un seul sous-module du module Evenements tourne
+        if data["actif"] not in evenements.SOUS_MODULES:
+            erreurs.append("Événements : choisis le sous-module à activer (Nomades, Corbeaux de sang ou Samouraïs).")
+        else:
+            cfg["actif"] = data["actif"]
     if erreurs:
         raise ErreurSaisie(erreurs)
     return cfg
 
 
+def _engins_corbeaux(liste, nom, cases, erreurs):
+    """[[id, quantite], ...] de la grille des vagues d'engins des corbeaux -> liste validee (cases vides ignorees)."""
+    res = []
+    for p in liste if isinstance(liste, list) else []:
+        if not isinstance(p, list) or len(p) != 2 or p[0] in (None, "", 0):
+            continue
+        if p[0] not in evenements.ENGINS_CORBEAUX:
+            erreurs.append("%s : engin inconnu." % nom)
+            return None
+        if cases == 2 and p[0] not in evenements.ENGINS_CORBEAUX_FLANC:
+            erreurs.append("%s : pas de bélier sur un flanc (les béliers vont au centre)." % nom)
+            return None
+        q = _entier(p[1], "%s, %s" % (nom, NOMS_ENGINS_CORBEAUX[p[0]]), 1, evenements.PLACE_CORBEAUX, erreurs)
+        if q is None:
+            return None
+        res.append([p[0], q])
+    if len(res) > cases or len({p[0] for p in res}) != len(res):
+        erreurs.append("%s : %d engins différents au plus." % (nom, cases))
+        return None
+    if sum(p[1] for p in res) > evenements.PLACE_CORBEAUX:
+        erreurs.append("%s : %d engins au plus en tout (%d choisis)." % (nom, evenements.PLACE_CORBEAUX, sum(p[1] for p in res)))
+        return None
+    return res
+
+
+def _normaliser_corbeaux(d, erreurs):
+    """Reglages des Corbeaux de sang de la page Evenements -> dict valide (evenements.corbeaux_valides), ou None (erreurs ajoutees)."""
+    nb = len(erreurs)
+    n = {"commandants": _commandants(d.get("commandants", ""), erreurs)}
+    b = {}
+    _reglages_communs(dict(d, mode="auto"), "Corbeaux de sang", erreurs, b)
+    n.update({k: v for k, v in b.items() if k != "mode"})
+    for cle, mini, texte in (("soldats", 1, "des vagues d'engins"), ("soldats_suite", 0, "des vagues de bannières")):
+        s = d.get(cle, [])
+        if not (isinstance(s, list) and mini <= len(s) <= tours.NB_SOLDATS_MAX and len(set(s)) == len(s)
+                and all(isinstance(u, int) and not isinstance(u, bool) and u > 0 for u in s)):
+            erreurs.append("Corbeaux de sang : choisis de %d à %d unités de soldats %s." % (mini, tours.NB_SOLDATS_MAX, texte))
+        else:
+            n[cle] = list(s)
+    ve = n["vagues_engins"] = _entier(d.get("vagues_engins", 1), "Corbeaux de sang, vagues d'engins", 1, evenements.VAGUES_ENGINS_MAX, erreurs)
+    grilles = evenements.migrer_engins_corbeaux(d.get("engins"))
+    grilles = [grilles] * (ve or 1) if isinstance(grilles, dict) else grilles if isinstance(grilles, list) else []
+    n["engins"] = []
+    for i in range(ve or 0):
+        e = grilles[i] if i < len(grilles) and isinstance(grilles[i], dict) else {}
+        g = {"flanc": _engins_corbeaux(e.get("flanc"), "Corbeaux de sang, vague d'engins %d, chaque flanc" % (i + 1), 2, erreurs),
+             "centre": _engins_corbeaux(e.get("centre"), "Corbeaux de sang, vague d'engins %d, centre" % (i + 1), 3, erreurs)}
+        if g["flanc"] == [] and g["centre"] == []:
+            erreurs.append("Corbeaux de sang : choisis au moins un engin pour la vague d'engins %d." % (i + 1))
+        if g["flanc"] is not None and g["centre"] is not None:
+            for w, q, lim in evenements.depasse_limite(g, n.get("cotes")):
+                erreurs.append("Corbeaux de sang, vague d'engins %d : %s, %d au plus par vague (chaque flanc + centre), %d choisis."
+                               % (i + 1, NOMS_ENGINS_CORBEAUX[w], lim, q))
+        n["engins"].append(g)
+    k = d.get("bannieres") if isinstance(d.get("bannieres"), dict) else {}
+    n["bannieres"] = {"types": [w for w in evenements.BANNIERES_CORBEAUX if w in (k.get("types") or [])],
+                      "ordre": "faibles" if k.get("ordre") == "faibles" else "forts"}
+    n["rayon"] = _entier(d.get("rayon", evenements.RAYON_CORBEAUX), "Corbeaux de sang, rayon de recherche des camps", 5, 100, erreurs)
+    n["max_attaques"] = _entier(d.get("max_attaques", 0), "Corbeaux de sang, arrêt après un nombre d'attaques", 0, 10 ** 6, erreurs)
+    if len(erreurs) > nb:
+        return None
+    if not evenements.corbeaux_valides(n):
+        erreurs.append("Corbeaux de sang : réglages incomplets.")
+        return None
+    n["remplir_cour"] = bool(d.get("remplir_cour", True))
+    return n
+
+
 def _normaliser_camp(d, genre, erreurs):
     khan = genre == "khan"
+    tables = evenements.CAMPS["samourais" if genre == "samourais" else "nomades"]
     nb_avant = len(erreurs)
     n = {}
     if not khan:
@@ -663,10 +773,11 @@ def _normaliser_camp(d, genre, erreurs):
         else:
             n["soldats_suite"] = list(s2)
         e = d.get("engins") if isinstance(d.get("engins"), dict) else {}
-        n["engins"] = {"flanc": _engins_nomades(e.get("flanc"), "Engins de la vague 1, flanc", 2, erreurs),
-                       "centre": _engins_nomades(e.get("centre"), "Engins de la vague 1, centre", 3, erreurs)}
+        g_eng = "samourais" if genre == "samourais" else "nomades"
+        n["engins"] = {"flanc": _engins_nomades(e.get("flanc"), "Engins de la vague 1, flanc", 2, erreurs, g_eng),
+                       "centre": _engins_nomades(e.get("centre"), "Engins de la vague 1, centre", 3, erreurs, g_eng)}
         k = d.get("coffres") if isinstance(d.get("coffres"), dict) and not khan else {}
-        types = [w for w in evenements.COFFRES if w in (k.get("types") or [])]
+        types = [w for w in tables["coffres"] if w in (k.get("types") or [])]
         if k.get("actif") and not types:
             erreurs.append("Nomades : coche au moins un coffre, ou désactive les coffres.")
         n["coffres"] = {"actif": bool(k.get("actif")), "types": types, "ordre": "faibles" if k.get("ordre") == "faibles" else "forts"}
@@ -687,14 +798,15 @@ def _normaliser_camp(d, genre, erreurs):
             n["defense"] = _defense_khan(d.get("defense"), erreurs)
     else:
         n["max_attaques"] = _entier(d.get("max_attaques", 0), "Nomades, arrêt après un nombre d'attaques", 0, 10 ** 6, erreurs)
-        n["max_tablettes"] = _entier(d.get("max_tablettes", 0), "Nomades, arrêt après un nombre de tablettes", 0, 10 ** 9, erreurs)
+        cle = tables["cle_max"]
+        n[cle] = _entier(d.get(cle, 0), "Nomades, arrêt après un nombre de %s" % NOMS_CAMPS[genre][2], 0, 10 ** 9, erreurs)
     if len(erreurs) > nb_avant:
-        if khan:
-            erreurs[nb_avant:] = [e.replace("Nomades", "Khan") for e in erreurs[nb_avant:]]
+        if genre != "nomades":
+            erreurs[nb_avant:] = [e.replace("Nomades", NOMS_CAMPS[genre][0]) for e in erreurs[nb_avant:]]
         return None
     n["passes"] = [c for c in montee.PASSES if c in p]
-    if not (evenements.khan_valides(n) if khan else evenements.nomades_valides(n)):
-        erreurs.append("%s : réglages incomplets." % ("Khan" if khan else "Nomades"))
+    if not (evenements.khan_valides(n) if khan else evenements.nomades_valides(n, "samourais" if genre == "samourais" else "nomades")):
+        erreurs.append("%s : réglages incomplets." % NOMS_CAMPS[genre][0])
         return None
     return n
 
@@ -762,7 +874,13 @@ def _defense_khan(d, erreurs):
 
 
 def evenements_valides(c):
-    return isinstance(c, dict) and evenements.nomades_valides(c.get("nomades"))
+    """Module Evenements : les reglages du sous-module ACTIF (18/11 : nomades ou corbeaux de sang)."""
+    if not isinstance(c, dict):
+        return False
+    genre = evenements.sous_module(c)
+    if genre == "corbeaux":
+        return evenements.corbeaux_valides(c.get("corbeaux"))
+    return evenements.nomades_valides(c.get(genre), genre)
 
 
 def demarrer_bot(lanceur, popen=subprocess.Popen):
@@ -817,7 +935,7 @@ def tout_etat():
                        "achats": tout.get(achats.RUBRIQUE), "defense": tout.get(defense.RUBRIQUE),
                        "transferts": tout.get(transferts.RUBRIQUE), "recrutement": tout.get(recrutement.RUBRIQUE),
                        "materiaux": tout.get(materiaux.RUBRIQUE), "montee": tout.get(montee.RUBRIQUE),
-                       "evenements": tout.get(evenements.RUBRIQUE)},
+                       "evenements": _config_evenements_page(tout.get(evenements.RUBRIQUE))},
             "evenements": {"engins": [[w, NOMS_ENGINS_NOMADES[w], evenements.ENGINS[w][1], _image("engins", w), famille]
                                       for famille, ids in evenements.FAMILLES_ENGINS.items() for w in ids],
                            "logo_nomades": _image("evenements", "nomades"), "logo_khan": _image("evenements", "khan"),
@@ -832,7 +950,20 @@ def tout_etat():
                            "seuil_case": khan_defense.SEUIL_CASE, "seuil_achat": khan_defense.SEUIL_ACHAT, "lot_achat": khan_defense.LOT_ACHAT,
                            "reserve_pieces": tours.PIECES_RESERVE, "engins_pieces": sorted(w for w in khan_defense.ENGINS_DEFENSE if w in achats.ENGINS),
                            "engins_defaut": evenements.ENGINS_DEFAUT, "quantite_max": evenements.QUANTITE_MAX,
-                           "place_engins": evenements.PLACE_ENGINS},
+                           "place_engins": evenements.PLACE_ENGINS,
+                           "samourais": {"engins": [[w, NOMS_ENGINS_SAMOURAIS[w], evenements.ENGINS_SAMOURAIS[w][1], _image("engins", w), famille]
+                                                    for famille, ids in evenements.FAMILLES_SAMOURAIS.items() for w in ids],
+                                         "coffres": [[w, b, NOMS_COFFRES_SAMOURAIS[w], _image("engins", w)]
+                                                     for w, b in evenements.COFFRES_SAMOURAIS.items()],
+                                         "engins_defaut": evenements.ENGINS_SAMOURAIS_DEFAUT, "logo": _image("evenements", "samourais")},
+                           "corbeaux": {"engins": [[w, NOMS_ENGINS_CORBEAUX[w], _texte_engin_corbeaux(w), _image("engins", w),
+                                                    v[1], evenements.LIMITE_PAR_VAGUE.get(w)]
+                                                   for w, v in evenements.ENGINS_CORBEAUX.items()],
+                                        "bannieres": [[w, NOMS_BANNIERES_CORBEAUX[w], b, _image("engins", w)]
+                                                      for w, b in sorted(evenements.BANNIERES_CORBEAUX.items(), key=lambda x: (x[1], x[0]))],
+                                        "place": evenements.PLACE_CORBEAUX, "vagues_max": evenements.VAGUES_ENGINS_MAX,
+                                        "rayon": evenements.RAYON_CORBEAUX, "engins_defaut": evenements.ENGINS_CORBEAUX_DEFAUT,
+                                        "logo": _image("evenements", "corbeaux")}},
             "montee": {"niveaux_max": niveaux_max_montee(), "niveau_vise": montee.NIVEAU_VISE, "niveau_max": montee.NIVEAU_MAX_SAISIE,
                        "niveaux_max_mondes": {str(k): v for k, v in montee.NIVEAUX_MAX.items()},
                        "passes": [[c, montee.NOMS_PASSES[c]] for c in montee.PASSES]},

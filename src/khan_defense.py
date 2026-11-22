@@ -34,6 +34,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import achats           # noqa: E402
 import combat           # noqa: E402
+import defense          # noqa: E402
 import tours            # noqa: E402
 from tours import T, duree   # noqa: E402
 
@@ -239,6 +240,13 @@ class DefenseKhan:
 
     async def _demander(self, cmd, donnees, delai=15):
         return await self.m._demander(cmd, donnees, delai)
+
+    async def _ouvrir_chateau(self):
+        """Ouvre le chateau du Khan (jca, reponse jaa) comme le jeu quand on le choisit : les achats y arrivent, et sdi se lit
+        dans le monde du dernier chateau ouvert (voir defense.ModuleDefense._ouvrir_chateau, 20/11)."""
+        await self.m._vider()
+        await self.m.jeu.envoyer("jca", {"CID": self.c["id"], "KID": KID})
+        return await self.m.jeu.attendre("jaa", 5)
 
     def _base(self):
         return {"CX": self.c["x"], "CY": self.c["y"], "AID": self.c["id"]}
@@ -544,7 +552,7 @@ class DefenseKhan:
                     self.achat_pause[w] = t + PAUSE_ACHAT
                     break
                 if not selection:                                # l'achat arrive dans le chateau selectionne
-                    await self._demander("jca", {"CID": self.c["id"], "KID": KID}, 10)
+                    await self._ouvrir_chateau()
                     selection = True
                 rep = await self._demander("sbp", {"PID": achats.ENGINS[w][1], "BT": 0, "TID": 27, "AMT": tours.ACHAT_PAR_MESSAGE,
                                                    "KID": KID, "AID": -1, "PC2": -1, "BA": 0, "PWR": 0, "_PO": -1}, 10)
@@ -632,6 +640,7 @@ class DefenseKhan:
         """Envoie les soldats defensifs NON choisis chez le joueur protege (coordonnees de l'interface)."""
         self.soldats_lus = self.m.horloge()
         a = self.cfg["abri"]
+        await self._ouvrir_chateau()                     # sdi se lit dans le monde du dernier chateau ouvert
         rep = await self._demander("sdi", {"TX": a["x"], "TY": a["y"], "SX": self.c["x"], "SY": self.c["y"]}, 20)
         d = T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None
         if not isinstance(d, dict):
@@ -694,7 +703,9 @@ class DefenseKhan:
             if not rep or rep[1] != 0:
                 self._noter("   KHAN : rappel refuse (%s) : ces soldats rentreront seuls a la fin des %d h."
                             % ("code %s" % rep[1] if rep else "pas de reponse", HEURES_SOUTIEN))
-            self.m.partage.libre_a[e["pos"]] = self.m.horloge() + 1800
+            reel = defense.retour_rappel(T.json_ou_none(rep[2]) if rep and rep[1] == 0 else None)
+            # duree reelle du retour donnee par le jeu (20/11) ; sinon 30 min par prudence
+            self.m.partage.libre_a[e["pos"]] = self.m.horloge() + (reel[0] + 2 if reel else 1800)
         if self.envois:
             self._noter("KHAN : soldats envoyes chez le joueur protege rappeles.")
         self.envois = []
